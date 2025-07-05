@@ -1,22 +1,35 @@
-import { Trip, TripType, PackingItem, Meal, GearItem, ShoppingItem, CampingGroup } from '../types';
+import { Trip, PackingItem, Meal, GearItem, ShoppingItem, CampingGroup, GROUP_COLORS } from '../types';
+import { TripSchema, PackingItemSchema, MealSchema, GearItemSchema, ShoppingItemSchema, validateData } from '../schemas';
+import {
+  getTripsFromDB,
+  saveTripToDB,
+  deleteTripFromDB,
+  getPackingListFromDB,
+  savePackingListToDB,
+  getMealsFromDB,
+  saveMealsToDB,
+  getGearFromDB,
+  saveGearToDB,
+  deleteGearFromDB,
+  getShoppingListFromDB,
+  saveShoppingListToDB,
+  addToShoppingListDB,
+  initDB
+} from './db';
 
-const TRIPS_KEY = 'trips';
-const PACKING_LIST_KEY_PREFIX = 'packing_list_';
-const MEALS_KEY = 'campme_meals_';
-const SHOPPING_LIST_KEY = 'shopping_list';
+// Initialize database
+initDB().catch(console.error);
 
-export const GROUP_COLORS = [
-  '#4299E1', // Blue
-  '#48BB78', // Green
-  '#ED8936', // Orange
-  '#9F7AEA', // Purple
-  '#F56565'  // Red
-];
+// Generate unique IDs
+export const generateId = (): string => {
+  return crypto.randomUUID ? crypto.randomUUID() : 
+    Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
 
 type OldTripFormat = {
   id: string;
   groupSize?: number;
-  type: 'car' | 'backcountry' | 'canoe' | TripType;
+  type: 'car' | 'backcountry' | 'canoe' | string;
   startDate: string;
   endDate: string;
   tripName: string;
@@ -24,117 +37,205 @@ type OldTripFormat = {
 };
 
 // Trip Storage
-export const getTrips = (): Trip[] => {
-  const tripsJson = localStorage.getItem(TRIPS_KEY);
-  return tripsJson ? JSON.parse(tripsJson) : [];
-};
-
-export const saveTrip = async (trip: Trip) => {
-  const trips = await getTrips();
-  const index = trips.findIndex(t => t.id === trip.id);
-  if (index >= 0) {
-    trips[index] = trip;
-  } else {
-    trips.push(trip);
+export const getTrips = async (): Promise<Trip[]> => {
+  try {
+    const trips = await getTripsFromDB();
+    return trips;
+  } catch (error) {
+    console.error('Failed to get trips:', error);
+    return [];
   }
-  await localStorage.setItem(TRIPS_KEY, JSON.stringify(trips));
 };
 
-export const saveTrips = async (trips: Trip[]) => {
-  await localStorage.setItem(TRIPS_KEY, JSON.stringify(trips));
+export const saveTrip = async (trip: Trip): Promise<boolean> => {
+  const validation = validateData(TripSchema, trip);
+  if (!validation.success) {
+    console.error('Invalid trip data:', validation.error);
+    return false;
+  }
+
+  try {
+    await saveTripToDB(validation.data);
+    return true;
+  } catch (error) {
+    console.error('Failed to save trip:', error);
+    return false;
+  }
 };
 
-export const deleteTrip = (tripId: string) => {
-  const trips = getTrips().filter(trip => trip.id !== tripId);
-  localStorage.setItem(TRIPS_KEY, JSON.stringify(trips));
-  
-  // Clean up related data
-  localStorage.removeItem(`${PACKING_LIST_KEY_PREFIX}${tripId}`);
-  localStorage.removeItem(`${MEALS_KEY}${tripId}`);
-  localStorage.removeItem(`${SHOPPING_LIST_KEY}${tripId}`);
+export const saveTrips = async (trips: Trip[]): Promise<boolean> => {
+  try {
+    for (const trip of trips) {
+      const validation = validateData(TripSchema, trip);
+      if (!validation.success) {
+        console.error('Invalid trip data:', validation.error);
+        return false;
+      }
+      await saveTripToDB(validation.data);
+    }
+    return true;
+  } catch (error) {
+    console.error('Failed to save trips:', error);
+    return false;
+  }
+};
+
+export const deleteTrip = async (tripId: string): Promise<void> => {
+  try {
+    await deleteTripFromDB(tripId);
+  } catch (error) {
+    console.error('Failed to delete trip:', error);
+  }
 };
 
 // Packing List Storage
-export const getPackingList = (tripId: string): PackingItem[] => {
-  const listJson = localStorage.getItem(`${PACKING_LIST_KEY_PREFIX}${tripId}`);
-  return listJson ? JSON.parse(listJson) : [];
+export const getPackingList = async (tripId: string): Promise<PackingItem[]> => {
+  try {
+    const items = await getPackingListFromDB(tripId);
+    return items;
+  } catch (error) {
+    console.error('Failed to get packing list:', error);
+    return [];
+  }
 };
 
-export const savePackingList = (tripId: string, items: PackingItem[]) => {
-  localStorage.setItem(`${PACKING_LIST_KEY_PREFIX}${tripId}`, JSON.stringify(items));
+export const savePackingList = async (tripId: string, items: PackingItem[]): Promise<boolean> => {
+  try {
+    for (const item of items) {
+      const validation = validateData(PackingItemSchema, item);
+      if (!validation.success) {
+        console.error('Invalid packing item:', validation.error);
+        return false;
+      }
+    }
+    await savePackingListToDB(tripId, items);
+    return true;
+  } catch (error) {
+    console.error('Failed to save packing list:', error);
+    return false;
+  }
 };
 
 // Meals Storage
-export const getMeals = (tripId: string): Meal[] => {
-  const mealsJson = localStorage.getItem(`${MEALS_KEY}${tripId}`);
-  return mealsJson ? JSON.parse(mealsJson) : [];
-};
-
-export const saveMeals = (tripId: string, meals: Meal[]) => {
-  localStorage.setItem(`${MEALS_KEY}${tripId}`, JSON.stringify(meals));
-};
-
-// Gear storage
-export const getGear = (): GearItem[] => {
-  return JSON.parse(localStorage.getItem('gear') || '[]');
-};
-
-export const saveGear = (gear: GearItem): void => {
-  const gearList = getGear();
-  const existingIndex = gearList.findIndex(g => g.id === gear.id);
-  
-  if (existingIndex >= 0) {
-    gearList[existingIndex] = gear;
-  } else {
-    gearList.push(gear);
+export const getMeals = async (tripId: string): Promise<Meal[]> => {
+  try {
+    const meals = await getMealsFromDB(tripId);
+    return meals;
+  } catch (error) {
+    console.error('Failed to get meals:', error);
+    return [];
   }
-  
-  localStorage.setItem('gear', JSON.stringify(gearList));
 };
 
-export const deleteGear = (gearId: string): void => {
-  const gearList = getGear().filter(g => g.id !== gearId);
-  localStorage.setItem('gear', JSON.stringify(gearList));
+export const saveMeals = async (tripId: string, meals: Meal[]): Promise<boolean> => {
+  try {
+    for (const meal of meals) {
+      const validation = validateData(MealSchema, meal);
+      if (!validation.success) {
+        console.error('Invalid meal data:', validation.error);
+        return false;
+      }
+    }
+    await saveMealsToDB(tripId, meals);
+    return true;
+  } catch (error) {
+    console.error('Failed to save meals:', error);
+    return false;
+  }
+};
+
+// Gear Storage
+export const getGear = async (): Promise<GearItem[]> => {
+  try {
+    const gear = await getGearFromDB();
+    return gear;
+  } catch (error) {
+    console.error('Failed to get gear:', error);
+    return [];
+  }
+};
+
+export const saveGear = async (gear: GearItem): Promise<boolean> => {
+  const validation = validateData(GearItemSchema, gear);
+  if (!validation.success) {
+    console.error('Invalid gear data:', validation.error);
+    return false;
+  }
+
+  try {
+    await saveGearToDB(validation.data);
+    return true;
+  } catch (error) {
+    console.error('Failed to save gear:', error);
+    return false;
+  }
+};
+
+export const deleteGear = async (gearId: string): Promise<void> => {
+  try {
+    await deleteGearFromDB(gearId);
+  } catch (error) {
+    console.error('Failed to delete gear:', error);
+  }
 };
 
 // Shopping List Storage
-export const getShoppingList = (tripId: string): ShoppingItem[] => {
-  const listJson = localStorage.getItem(`${SHOPPING_LIST_KEY}${tripId}`);
-  return listJson ? JSON.parse(listJson) : [];
+export const getShoppingList = async (tripId: string): Promise<ShoppingItem[]> => {
+  try {
+    const items = await getShoppingListFromDB(tripId);
+    return items;
+  } catch (error) {
+    console.error('Failed to get shopping list:', error);
+    return [];
+  }
 };
 
-export const saveShoppingList = (tripId: string, items: ShoppingItem[]) => {
-  localStorage.setItem(`${SHOPPING_LIST_KEY}${tripId}`, JSON.stringify(items));
-};
-
-export const addToShoppingList = (tripId: string, items: ShoppingItem[]) => {
-  const currentList = getShoppingList(tripId);
-  const newList = [...currentList];
-
-  items.forEach(item => {
-    const existingItem = newList.find(i => i.name === item.name && i.category === item.category);
-    if (existingItem) {
-      existingItem.quantity += item.quantity;
-    } else {
-      newList.push(item);
+export const saveShoppingList = async (tripId: string, items: ShoppingItem[]): Promise<boolean> => {
+  try {
+    for (const item of items) {
+      const validation = validateData(ShoppingItemSchema, item);
+      if (!validation.success) {
+        console.error('Invalid shopping item:', validation.error);
+        return false;
+      }
     }
-  });
-
-  saveShoppingList(tripId, newList);
+    await saveShoppingListToDB(tripId, items);
+    return true;
+  } catch (error) {
+    console.error('Failed to save shopping list:', error);
+    return false;
+  }
 };
 
-export const removeFromShoppingList = (tripId: string, itemId: string): void => {
-  const shoppingList = getShoppingList(tripId);
+export const addToShoppingList = async (tripId: string, items: ShoppingItem[]): Promise<boolean> => {
+  try {
+    for (const item of items) {
+      const validation = validateData(ShoppingItemSchema, item);
+      if (!validation.success) {
+        console.error('Invalid shopping item:', validation.error);
+        return false;
+      }
+    }
+    await addToShoppingListDB(tripId, items);
+    return true;
+  } catch (error) {
+    console.error('Failed to add to shopping list:', error);
+    return false;
+  }
+};
+
+export const removeFromShoppingList = async (tripId: string, itemId: string): Promise<void> => {
+  const shoppingList = await getShoppingList(tripId);
   const updatedList = shoppingList.filter(item => item.id !== itemId);
-  saveShoppingList(tripId, updatedList);
+  await saveShoppingList(tripId, updatedList);
 };
 
-export const toggleShoppingItem = (tripId: string, itemId: string): void => {
-  const shoppingList = getShoppingList(tripId);
+export const toggleShoppingItem = async (tripId: string, itemId: string): Promise<void> => {
+  const shoppingList = await getShoppingList(tripId);
   const updatedList = shoppingList.map(item => 
     item.id === itemId ? { ...item, isChecked: !item.isChecked } : item
   );
-  saveShoppingList(tripId, updatedList);
+  await saveShoppingList(tripId, updatedList);
 };
 
 // Helper function to migrate old data structure to new one if needed
@@ -154,10 +255,10 @@ export const migrateTrips = async () => {
 
       return {
         ...trip,
-        type: oldTrip.type === 'car' ? 'car camping' as TripType :
-              oldTrip.type === 'backcountry' ? 'hike camping' as TripType :
-              oldTrip.type === 'canoe' ? 'canoe camping' as TripType :
-              oldTrip.type as TripType,
+        tripType: oldTrip.type === 'car' ? 'car camping' :
+                  oldTrip.type === 'backcountry' ? 'hike camping' :
+                  oldTrip.type === 'canoe' ? 'canoe camping' :
+                  oldTrip.type,
         groups: [newGroup],
         isCoordinated: false,
         tripName: (trip as any).parkName || oldTrip.tripName // Handle both old and new field names
@@ -167,10 +268,10 @@ export const migrateTrips = async () => {
     if (oldTrip.type === 'car' || oldTrip.type === 'backcountry' || oldTrip.type === 'canoe' || (trip as any).parkName) {
       return {
         ...trip,
-        type: oldTrip.type === 'car' ? 'car camping' as TripType :
-              oldTrip.type === 'backcountry' ? 'hike camping' as TripType :
-              oldTrip.type === 'canoe' ? 'canoe camping' as TripType :
-              oldTrip.type as TripType,
+        tripType: oldTrip.type === 'car' ? 'car camping' :
+                  oldTrip.type === 'backcountry' ? 'hike camping' :
+                  oldTrip.type === 'canoe' ? 'canoe camping' :
+                  oldTrip.type,
         tripName: (trip as any).parkName || oldTrip.tripName // Handle both old and new field names
       } as Trip;
     }

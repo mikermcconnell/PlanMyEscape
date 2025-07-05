@@ -1,4 +1,4 @@
-import { TripType } from '../types';
+import { TripTypeOption } from '../types';
 
 type MealType = {
   breakfast: string[];
@@ -6,7 +6,7 @@ type MealType = {
   dinner: string[];
 };
 
-type MealSuggestions = Record<TripType, MealType>;
+type MealSuggestions = Record<TripTypeOption, MealType>;
 
 export const mealSuggestions: MealSuggestions = {
   'car camping': {

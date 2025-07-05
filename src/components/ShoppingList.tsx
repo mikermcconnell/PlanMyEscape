@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Utensils, Package, Check, Trash2, Plus } from 'lucide-react';
 import { ShoppingItem } from '../types';
-import { getShoppingList, saveShoppingList, removeFromShoppingList, toggleShoppingItem } from '../utils/storage';
+import { getShoppingList, saveShoppingList } from '../utils/storage';
 
 interface ShoppingListProps {
   tripId: string;
@@ -14,27 +14,31 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
   const [showAddForm, setShowAddForm] = useState(false);
 
   useEffect(() => {
-    const items = getShoppingList(tripId);
-    setShoppingItems(items);
+    const loadItems = async () => {
+      const items = await getShoppingList(tripId);
+      setShoppingItems(items);
+    };
+    loadItems();
   }, [tripId]);
 
-  const handleToggleItem = (itemId: string) => {
-    toggleShoppingItem(tripId, itemId);
+  const handleToggleItem = async (itemId: string) => {
     const updatedItems = shoppingItems.map(item => 
       item.id === itemId ? { ...item, isChecked: !item.isChecked } : item
     );
     setShoppingItems(updatedItems);
+    await saveShoppingList(tripId, updatedItems);
   };
 
-  const handleRemoveItem = (itemId: string) => {
-    removeFromShoppingList(tripId, itemId);
-    setShoppingItems(shoppingItems.filter(item => item.id !== itemId));
+  const handleRemoveItem = async (itemId: string) => {
+    const updatedItems = shoppingItems.filter(item => item.id !== itemId);
+    setShoppingItems(updatedItems);
+    await saveShoppingList(tripId, updatedItems);
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (newItem.name.trim()) {
       const item: ShoppingItem = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         name: newItem.name.trim(),
         quantity: newItem.quantity,
         category: newItem.category,
@@ -43,7 +47,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
       
       const updatedItems = [...shoppingItems, item];
       setShoppingItems(updatedItems);
-      saveShoppingList(tripId, updatedItems);
+      await saveShoppingList(tripId, updatedItems);
       setNewItem({ name: '', category: 'camping', quantity: 1 });
       setShowAddForm(false);
     }

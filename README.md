@@ -1,6 +1,26 @@
-# CampMe - Camping Trip Planner
+# PlanMyEscape
 
-A modern, responsive web app for planning camping trips. Built for both car camping and backcountry adventures.
+A comprehensive camping trip planning application that helps you organize your gear, plan meals, and manage your budget for outdoor adventures.
+
+## Features
+
+- Meal Planning
+- Packing List Management
+- Gear Locker
+- Trip Setup
+- Budget Tracking
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Start the development server with `npm start`
+
+## Technologies
+
+- React
+- TypeScript
+- Tailwind CSS
 
 ## Features
 
@@ -41,59 +61,6 @@ A modern, responsive web app for planning camping trips. Built for both car camp
 - **Routing**: React Router v6
 - **Storage**: Local Storage (ready for backend integration)
 - **Build**: Create React App
-
-## Getting Started
-
-### Prerequisites
-- Node.js 16+ 
-- npm or yarn
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd CampMe
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start the development server:
-```bash
-npm start
-```
-
-4. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Usage
-
-### Creating a Trip
-1. Click "New Trip" on the dashboard
-2. Select trip type (car camping or backcountry)
-3. Set start and end dates
-4. Enter group size and park/location name
-5. Click "Create Trip"
-
-### Packing List
-- Automatically loads with template items based on trip type
-- Check off items as you pack them
-- Add custom items with categories
-- View progress and total weight
-
-### Meal Planning
-- Add meals to each day of your trip
-- Choose from pre-built templates
-- View combined shopping list
-- Plan efficiently with ingredient reuse
-
-### Gear Management
-- Add your personal gear to the locker
-- Assign gear to specific trips
-- Track weights and add notes
-- Organize by categories
 
 ## Project Structure
 

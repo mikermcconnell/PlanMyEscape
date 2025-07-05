@@ -1,15 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Check, Plus, Trash2, Edit3, Save, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle } from 'lucide-react';
 import { PackingItem, Trip, ShoppingItem, TripType } from '../types';
-import { getPackingList, savePackingList, getTrips, addToShoppingList, getShoppingList } from '../utils/storage';
-import { packingTemplates, specializedGear, tripTypeDescriptions } from '../data/packingTemplates';
+import { getPackingList, savePackingList, addToShoppingList, getShoppingList } from '../utils/storage';
+import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
+import { separateAndItems, PackingSuggestion } from '../data/activityEquipment';
 import ShoppingList from '../components/ShoppingList';
 
+interface TripContextType {
+  trip: Trip;
+  setTrip: (trip: Trip) => void;
+}
+
 const PackingList = () => {
-  const { tripId } = useParams<{ tripId: string }>();
+  const { trip } = useOutletContext<TripContextType>();
+  const tripId = trip.id;
   const [items, setItems] = useState<PackingItem[]>([]);
-  const [trip, setTrip] = useState<Trip | null>(null);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const categories = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Other'];
@@ -20,142 +26,128 @@ const PackingList = () => {
     }), {})
   );
 
+  // Debounced save function
+  const debouncedSave = useCallback(
+    async (tripId: string, items: PackingItem[]) => {
+      const timeoutId = setTimeout(async () => {
+        await savePackingList(tripId, items);
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    },
+    []
+  );
+
+  const updateItems = useCallback(async (newItems: PackingItem[]) => {
+    setItems(newItems);
+    if (tripId) {
+      await debouncedSave(tripId, newItems);
+    }
+  }, [tripId, debouncedSave]);
+
   const calculateTotalCampers = (trip: Trip): number => {
     return trip.groups.reduce((sum, group) => sum + group.size, 0);
   };
 
+  const calculateTripDays = (startDate: string, endDate: string): number => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  };
+
   useEffect(() => {
-    const loadTripAndPackingList = async () => {
-      if (!tripId) return;
+    const loadPackingList = async () => {
+      if (!tripId || !trip) return;
 
-      const trips = await getTrips();
-      const currentTrip = trips.find(t => t.id === tripId);
-      if (!currentTrip) return;
-
-      setTrip(currentTrip);
       const savedList = await getPackingList(tripId);
       
       if (savedList && savedList.length > 0) {
         setItems(savedList);
       } else {
-        const template = packingTemplates[currentTrip.tripType];
-        const initializedTemplate: PackingItem[] = template.essentials.concat(template.recommended).map(item => ({
-          id: Math.random().toString(36).substr(2, 9),
-          name: item,
-          category: 'General',
-          isPacked: false,
-          isOwned: false,
-          isChecked: false,
-          needsToBuy: false,
-          required: true,
-          quantity: 1
-        }));
-        setItems(initializedTemplate);
-        await savePackingList(tripId, initializedTemplate);
+        // Get template with trip duration consideration
+        const groupSize = calculateTotalCampers(trip);
+        const tripDays = calculateTripDays(trip.startDate, trip.endDate);
+        const templateItems = getPackingTemplate(trip.tripType, groupSize, tripDays);
+        
+        setItems(templateItems);
+        await savePackingList(tripId, templateItems);
       }
     };
-    loadTripAndPackingList();
-  }, [tripId]);
+    loadPackingList();
+  }, [tripId, trip]);
 
-  const toggleOwned = (itemId: string) => {
+  const toggleOwned = async (itemId: string) => {
     const updatedItems = items.map(item =>
       item.id === itemId ? { 
         ...item, 
         isOwned: !item.isOwned,
-        needsToBuy: false // Remove need to buy when marking as owned
+        needsToBuy: false
       } : item
     );
-    setItems(updatedItems);
-    if (tripId) savePackingList(tripId, updatedItems);
+    await updateItems(updatedItems);
   };
 
-  const toggleNeedsToBuy = (itemId: string) => {
+  const toggleNeedsToBuy = async (itemId: string) => {
     const updatedItems = items.map(item =>
       item.id === itemId ? { 
         ...item, 
         needsToBuy: !item.needsToBuy,
+        isOwned: false
       } : item
     );
-    setItems(updatedItems);
+    await updateItems(updatedItems);
+
+    // If marking as need to buy, add to shopping list
     if (tripId) {
-      savePackingList(tripId, updatedItems);
-      
-      // If marking as need to buy, add to shopping list
       const item = updatedItems.find(i => i.id === itemId);
       if (item && item.needsToBuy) {
         // Check if item is already in shopping list
-        const existingShoppingList = getShoppingList(tripId);
+        const existingShoppingList = await getShoppingList(tripId);
         const alreadyInList = existingShoppingList.some(shoppingItem => 
           shoppingItem.sourceItemId === itemId
         );
         
         if (!alreadyInList) {
           const shoppingItem: ShoppingItem = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             name: item.name,
             quantity: item.quantity,
             category: item.category === 'Kitchen' ? 'food' : 'camping',
             isChecked: false,
             sourceItemId: itemId
           };
-          addToShoppingList(tripId, [shoppingItem]);
+          await addToShoppingList(tripId, [shoppingItem]);
         }
       }
     }
   };
 
-  const togglePacked = (itemId: string) => {
+  const togglePacked = async (itemId: string) => {
     const updatedItems = items.map(item =>
       item.id === itemId ? { ...item, isPacked: !item.isPacked } : item
     );
-    setItems(updatedItems);
-    if (tripId) savePackingList(tripId, updatedItems);
+    await updateItems(updatedItems);
+  };
+
+  const updateItemQuantity = async (itemId: string, quantity: number) => {
+    const updatedItems = items.map(item =>
+      item.id === itemId ? { ...item, quantity } : item
+    );
+    await updateItems(updatedItems);
   };
 
   // Legacy function for backward compatibility
-  const toggleItem = (itemId: string) => {
-    togglePacked(itemId);
-  };
-
-  const updateItem = (itemId: string, updates: Partial<PackingItem>) => {
+  const updateItem = async (itemId: string, updates: Partial<PackingItem>) => {
     const updatedItems = items.map(item =>
       item.id === itemId ? { ...item, ...updates } : item
     );
-    setItems(updatedItems);
-    if (tripId) savePackingList(tripId, updatedItems);
+    await updateItems(updatedItems);
     setEditingItem(null);
   };
 
-  const deleteItem = (itemId: string) => {
+  const deleteItem = async (itemId: string) => {
     const updatedItems = items.filter(item => item.id !== itemId);
-    setItems(updatedItems);
-    if (tripId) savePackingList(tripId, updatedItems);
-  };
-
-  const addItem = (category: string) => {
-    const formData = addItemForms[category];
-    if (formData.name.trim()) {
-      const item: PackingItem = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        name: formData.name.trim(),
-        category: category,
-        quantity: formData.quantity,
-        isChecked: false,
-        isOwned: false,
-        needsToBuy: false,
-        isPacked: false,
-        required: true // Default to required for user-added items
-      };
-      const updatedItems = [...items, item];
-      setItems(updatedItems);
-      if (tripId) savePackingList(tripId, updatedItems);
-      
-      // Reset the form for this category
-      setAddItemForms(prev => ({
-        ...prev,
-        [category]: { show: false, name: '', quantity: 1 }
-      }));
-    }
+    await updateItems(updatedItems);
   };
 
   const toggleAddForm = (category: string) => {
@@ -186,8 +178,17 @@ const PackingList = () => {
     }
   };
 
-  const groupedItems = categories.reduce((acc, category) => {
-    acc[category] = items.filter(item => item.category === category);
+  // Group items by personal vs group first, then by category
+  const personalItems = items.filter(item => item.isPersonal);
+  const groupItems = items.filter(item => !item.isPersonal);
+  
+  const groupedPersonalItems = categories.reduce((acc, category) => {
+    acc[category] = personalItems.filter(item => item.category === category);
+    return acc;
+  }, {} as Record<string, PackingItem[]>);
+  
+  const groupedGroupItems = categories.reduce((acc, category) => {
+    acc[category] = groupItems.filter(item => item.category === category);
     return acc;
   }, {} as Record<string, PackingItem[]>);
 
@@ -197,26 +198,7 @@ const PackingList = () => {
   const packedItems = items.filter(item => item.isPacked).length;
   const totalWeight = items.reduce((sum, item) => sum + (item.weight || 0), 0);
 
-  const addItemToShoppingList = async (item: PackingItem) => {
-    if (!tripId) return;
-    
-    const shoppingItem: ShoppingItem = {
-      id: item.id,
-      name: item.name,
-      quantity: item.quantity || 1,
-      category: 'camping',
-      isChecked: false,
-      sourceItemId: item.id
-    };
-    await addToShoppingList(tripId, [shoppingItem]);
-  };
 
-  const handleAddToShoppingList = async (itemId: string) => {
-    const item = items.find(i => i.id === itemId);
-    if (item && tripId) {
-      await addItemToShoppingList(item);
-    }
-  };
 
   const renderTripTypeText = (type: TripType): string => {
     switch (type) {
@@ -233,10 +215,6 @@ const PackingList = () => {
     }
   };
 
-  const getPackingListDescription = (type: TripType): string => {
-    return tripTypeDescriptions[type];
-  };
-
   const shouldShowWeightTracking = (type: TripType): boolean => {
     return type === 'hike camping' || type === 'canoe camping';
   };
@@ -251,28 +229,53 @@ const PackingList = () => {
       }
       return item;
     });
-    setItems(updatedItems);
-    if (tripId) savePackingList(tripId, updatedItems);
+    updateItems(updatedItems);
   };
 
-  if (!trip) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center py-12">
-          <Package className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Trip not found</h3>
-          <Link to="/" className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
-            Back to Dashboard
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const addItemToCategory = async (category: string, itemName: string, quantity: number) => {
+    if (!itemName.trim()) return;
+    
+    // Create a suggestion object to use the separateAndItems function
+    const suggestions = separateAndItems([{
+      name: itemName.trim(),
+      category: category,
+      required: false,
+      quantity: quantity
+    }]);
+    
+    // Create packing items from the separated suggestions
+    const newItems: PackingItem[] = suggestions.map((suggestion: PackingSuggestion) => ({
+      id: crypto.randomUUID(),
+      name: suggestion.name,
+      category: suggestion.category,
+      quantity: suggestion.quantity || 1,
+      isChecked: false,
+      weight: undefined,
+      isOwned: false,
+      needsToBuy: false,
+      isPacked: false,
+      required: suggestion.required,
+      assignedGroupId: undefined,
+      isPersonal: false // Default to group item when manually added
+    }));
+    
+    // Add to the current items list
+    const updatedItems = [...items, ...newItems];
+    updateItems(updatedItems);
+    
+    // Reset the form
+    setAddItemForms(prev => ({
+      ...prev,
+      [category]: { show: false, name: '', quantity: 1 }
+    }));
+  };
+
+
 
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-12">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -291,21 +294,7 @@ const PackingList = () => {
               </p>
             )}
           </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setShowShoppingList(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700"
-            >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Shopping List
-            </button>
-            <Link
-              to={`/meal-planner/${tripId}`}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-            >
-              Meal Planner
-            </Link>
-          </div>
+
         </div>
         
         {/* Stats */}
@@ -353,6 +342,13 @@ const PackingList = () => {
               />
               <div className="flex space-x-2">
                 <button
+                  onClick={() => addItemToCategory(category, formData.name, formData.quantity)}
+                  disabled={!formData.name.trim()}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  Add
+                </button>
+                <button
                   onClick={() => toggleAddForm(category)}
                   className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                 >
@@ -365,40 +361,42 @@ const PackingList = () => {
       })}
 
       {/* Packing List */}
-      <div className="space-y-6">
-        {categories.map(category => {
-          const categoryItems = groupedItems[category];
-          if (categoryItems.length === 0) return null;
+      <div className="space-y-8">
+        {/* Personal Items Section */}
+        {personalItems.length > 0 && (
+          <div className="space-y-6">
+            <div className="border-b border-gray-300 dark:border-gray-600 pb-2">
+              <h2 className="text-xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Personal Items (Per Person)
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Each person in your group needs their own
+              </p>
+            </div>
+            {categories.map(category => {
+              const categoryItems = groupedPersonalItems[category];
+              if (categoryItems.length === 0) return null;
 
-          // Split into required and optional
-          const requiredItems = categoryItems.filter(item => item.required);
-          const optionalItems = categoryItems.filter(item => !item.required);
-
-          return (
-            <div key={category} className="bg-white dark:bg-gray-800 shadow rounded-lg">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center">
-                    {getCategoryIcon(category)}
-                    <span className="ml-2">{category}</span>
-                  </h3>
-                  <button
-                    onClick={() => toggleAddForm(category)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Item
-                  </button>
-                </div>
-              </div>
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {/* Required Items */}
-                {requiredItems.length > 0 && (
-                  <>
-                    <div className="px-6 pt-4 pb-2">
-                      <span className="text-sm font-semibold text-green-700 dark:text-green-300">Required</span>
+              return (
+                <div key={`personal-${category}`} className="bg-white dark:bg-gray-800 shadow rounded-lg pt-8">
+                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center">
+                        {getCategoryIcon(category)}
+                        <span className="ml-2">{category}</span>
+                      </h3>
+                      <button
+                        onClick={() => toggleAddForm(category)}
+                        className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Item
+                      </button>
                     </div>
-                    {requiredItems.map(item => (
+                  </div>
+                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {categoryItems.map((item: PackingItem) => (
                       <div key={item.id} className="px-6 py-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3 flex-1">
@@ -450,13 +448,14 @@ const PackingList = () => {
                                   type="text"
                                   value={item.name}
                                   onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 w-64"
+                                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0"
+                                  style={{ width: `${Math.max(item.name.length * 8 + 32, 120)}px` }}
                                 />
                                 <input
                                   type="number"
                                   min="1"
                                   value={item.quantity}
-                                  onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) })}
+                                  onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
                                   className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700"
                                 />
                                 <button
@@ -474,7 +473,7 @@ const PackingList = () => {
                                 >
                                   <span className={`${
                                     item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                  } truncate max-w-[200px]`}>
+                                  } break-words max-w-[300px]`}>
                                     {item.name}
                                   </span>
                                   {item.quantity > 1 && (
@@ -537,16 +536,49 @@ const PackingList = () => {
                         </div>
                       </div>
                     ))}
-                  </>
-                )}
-                {/* Optional Items */}
-                {optionalItems.length > 0 && (
-                  <>
-                    <div className="px-6 pt-4 pb-2">
-                      <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">Optional</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Group Items Section */}
+        {groupItems.length > 0 && (
+          <div className="space-y-6">
+            <div className="border-b border-gray-300 dark:border-gray-600 pb-2">
+              <h2 className="text-xl font-bold text-green-600 dark:text-green-400 flex items-center">
+                <Package className="h-5 w-5 mr-2" />
+                Group Items (Shared by Everyone)
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Your group only needs one of each of these items
+              </p>
+            </div>
+            {categories.map(category => {
+              const categoryItems = groupedGroupItems[category];
+              if (categoryItems.length === 0) return null;
+
+              return (
+                <div key={`group-${category}`} className="bg-white dark:bg-gray-800 shadow rounded-lg">
+                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center">
+                        {getCategoryIcon(category)}
+                        <span className="ml-2">{category}</span>
+                      </h3>
+                      <button
+                        onClick={() => toggleAddForm(category)}
+                        className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Item
+                      </button>
                     </div>
-                    {optionalItems.map(item => (
-                      <div key={item.id} className="px-6 py-4 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                  </div>
+                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {categoryItems.map((item: PackingItem) => (
+                      <div key={item.id} className="px-6 py-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3 flex-1">
                             {/* Status Buttons */}
@@ -597,13 +629,14 @@ const PackingList = () => {
                                   type="text"
                                   value={item.name}
                                   onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 w-64"
+                                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0"
+                                  style={{ width: `${Math.max(item.name.length * 8 + 32, 120)}px` }}
                                 />
                                 <input
                                   type="number"
                                   min="1"
                                   value={item.quantity}
-                                  onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) })}
+                                  onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
                                   className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700"
                                 />
                                 <button
@@ -621,7 +654,7 @@ const PackingList = () => {
                                 >
                                   <span className={`${
                                     item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                  } truncate max-w-[200px]`}>
+                                  } break-words max-w-[300px]`}>
                                     {item.name}
                                   </span>
                                   {item.quantity > 1 && (
@@ -675,10 +708,6 @@ const PackingList = () => {
                                     Need to Buy
                                   </span>
                                 )}
-                                {/* Optional badge */}
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 ml-2">
-                                  Optional
-                                </span>
                               </div>
                             )}
                           </div>
@@ -688,12 +717,12 @@ const PackingList = () => {
                         </div>
                       </div>
                     ))}
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Shopping List Modal */}

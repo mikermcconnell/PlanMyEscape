@@ -1,45 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Plus, Trash2, Edit3, Save, X, Utensils, ShoppingCart, Calendar, ArrowLeft, ArrowRight } from 'lucide-react';
-import { Meal, Trip, ShoppingItem, MealType, TripType } from '../types';
-import { getMeals, saveMeals, getTrips, addToShoppingList, getShoppingList as getShoppingListFromStorage } from '../utils/storage';
-import { getMealTemplates, getShoppingList as getMealShoppingList, createCustomMeal } from '../data/mealTemplates';
+import { useOutletContext } from 'react-router-dom';
+import { Plus, Trash2, X, ShoppingCart, Calendar, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Meal, Trip, TripType } from '../types';
+import { getMeals, saveMeals } from '../utils/storage';
+import { getMealTemplates, getShoppingList as getMealShoppingList } from '../data/mealTemplates';
 import ShoppingList from '../components/ShoppingList';
-import { mealSuggestions, suggestIngredients } from '../data/recipeSuggestions';
+import { suggestIngredients } from '../data/recipeSuggestions';
 import { tripMealSuggestions } from '../data/tripMealSuggestions';
 
-type RouteParams = {
-  tripId: string;
-};
+interface TripContextType {
+  trip: Trip;
+  setTrip: (trip: Trip) => void;
+}
 
 const MealPlanner = () => {
-  const { tripId } = useParams<RouteParams>();
+  const { trip } = useOutletContext<TripContextType>();
+  const tripId = trip.id;
   const [meals, setMeals] = useState<Meal[]>([]);
-  const [trip, setTrip] = useState<Trip | null>(null);
-  const [editingMeal, setEditingMeal] = useState<string | null>(null);
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showMealModal, setShowMealModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState(1);
   const [selectedType, setSelectedType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('breakfast');
   const [showShoppingList, setShowShoppingList] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showCustomForm, setShowCustomForm] = useState(false);
   const [customMealName, setCustomMealName] = useState('');
-  const [servings, setServings] = useState<number>(1);
   const [suggestedIngredients, setSuggestedIngredients] = useState<string[]>([]);
-
-  const calculateTotalServings = (trip: Trip): number => {
-    return trip.groups.reduce((sum, group) => sum + group.size, 0);
-  };
-
-  useEffect(() => {
-    const loadTrip = async () => {
-      if (!tripId) return;
-      
-      const trips = await getTrips();
-      const currentTrip = trips.find(t => t.id === tripId);
-      setTrip(currentTrip || null);
-    };
-    loadTrip();
-  }, [tripId]);
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
+  const [customIngredient, setCustomIngredient] = useState('');
 
   useEffect(() => {
     const loadMeals = async () => {
@@ -48,8 +34,6 @@ const MealPlanner = () => {
       const savedMeals = await getMeals(tripId);
       if (savedMeals) {
         setMeals(savedMeals);
-        const totalServings = calculateTotalServings(trip);
-        setServings(totalServings);
       }
     };
     loadMeals();
@@ -76,22 +60,13 @@ const MealPlanner = () => {
     const newMeal = {
       ...meal,
       day: selectedDay,
-      servings: servings,
       assignedGroupId: undefined,
       sharedServings: true
     };
     const updatedMeals = [...meals, newMeal];
     setMeals(updatedMeals);
     if (tripId) saveMeals(tripId, updatedMeals);
-  };
-
-  const updateMeal = (mealId: string, updates: Partial<Meal>) => {
-    const updatedMeals = meals.map(meal =>
-      meal.id === mealId ? { ...meal, ...updates } : meal
-    );
-    setMeals(updatedMeals);
-    if (tripId) saveMeals(tripId, updatedMeals);
-    setEditingMeal(null);
+    setShowMealModal(false);
   };
 
   const deleteMeal = (mealId: string) => {
@@ -100,101 +75,66 @@ const MealPlanner = () => {
     if (tripId) saveMeals(tripId, updatedMeals);
   };
 
-  const getMealsForDay = (day: number) => {
-    return meals.filter(meal => meal.day === day);
-  };
-
   const getMealsByType = (day: number, type: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
     return meals.filter(meal => meal.day === day && meal.type === type);
   };
 
   const shoppingList = getMealShoppingList(meals);
-  const shoppingItems = tripId ? getShoppingListFromStorage(tripId) : [];
 
   const addCustomMeal = () => {
-    if (customMealName.trim()) {
-      const newMeal = createCustomMeal(customMealName.trim(), selectedType, servings);
-      newMeal.day = selectedDay;
-      newMeal.assignedGroupId = undefined;
-      newMeal.sharedServings = true;
+    if (customMealName.trim() && selectedIngredients.length > 0) {
+      const newMeal = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        name: customMealName.trim(),
+        day: selectedDay,
+        type: selectedType,
+        ingredients: selectedIngredients,
+        isCustom: true,
+        assignedGroupId: undefined,
+        sharedServings: true
+      };
       const updatedMeals = [...meals, newMeal];
       setMeals(updatedMeals);
       if (tripId) saveMeals(tripId, updatedMeals);
+      
+      // Reset form
       setCustomMealName('');
       setSuggestedIngredients([]);
-      setShowAddForm(false);
+      setSelectedIngredients([]);
+      setCustomIngredient('');
+      setShowCustomForm(false);
+      setShowMealModal(false);
     }
   };
 
-  const assignMealToGroup = (mealId: string, groupId: string | undefined) => {
-    const updatedMeals = meals.map(meal => {
-      if (meal.id === mealId) {
-        return {
-          ...meal,
-          assignedGroupId: groupId,
-          sharedServings: !groupId // If assigned to a group, it's not shared
-        };
-      }
-      return meal;
-    });
-    setMeals(updatedMeals);
-    if (tripId) saveMeals(tripId, updatedMeals);
+  const toggleIngredient = (ingredient: string) => {
+    setSelectedIngredients(prev => 
+      prev.includes(ingredient) 
+        ? prev.filter(i => i !== ingredient)
+        : [...prev, ingredient]
+    );
   };
 
-  const renderMealList = (type: MealType, meals: Meal[]) => {
-    const assignedGroup = (meal: Meal) => 
-      trip?.groups.find(g => g.id === meal.assignedGroupId);
+  const addCustomIngredientToList = () => {
+    if (customIngredient.trim() && !selectedIngredients.includes(customIngredient.trim())) {
+      setSelectedIngredients(prev => [...prev, customIngredient.trim()]);
+      setCustomIngredient('');
+    }
+  };
 
-    return (
-      <div className="space-y-2">
-        {meals.map((meal) => (
-          <div
-            key={meal.id}
-            className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg shadow"
-          >
-            <div className="flex-1">
-              <div className="flex items-center">
-                <span className="font-medium">{meal.name}</span>
-                <span className="ml-2 text-sm text-gray-500">
-                  ({meal.servings} {meal.servings === 1 ? 'serving' : 'servings'})
-                </span>
-              </div>
-              {meal.ingredients.length > 0 && (
-                <div className="mt-1 text-sm text-gray-500">
-                  {meal.ingredients.join(', ')}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center space-x-2">
-              {trip?.isCoordinated && (
-                <select
-                  value={meal.assignedGroupId || ''}
-                  onChange={(e) => assignMealToGroup(meal.id, e.target.value || undefined)}
-                  className="text-sm border rounded-md py-1 px-2 dark:bg-gray-700"
-                  style={{
-                    borderColor: assignedGroup(meal)?.color || 'transparent',
-                    color: assignedGroup(meal)?.color
-                  }}
-                >
-                  <option value="">Shared</option>
-                  {trip?.groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button
-                onClick={() => deleteMeal(meal.id)}
-                className="p-1 text-gray-500 hover:text-red-500"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+  const removeIngredient = (ingredient: string) => {
+    setSelectedIngredients(prev => prev.filter(i => i !== ingredient));
+  };
+
+  const openMealModal = (day: number, type: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+    setSelectedDay(day);
+    setSelectedType(type);
+    setShowMealModal(true);
+    setShowCustomForm(false);
+    setCustomMealName('');
+    setSuggestedIngredients([]);
+    setSelectedIngredients([]);
+    setCustomIngredient('');
   };
 
   const totalPeople = trip?.groups.reduce((total, group) => total + group.size, 0) || 0;
@@ -203,7 +143,7 @@ const MealPlanner = () => {
     return tripMealSuggestions[type][mealType];
   };
 
-  const renderTripTypeText = (type: TripType) => {
+  const renderTripTypeText = (type: TripType): string => {
     switch (type) {
       case 'car camping':
         return 'Car Camping';
@@ -218,55 +158,29 @@ const MealPlanner = () => {
     }
   };
 
-  if (!trip) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center py-12">
-          <Utensils className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Trip not found</h3>
-          <Link to="/" className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
-            Back to Dashboard
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   const days = getDaysArray();
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="p-6">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
               Meal Planner
-            </h1>
+            </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              {trip.tripName} • {renderTripTypeText(trip.tripType)} • 
+              {renderTripTypeText(trip.tripType)} • 
               {totalPeople} {totalPeople === 1 ? 'person' : 'people'} total
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              You control serving amounts - set quantities that work for your group
             </p>
             {trip.isCoordinated && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Meals can be assigned to specific groups
               </p>
             )}
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setShowShoppingList(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700"
-            >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Shopping List
-            </button>
-            <Link
-              to={`/packing-list/${tripId}`}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-            >
-              Packing List
-            </Link>
           </div>
         </div>
       </div>
@@ -289,88 +203,6 @@ const MealPlanner = () => {
           <ArrowRight className="h-5 w-5" />
         </button>
       </div>
-
-      {/* Add Meal Form */}
-      {showAddForm && (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
-          <div className="grid grid-cols-1 gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <input
-                type="text"
-                placeholder="Meal name"
-                value={customMealName}
-                onChange={(e) => setCustomMealName(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
-              />
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value as 'breakfast' | 'lunch' | 'dinner' | 'snack')}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
-              >
-                <option value="breakfast">Breakfast</option>
-                <option value="lunch">Lunch</option>
-                <option value="dinner">Dinner</option>
-                <option value="snack">Snack</option>
-              </select>
-              <input
-                type="number"
-                min="1"
-                value={servings}
-                onChange={(e) => setServings(parseInt(e.target.value))}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
-              />
-              <div className="flex space-x-2">
-                <button
-                  onClick={addCustomMeal}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                >
-                  Add
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAddForm(false);
-                    setCustomMealName('');
-                    setSuggestedIngredients([]);
-                  }}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-            
-            {/* Suggested Ingredients */}
-            {suggestedIngredients.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Suggested Ingredients:
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {suggestedIngredients.map((ingredient, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-sm"
-                    >
-                      {ingredient}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Add Meal Button */}
-      {!showAddForm && (
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="mb-6 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Add Custom Meal
-        </button>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Meal Calendar */}
@@ -400,11 +232,7 @@ const MealPlanner = () => {
                             {mealType}
                           </h4>
                           <button
-                            onClick={() => {
-                              setSelectedDay(day);
-                              setSelectedType(mealType);
-                              setShowTemplateModal(true);
-                            }}
+                            onClick={() => openMealModal(day, mealType)}
                             className="text-green-600 hover:text-green-700 text-sm"
                           >
                             <Plus className="h-4 w-4" />
@@ -428,12 +256,6 @@ const MealPlanner = () => {
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                  <button
-                                    onClick={() => setEditingMeal(meal.id)}
-                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                  >
-                                    <Edit3 className="h-4 w-4" />
-                                  </button>
                                   <button
                                     onClick={() => deleteMeal(meal.id)}
                                     className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
@@ -484,36 +306,183 @@ const MealPlanner = () => {
         </div>
       </div>
 
-      {/* Template Modal */}
-      {showTemplateModal && (
+      {/* Enhanced Meal Modal */}
+      {showMealModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 Add {selectedType} for Day {selectedDay}
               </h3>
               <button
-                onClick={() => setShowTemplateModal(false)}
+                onClick={() => setShowMealModal(false)}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {getMealTemplates()[selectedType].map(meal => (
-                <div
-                  key={meal.id}
-                  onClick={() => addMeal(meal)}
-                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900"
-                >
-                  <h4 className="font-medium text-gray-900 dark:text-white">{meal.name}</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {meal.ingredients.join(', ')}
-                  </p>
+            {!showCustomForm ? (
+              <>
+                {/* Template Selection */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-md font-medium text-gray-900 dark:text-white">
+                      Choose from Templates
+                    </h4>
+                    <button
+                      onClick={() => setShowCustomForm(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      Create Custom Meal
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {getMealTemplates()[selectedType].map(meal => (
+                      <div
+                        key={meal.id}
+                        onClick={() => addMeal(meal)}
+                        className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900"
+                      >
+                        <h4 className="font-medium text-gray-900 dark:text-white">{meal.name}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          {meal.ingredients.join(', ')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <>
+                {/* Custom Meal Form */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-md font-medium text-gray-900 dark:text-white">
+                      Create Custom Meal
+                    </h4>
+                    <button
+                      onClick={() => setShowCustomForm(false)}
+                      className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                    >
+                      Back to Templates
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* Meal Name Input */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Meal Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter meal name (e.g., Chicken Alfredo)"
+                        value={customMealName}
+                        onChange={(e) => setCustomMealName(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
+                      />
+                    </div>
+                    
+                    {/* Suggested Ingredients */}
+                    {suggestedIngredients.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Suggested Ingredients (click to add)
+                        </label>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {suggestedIngredients.map((ingredient, index) => (
+                            <button
+                              key={index}
+                              onClick={() => toggleIngredient(ingredient)}
+                              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                                selectedIngredients.includes(ingredient)
+                                  ? 'bg-green-100 text-green-800 border border-green-300'
+                                  : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                              }`}
+                            >
+                              {ingredient}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Custom Ingredient Input */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Add Custom Ingredient
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Enter ingredient name"
+                          value={customIngredient}
+                          onChange={(e) => setCustomIngredient(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && addCustomIngredientToList()}
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
+                        />
+                        <button
+                          onClick={addCustomIngredientToList}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Selected Ingredients List */}
+                    {selectedIngredients.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Selected Ingredients ({selectedIngredients.length})
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedIngredients.map((ingredient, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-md text-sm"
+                            >
+                              <span>{ingredient}</span>
+                              <button
+                                onClick={() => removeIngredient(ingredient)}
+                                className="ml-2 text-green-600 hover:text-green-800"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Action Buttons */}
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <button
+                        onClick={() => {
+                          setShowCustomForm(false);
+                          setCustomMealName('');
+                          setSuggestedIngredients([]);
+                          setSelectedIngredients([]);
+                          setCustomIngredient('');
+                        }}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={addCustomMeal}
+                        disabled={!customMealName.trim() || selectedIngredients.length === 0}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Add Meal
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -526,32 +495,37 @@ const MealPlanner = () => {
         />
       )}
 
-      <div>
-        {trip && (
+      {/* Trip Meal Suggestions */}
+      <div className="mt-8 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+          Suggested Meals for {renderTripTypeText(trip.tripType)}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <h3>Suggested Meals for {trip.tripType}</h3>
-            <div>
-              <h4>Breakfast</h4>
-              <ul>
-                {getMealSuggestions(trip.tripType, 'breakfast').map((meal, index) => (
-                  <li key={index}>{meal}</li>
-                ))}
-              </ul>
-              <h4>Lunch</h4>
-              <ul>
-                {getMealSuggestions(trip.tripType, 'lunch').map((meal, index) => (
-                  <li key={index}>{meal}</li>
-                ))}
-              </ul>
-              <h4>Dinner</h4>
-              <ul>
-                {getMealSuggestions(trip.tripType, 'dinner').map((meal, index) => (
-                  <li key={index}>{meal}</li>
-                ))}
-              </ul>
-            </div>
+            <h4 className="font-medium text-gray-900 dark:text-white mb-2">Breakfast</h4>
+            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              {getMealSuggestions(trip.tripType, 'breakfast').map((meal, index) => (
+                <li key={index}>{meal}</li>
+              ))}
+            </ul>
           </div>
-        )}
+          <div>
+            <h4 className="font-medium text-gray-900 dark:text-white mb-2">Lunch</h4>
+            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              {getMealSuggestions(trip.tripType, 'lunch').map((meal, index) => (
+                <li key={index}>{meal}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-medium text-gray-900 dark:text-white mb-2">Dinner</h4>
+            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              {getMealSuggestions(trip.tripType, 'dinner').map((meal, index) => (
+                <li key={index}>{meal}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );

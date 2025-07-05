@@ -6,20 +6,31 @@ import TripSetup from './pages/TripSetup';
 import PackingList from './pages/PackingList';
 import MealPlanner from './pages/MealPlanner';
 import GearLocker from './pages/GearLocker';
+import TripContainer from './components/TripContainer';
+import TripOverview from './pages/TripOverview';
+import TripSchedule from './pages/TripSchedule';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (
-    <Router>
-      <Layout>
+    <ErrorBoundary>
+      <Router>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/trip-setup" element={<TripSetup />} />
-          <Route path="/packing-list/:tripId" element={<PackingList />} />
-          <Route path="/meal-planner/:tripId" element={<MealPlanner />} />
-          <Route path="/gear-locker" element={<GearLocker />} />
+          {/* Main layout routes */}
+          <Route path="/" element={<Layout><Dashboard /></Layout>} />
+          <Route path="/trip-setup" element={<Layout><TripSetup /></Layout>} />
+          <Route path="/gear-locker" element={<Layout><GearLocker /></Layout>} />
+          
+          {/* Trip-specific routes with navigation */}
+          <Route path="/trip/:tripId" element={<TripContainer />}>
+            <Route index element={<TripOverview />} />
+            <Route path="packing" element={<PackingList />} />
+            <Route path="meals" element={<MealPlanner />} />
+            <Route path="schedule" element={<TripSchedule />} />
+          </Route>
         </Routes>
-      </Layout>
-    </Router>
+      </Router>
+    </ErrorBoundary>
   );
 }
 

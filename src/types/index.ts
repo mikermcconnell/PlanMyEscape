@@ -1,4 +1,6 @@
-export type TripType = 'car camping' | 'canoe camping' | 'hike camping' | 'cottage';
+export const TRIP_TYPES = ['car camping', 'canoe camping', 'hike camping', 'cottage'] as const;
+export type TripTypeOption = typeof TRIP_TYPES[number];
+export type TripType = TripTypeOption;
 
 export interface Group {
   id: string;
@@ -16,8 +18,29 @@ export interface Trip {
   startDate: string;
   endDate: string;
   description?: string;
+  location?: string;
   isCoordinated: boolean;
   groups: Group[];
+  activities?: Activity[];
+  emergencyContacts?: EmergencyContact[];
+}
+
+export interface Activity {
+  id: string;
+  name: string;  
+  type: 'outdoor' | 'indoor' | 'water' | 'entertainment';
+  equipment?: string[];
+  notes?: string;
+  schedules?: { day: number; timeOfDay: string }[];
+  isCompleted?: boolean;
+}
+
+export interface EmergencyContact {
+  id: string;
+  name: string;
+  type: 'hospital' | 'police' | 'park_services' | 'local_services';
+  phone: string;
+  address?: string;
 }
 
 export interface PackingItem {
@@ -32,6 +55,7 @@ export interface PackingItem {
   isPacked: boolean;
   required: boolean;
   assignedGroupId?: string;
+  isPersonal: boolean; // true for personal items (per person), false for group items (shared)
 }
 
 export interface ShoppingItem {
@@ -50,7 +74,6 @@ export interface Meal {
   day: number;
   type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   ingredients: string[];
-  servings: number;
   isCustom?: boolean;
   assignedGroupId?: string;
   sharedServings?: boolean;
