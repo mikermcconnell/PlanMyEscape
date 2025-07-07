@@ -18,8 +18,7 @@ const Notes: React.FC = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('notes')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
 
       if (error) {
         setError(error.message);
@@ -45,7 +44,9 @@ const Notes: React.FC = () => {
             <li key={note.id} className="border border-gray-300 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 shadow-sm">
               <h2 className="text-lg font-semibold mb-1">{note.title}</h2>
               {note.content && <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{note.content}</p>}
-              <p className="text-xs text-gray-500 mt-2">{new Date(note.created_at).toLocaleString()}</p>
+              {note.created_at && !isNaN(Date.parse(note.created_at)) && (
+                <p className="text-xs text-gray-500 mt-2">{new Date(note.created_at).toLocaleString()}</p>
+              )}
             </li>
           ))}
         </ul>

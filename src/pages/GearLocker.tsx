@@ -72,6 +72,7 @@ const GearLocker = () => {
   const categories = GEAR_CATEGORIES;
 
   // Memoised selector – recomputes only when `gear` changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const groupedGear = useMemo(() => {
     return categories.reduce((acc, category) => {
       acc[category] = gear.filter(item => item.category === category);

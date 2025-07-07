@@ -18,9 +18,20 @@ export class SupabaseStorageAdapter implements StorageAdapter {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) throw new Error('Not signed in');
 
+    // Map frontend Trip shape → DB columns
+    const { id, tripName, startDate, endDate, ...rest } = trip as any;
+    const payload: any = {
+      id,
+      name: tripName,
+      start: startDate ?? null,
+      end: endDate ?? null,
+      user_id: user.id,
+      data: rest, // store the remaining fields in a jsonb column called `data`
+    };
+
     const { data, error } = await supabase
       .from('trips')
-      .upsert({ ...trip, user_id: user.id })
+      .upsert(payload)
       .select()
       .single();
     if (error) throw error;
@@ -37,7 +48,14 @@ export class SupabaseStorageAdapter implements StorageAdapter {
       .eq('user_id', user.id);
 
     if (error) throw error;
-    return data as Trip[];
+
+    return (data ?? []).map((row: any) => ({
+      id: row.id,
+      tripName: row.name,
+      startDate: row.start,
+      endDate: row.end,
+      ...row.data, // spread stored jsonb back in
+    })) as Trip[];
   }
 }
 

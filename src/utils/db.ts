@@ -163,7 +163,7 @@ export const saveShoppingListToDB = async (tripId: string, items: ShoppingItem[]
 };
 
 export const addToShoppingListDB = async (tripId: string, newItems: ShoppingItem[]): Promise<void> => {
-  const db = await initDB();
+  const database = await initDB();
   const currentList = await getShoppingListFromDB(tripId);
   const updatedList = [...currentList];
 
@@ -183,5 +183,5 @@ export const addToShoppingListDB = async (tripId: string, newItems: ShoppingItem
     }
   });
 
-  await saveShoppingListToDB(tripId, updatedList);
+  await database.put('shopping_lists', updatedList, tripId);
 }; 

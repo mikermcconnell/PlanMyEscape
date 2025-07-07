@@ -214,6 +214,7 @@ const PackingList = () => {
   const personalItems = useMemo(() => displayedItems.filter(item => item.isPersonal), [displayedItems]);
   const groupItems = useMemo(() => displayedItems.filter(item => !item.isPersonal), [displayedItems]);
   
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const groupedPersonalItems = useMemo(() =>
     categories.reduce((acc, category) => {
       acc[category] = personalItems.filter(item => item.category === category);
@@ -221,6 +222,7 @@ const PackingList = () => {
     }, {} as Record<string, PackingItem[]>)
   , [personalItems]);
   
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const groupedGroupItems = useMemo(() =>
     categories.reduce((acc, category) => {
       acc[category] = groupItems.filter(item => item.category === category);

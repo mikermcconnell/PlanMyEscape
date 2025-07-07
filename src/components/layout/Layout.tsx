@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Tent, Backpack, Map, Home } from 'lucide-react';
+import { Tent, Backpack, Map, Home, Settings as SettingsIcon } from 'lucide-react';
+import LogoutButton from '../LogoutButton';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -40,7 +41,7 @@ const Layout = ({ children }: LayoutProps) => {
             </div>
             
             <div className="flex items-center space-x-2">
-              <Link to="/" className={navLinkClass('/')}>
+              <Link to="/dashboard" className={navLinkClass('/dashboard')}>
                 <Home className="h-5 w-5 mr-2" />
                 Dashboard
               </Link>
@@ -52,6 +53,11 @@ const Layout = ({ children }: LayoutProps) => {
                 <Backpack className="h-5 w-5 mr-2" />
                 Gear Locker
               </Link>
+              <Link to="/settings" className={navLinkClass('/settings')}>
+                <SettingsIcon className="h-5 w-5 mr-2" />
+                Settings
+              </Link>
+              <LogoutButton />
             </div>
           </div>
         </div>
@@ -66,8 +72,15 @@ const Layout = ({ children }: LayoutProps) => {
 
       {/* Footer */}
       <footer className="bg-white dark:bg-gray-800 shadow-md mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          {/* Footer content removed as requested */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap gap-2 justify-between text-sm text-gray-600 dark:text-gray-400">
+          <span>© {new Date().getFullYear()} PlanMyEscape. All rights reserved.</span>
+          <div className="space-x-2">
+            <Link to="/privacy" className="text-green-600 hover:underline">Privacy Policy</Link>
+            <span>|</span>
+            <Link to="/terms" className="text-green-600 hover:underline">Terms of Service</Link>
+            <span>|</span>
+            <Link to="/cookies" className="text-green-600 hover:underline">Cookie Policy</Link>
+          </div>
         </div>
       </footer>
     </div>

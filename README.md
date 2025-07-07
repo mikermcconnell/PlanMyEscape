@@ -627,3 +627,66 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - ✅ **Testing**: Unit tests, integration tests, E2E tests
 - 🔄 **In Progress**: Advanced meal planning, group coordination
 - 📋 **Planned**: Offline support, mobile app, API documentation 
+
+## Database Security: Row Level Security (RLS)
+
+This project now ships with a Supabase migration that enables RLS on all user-specific tables, adds `user_id` columns, and configures policies so that each user can only access their own data.
+
+1. Install the Supabase CLI if you haven't:
+   ```bash
+   npm install -g supabase
+   ```
+
+2. Authenticate and link your project (one-time):
+   ```bash
+   supabase login           # opens browser for token
+   supabase link --project-ref <your-project-ref>
+   ```
+
+3. Push the migration:
+   ```bash
+   supabase db push
+   ```
+
+The migration file lives at `supabase/migrations/202507072030_rls_security.sql`. Review it if you need to adjust table names or policies.
+
+⚠️  After applying the migration, make sure any inserts from external clients include the `user_id` column (the app already handles this automatically when a user is signed in). 
+
+## Environment Variables & Security Headers
+
+1. Copy `env.sample` to `.env.local` and fill in the required credentials.
+   `.env.local` is already listed in `.gitignore` so it will never be committed.
+
+2. The app relies on:
+   * `REACT_APP_SUPABASE_URL`
+   * `REACT_APP_SUPABASE_ANON_KEY`
+
+   Optional (server-side deployments):
+   * `SUPABASE_SERVICE_ROLE_KEY`
+   * `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
+
+3. Security headers
+   Static deployments (e.g., Netlify) will automatically serve the headers defined in `public/_headers` which includes `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, and a basic `Content-Security-Policy`.
+
+   If you host elsewhere, make sure to replicate these headers in your server configuration. 
+
+## Security Monitoring
+
+- A new `security_logs` table records login, failed login, data access, and data export events. See migration `202507072041_security_logs_table.sql`.
+- Front-end logging:
+  * Successful logins (in `SupaSignIn`) and data exports now call `logSecurityEvent` util.
+- For server/API endpoints, import `logSecurityEvent` from `src/utils/securityLogger` to capture additional events (e.g., `data_access`).
+
+## Rate Limiting
+
+`src/middleware/rateLimiter.ts` exports an Express middleware `authRateLimit` (5 login attempts per 15 min). Use it in any backend you deploy:
+
+```ts
+import express from 'express';
+import { authRateLimit } from './src/middleware/rateLimiter';
+
+const app = express();
+app.post('/login', authRateLimit, loginHandler);
+```
+
+> Note: The middleware file is marked `// @ts-nocheck` because it targets Node environments and is not bundled into the React app. 

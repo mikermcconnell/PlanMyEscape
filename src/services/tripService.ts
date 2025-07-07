@@ -1,5 +1,6 @@
 import { Trip } from '../types';
 import { StorageAdapter, HybridStorageAdapter } from './storageAdapter';
+import { toast } from 'react-toastify';
 
 export class TripService {
   constructor(private adapter: StorageAdapter) {}
@@ -9,6 +10,7 @@ export class TripService {
       return await this.adapter.saveTrip(trip);
     } catch (error) {
       console.error('Failed to save trip:', error);
+      toast.error('Unable to save trip');
       throw new Error('Unable to save trip');
     }
   }
@@ -18,6 +20,7 @@ export class TripService {
       return await this.adapter.getTrips();
     } catch (error) {
       console.error('Failed to load trips:', error);
+      toast.error('Unable to load trips');
       throw new Error('Unable to load trips');
     }
   }
