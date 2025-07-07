@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Edit3, Save, X, Package, Users, Shield, Sun, Home, Utensils, Scale, Tag } from 'lucide-react';
 import { GearItem } from '../types';
 import { getGear, saveGear, deleteGear } from '../utils/storage';
+
+// Categories are a fixed list – define once at module level so they don't change every render
+const GEAR_CATEGORIES = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Other'] as const;
 
 const GearLocker = () => {
   const [gear, setGear] = useState<GearItem[]>([]);
@@ -65,11 +68,16 @@ const GearLocker = () => {
     }
   };
 
-  const categories = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Other'];
-  const groupedGear = categories.reduce((acc, category) => {
-    acc[category] = gear.filter(item => item.category === category);
-    return acc;
-  }, {} as Record<string, GearItem[]>);
+  // Use stable categories constant
+  const categories = GEAR_CATEGORIES;
+
+  // Memoised selector – recomputes only when `gear` changes
+  const groupedGear = useMemo(() => {
+    return categories.reduce((acc, category) => {
+      acc[category] = gear.filter(item => item.category === category);
+      return acc;
+    }, {} as Record<string, GearItem[]>);
+  }, [gear]);
 
   const totalItems = gear.length;
   const totalWeight = gear.reduce((sum, item) => sum + (item.weight || 0), 0);
@@ -197,7 +205,7 @@ const GearLocker = () => {
       {/* Gear List */}
       <div className="space-y-8">
         {categories.map(category => {
-          const categoryGear = groupedGear[category];
+          const categoryGear: GearItem[] = groupedGear[category] ?? [];
           if (categoryGear.length === 0) return null;
 
           return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle } from 'lucide-react';
 import { PackingItem, Trip, ShoppingItem, TripType } from '../types';
@@ -12,37 +12,63 @@ interface TripContextType {
   setTrip: (trip: Trip) => void;
 }
 
+// ----------------------------------
+// Constants
+// ----------------------------------
+// Packing categories never change, so defining them at module level keeps
+// the array identity stable across renders and eliminates 'missing dependency' warnings.
+export const PACKING_CATEGORIES = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Other'] as const;
+
 const PackingList = () => {
   const { trip } = useOutletContext<TripContextType>();
   const tripId = trip.id;
   const [items, setItems] = useState<PackingItem[]>([]);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [showShoppingList, setShowShoppingList] = useState(false);
-  const categories = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Other'];
+  const groupOptions = [{ id: 'all', name: 'All' as const }, ...trip.groups];
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
+  const categories = PACKING_CATEGORIES;
   const [addItemForms, setAddItemForms] = useState<Record<string, { show: boolean; name: string; quantity: number }>>(
     categories.reduce((acc, category) => ({
       ...acc,
       [category]: { show: false, name: '', quantity: 1 }
     }), {})
   );
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
-  // Debounced save function
+  // Ref to keep track of the current timeout across renders
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced save function – clears any existing timeout before scheduling a new one
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSave = useCallback(
-    async (tripId: string, items: PackingItem[]) => {
-      const timeoutId = setTimeout(async () => {
-        await savePackingList(tripId, items);
+    (tripId: string, items: PackingItem[]) => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveTimeoutRef.current = setTimeout(() => {
+        savePackingList(tripId, items);
       }, 500);
-      return () => clearTimeout(timeoutId);
     },
     []
   );
 
-  const updateItems = useCallback(async (newItems: PackingItem[]) => {
-    setItems(newItems);
+  const updateItems = useCallback((newItems: PackingItem[]) => {
+    const previousItems = items;
+    setItems(newItems); // optimistic update
+    setUpdateError(null);
+
     if (tripId) {
-      await debouncedSave(tripId, newItems);
+      try {
+        debouncedSave(tripId, newItems);
+      } catch (error) {
+        console.error('Failed to save items:', error);
+        setUpdateError('Failed to save changes. Please try again.');
+        // revert
+        setItems(previousItems);
+      }
     }
-  }, [tripId, debouncedSave]);
+  }, [tripId, debouncedSave, items]);
 
   const calculateTotalCampers = (trip: Trip): number => {
     return trip.groups.reduce((sum, group) => sum + group.size, 0);
@@ -153,15 +179,15 @@ const PackingList = () => {
   const toggleAddForm = (category: string) => {
     setAddItemForms(prev => ({
       ...prev,
-      [category]: { ...prev[category], show: !prev[category].show }
-    }));
+      [category]: { ...prev[category]!, show: !prev[category]!.show }
+    }) as Record<string, { show: boolean; name: string; quantity: number }>);
   };
 
   const updateAddFormField = (category: string, field: 'name' | 'quantity', value: string | number) => {
     setAddItemForms(prev => ({
       ...prev,
-      [category]: { ...prev[category], [field]: value }
-    }));
+      [category]: { ...prev[category]!, [field]: value }
+    }) as Record<string, { show: boolean; name: string; quantity: number }>);
   };
 
   const getCategoryIcon = (category: string) => {
@@ -178,27 +204,35 @@ const PackingList = () => {
     }
   };
 
-  // Group items by personal vs group first, then by category
-  const personalItems = items.filter(item => item.isPersonal);
-  const groupItems = items.filter(item => !item.isPersonal);
+  // Items displayed according to the selected group tab
+  const displayedItems = useMemo(() =>
+    selectedGroupId === 'all'
+      ? items
+      : items.filter(i => i.assignedGroupId === selectedGroupId),
+    [items, selectedGroupId]);
+
+  const personalItems = useMemo(() => displayedItems.filter(item => item.isPersonal), [displayedItems]);
+  const groupItems = useMemo(() => displayedItems.filter(item => !item.isPersonal), [displayedItems]);
   
-  const groupedPersonalItems = categories.reduce((acc, category) => {
-    acc[category] = personalItems.filter(item => item.category === category);
-    return acc;
-  }, {} as Record<string, PackingItem[]>);
+  const groupedPersonalItems = useMemo(() =>
+    categories.reduce((acc, category) => {
+      acc[category] = personalItems.filter(item => item.category === category);
+      return acc;
+    }, {} as Record<string, PackingItem[]>)
+  , [personalItems]);
   
-  const groupedGroupItems = categories.reduce((acc, category) => {
-    acc[category] = groupItems.filter(item => item.category === category);
-    return acc;
-  }, {} as Record<string, PackingItem[]>);
+  const groupedGroupItems = useMemo(() =>
+    categories.reduce((acc, category) => {
+      acc[category] = groupItems.filter(item => item.category === category);
+      return acc;
+    }, {} as Record<string, PackingItem[]>)
+  , [groupItems]);
 
-  const totalItems = items.length;
-  const ownedItems = items.filter(item => item.isOwned).length;
-  const needToBuyItems = items.filter(item => item.needsToBuy).length;
-  const packedItems = items.filter(item => item.isPacked).length;
-  const totalWeight = items.reduce((sum, item) => sum + (item.weight || 0), 0);
-
-
+  const totalItems = displayedItems.length;
+  const ownedItems = displayedItems.filter(item => item.isOwned).length;
+  const needToBuyItems = displayedItems.filter(item => item.needsToBuy).length;
+  const packedItems = displayedItems.filter(item => item.isPacked).length;
+  const totalWeight = displayedItems.reduce((sum, item) => sum + (item.weight || 0), 0);
 
   const renderTripTypeText = (type: TripType): string => {
     switch (type) {
@@ -270,10 +304,27 @@ const PackingList = () => {
     }));
   };
 
-
-
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="mx-auto w-full md:max-w-5xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow p-8">
+      {updateError && (
+        <div className="mb-4 p-3 rounded-md bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300">
+          {updateError}
+        </div>
+      )}
+
+      {/* Group selector tabs */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {groupOptions.map(g => (
+          <button
+            key={g.id}
+            onClick={() => setSelectedGroupId(g.id)}
+            className={`px-3 py-1 rounded-full text-sm border transition-colors duration-150 ${selectedGroupId === g.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-600/50'}`}
+          >
+            {g.name === 'All' ? 'All Items' : `${g.name} list`}
+          </button>
+        ))}
+      </div>
+
       {/* Header */}
       <div className="mb-12">
         <div className="flex items-center justify-between">
@@ -321,7 +372,7 @@ const PackingList = () => {
       </div>
 
       {/* Add Item Form */}
-      {Object.entries(addItemForms).map(([category, formData]) => {
+      {Object.entries(addItemForms).map(([category, formData]: [string, { show: boolean; name: string; quantity: number }]) => {
         if (!formData.show) return null;
         return (
           <div key={category} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
@@ -375,7 +426,7 @@ const PackingList = () => {
               </p>
             </div>
             {categories.map(category => {
-              const categoryItems = groupedPersonalItems[category];
+              const categoryItems: PackingItem[] = groupedPersonalItems[category] ?? [];
               if (categoryItems.length === 0) return null;
 
               return (
@@ -556,7 +607,7 @@ const PackingList = () => {
               </p>
             </div>
             {categories.map(category => {
-              const categoryItems = groupedGroupItems[category];
+              const categoryItems: PackingItem[] = groupedGroupItems[category] ?? [];
               if (categoryItems.length === 0) return null;
 
               return (

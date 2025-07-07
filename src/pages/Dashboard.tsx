@@ -1,25 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trip, TripType, TRIP_TYPES } from '../types';
-import { getTrips } from '../utils/storage';
+import { getTrips } from '../utils/supabaseTrips';
 import { Tent, Compass, Mountain, Home, Calendar, Users, ArrowRight, Plus, MapPin, Activity } from 'lucide-react';
 
 const Dashboard = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const loadTrips = async () => {
-      setLoading(true);
-      try {
-        const savedTrips = await getTrips();
-        setTrips(savedTrips);
-      } catch (error) {
-        console.error('Failed to load trips:', error);
-      }
-      setLoading(false);
-    };
-    loadTrips();
+    setLoading(true);
+    getTrips()
+      .then(data => setTrips(data || []))
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
   }, []);
 
   const renderTripTypeText = (type: TripType): string => {
@@ -117,6 +112,8 @@ const Dashboard = () => {
       </div>
     );
   }
+
+  if (error) return <div style={{color:'red'}}>Error: {error}</div>;
 
   return (
     <div>

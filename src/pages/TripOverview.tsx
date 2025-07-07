@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Calendar, MapPin, Users } from 'lucide-react';
 import { Trip, TripType } from '../types';
-import { saveTrip } from '../utils/storage';
+import { saveTrip } from '../utils/supabaseTrips';
 import WeatherCard from '../components/WeatherCard';
 import ActivitiesPlanner from '../components/ActivitiesPlanner';
 
@@ -19,14 +19,22 @@ const TripOverview: React.FC = () => {
   const updateTripLocation = async () => {
     const updatedTrip = { ...trip, location: locationInput };
     setTrip(updatedTrip);
-    await saveTrip(updatedTrip);
-    setShowLocationEdit(false);
+    try {
+      await saveTrip(updatedTrip);
+      setShowLocationEdit(false);
+    } catch (error) {
+      console.error('Error saving trip:', error);
+    }
   };
 
   const updateTripActivities = async (activities: Trip['activities']) => {
     const updatedTrip = { ...trip, activities };
     setTrip(updatedTrip);
-    await saveTrip(updatedTrip);
+    try {
+      await saveTrip(updatedTrip);
+    } catch (error) {
+      console.error('Error saving trip:', error);
+    }
   };
 
   const getDaysBetweenDates = (startDate: string, endDate: string): number => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Outlet, Link } from 'react-router-dom';
 import { ArrowLeft, Tent } from 'lucide-react';
 import { Trip } from '../types';
-import { getTrips } from '../utils/storage';
+import { getTrips } from '../utils/supabaseTrips';
 import TripNavigation from './TripNavigation';
 
 const TripContainer: React.FC = () => {
@@ -17,7 +17,7 @@ const TripContainer: React.FC = () => {
       setLoading(true);
       try {
         const trips = await getTrips();
-        const currentTrip = trips.find(t => t.id === tripId);
+        const currentTrip = trips.find((t: Trip) => t.id === tripId);
         setTrip(currentTrip || null);
       } catch (error) {
         console.error('Failed to load trip:', error);

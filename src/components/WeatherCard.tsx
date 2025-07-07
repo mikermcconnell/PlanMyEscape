@@ -43,7 +43,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ startDate, endDate, location 
     if (!location) return;
     
     setLoading(true);
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       // Mock weather data
       setWeather({
         location: location || 'Trip Location',
@@ -60,6 +60,8 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ startDate, endDate, location 
       });
       setLoading(false);
     }, 1000);
+
+    return () => clearTimeout(timeout);
   }, [location, startDate, endDate]);
 
   if (!location) {

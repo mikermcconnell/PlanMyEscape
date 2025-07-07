@@ -161,7 +161,7 @@ export const getEquipmentSuggestions = (activityName: string): PackingSuggestion
   
   // Direct match
   if (activityEquipmentMap[normalizedName]) {
-    suggestions = activityEquipmentMap[normalizedName];
+    suggestions = activityEquipmentMap[normalizedName] ?? [];
   } else {
     // Partial matches for flexibility
     for (const [key, suggestionsArray] of Object.entries(activityEquipmentMap)) {

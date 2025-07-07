@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Tent, Package, Utensils, Users, Calendar, MapPin, Activity } from 'lucide-react';
 import { Trip, TripType } from '../types';
-import { getTrips, saveTrip } from '../utils/storage';
+import { getTrips, saveTrip } from '../utils/supabaseTrips';
 import WeatherCard from '../components/WeatherCard';
 import ActivitiesPlanner from '../components/ActivitiesPlanner';
 
@@ -11,18 +11,21 @@ const TripDetail = () => {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [showLocationEdit, setShowLocationEdit] = useState(false);
   const [locationInput, setLocationInput] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const loadTrip = async () => {
-      if (!tripId) return;
-      const trips = await getTrips();
-      const currentTrip = trips.find(t => t.id === tripId);
-      if (currentTrip) {
-        setTrip(currentTrip);
-        setLocationInput(currentTrip.location || '');
-      }
-    };
-    loadTrip();
+    setLoading(true);
+    getTrips()
+      .then(trips => {
+        const currentTrip = trips.find((t: Trip) => t.id === tripId);
+        if (currentTrip) {
+          setTrip(currentTrip);
+          setLocationInput(currentTrip.location || '');
+        }
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
   }, [tripId]);
 
   const updateTripLocation = async () => {
@@ -46,6 +49,9 @@ const TripDetail = () => {
     const diffTime = Math.abs(end.getTime() - start.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   };
+
+  if (loading) return <div>Loading trip...</div>;
+  if (error) return <div style={{color:'red'}}>Error: {error}</div>;
 
   if (!trip) {
     return (

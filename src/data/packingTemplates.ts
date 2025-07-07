@@ -758,7 +758,7 @@ export const processPackingItems = (items: PackingItem[]): PackingItem[] => {
   
   return separatedSuggestions.map((suggestion, index) => {
     // Find the original item to preserve its isPersonal property
-    const originalItem = items.find(item => item.name.toLowerCase().includes(suggestion.name.toLowerCase())) || items[0];
+    const originalItem = items.find(item => item.name.toLowerCase().includes(suggestion.name.toLowerCase()));
     
     return {
       id: Math.random().toString(36).substr(2, 9),
@@ -772,7 +772,7 @@ export const processPackingItems = (items: PackingItem[]): PackingItem[] => {
       isPacked: false,
       required: suggestion.required,
       assignedGroupId: undefined,
-      isPersonal: originalItem.isPersonal
+      isPersonal: originalItem?.isPersonal ?? false
     };
   });
 }; 

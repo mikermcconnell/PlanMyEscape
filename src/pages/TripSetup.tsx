@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Users, Mail, Search, Info, CheckCircle, AlertCircle, MapPin, Calendar, Users as UsersIcon, Compass, X } from 'lucide-react';
 import { Trip, TripType, Group, GROUP_COLORS, TRIP_TYPES } from '../types';
-import { saveTrips, getTrips, generateId } from '../utils/storage';
-
-// Use environment variable for API key
-const NPS_API_KEY = process.env.REACT_APP_NPS_API_KEY;
+import { saveTrip, getTrips } from '../utils/supabaseTrips';
+import { generateId } from '../utils/storage';
 
 interface ParkSuggestion {
   fullName: string;
@@ -15,7 +13,6 @@ interface ParkSuggestion {
 
 const TripSetup = () => {
   const navigate = useNavigate();
-  const [trips, setTrips] = useState<Trip[]>([]);
   const [tripName, setTripName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -34,19 +31,66 @@ const TripSetup = () => {
     size: 1,
     contactName: '',
     contactEmail: '',
-    color: GROUP_COLORS[0]
+    color: GROUP_COLORS[0] as string
   });
   const [tripNameError, setTripNameError] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
 
+  // Load trips just to prevent duplicate names (future feature)
+  const tripsRef = useRef<Trip[]>([]);
   useEffect(() => {
     const loadTrips = async () => {
       const savedTrips = await getTrips();
-      setTrips(savedTrips);
+      tripsRef.current = savedTrips;
     };
     loadTrips();
   }, []);
+
+  // Cleanup-aware suggestion fetcher (debounced ~300ms)
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const timeout = setTimeout(async () => {
+      if (!tripName.trim()) {
+        if (isMounted) {
+          setParkSuggestions([]);
+          setShowSuggestions(false);
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `/api/parks?q=${encodeURIComponent(tripName)}&limit=5`,
+          { signal: controller.signal }
+        );
+        const data = await response.json();
+        if (isMounted) {
+          setParkSuggestions(data.data.map((park: any) => ({
+            fullName: park.fullName,
+            name: park.name,
+            states: park.states
+          })));
+          setShowSuggestions(true);
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error('Error fetching park suggestions:', error);
+          setParkSuggestions([]);
+        }
+      }
+    }, 300);
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [tripName]);
 
   // Calculate completion progress
   const calculateProgress = () => {
@@ -112,33 +156,9 @@ const TripSetup = () => {
     return info[type] || info['car camping'];
   };
 
-  const fetchParkSuggestions = async (query: string) => {
-    if (!query.trim()) {
-      setParkSuggestions([]);
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `https://developer.nps.gov/api/v1/parks?q=${encodeURIComponent(query)}&api_key=${NPS_API_KEY}&limit=5`
-      );
-      const data = await response.json();
-      setParkSuggestions(data.data.map((park: any) => ({
-        fullName: park.fullName,
-        name: park.name,
-        states: park.states
-      })));
-      setShowSuggestions(true);
-    } catch (error) {
-      console.error('Error fetching park suggestions:', error);
-      setParkSuggestions([]);
-    }
-  };
-
   const handleTripNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setTripName(value);
-    fetchParkSuggestions(value);
     setTripNameError('');
   };
 
@@ -150,10 +170,12 @@ const TripSetup = () => {
 
   const handleAddGroup = () => {
     if (currentGroup.name && currentGroup.size > 0) {
-      const newGroup = {
+      const newGroup: Group = {
         ...currentGroup,
         id: Date.now().toString(),
-        color: GROUP_COLORS[groups.length % GROUP_COLORS.length]
+        contactName: currentGroup.contactName?.trim() || undefined,
+        contactEmail: currentGroup.contactEmail?.trim() || undefined,
+        color: GROUP_COLORS[groups.length % GROUP_COLORS.length] as string
       };
       setGroups([...groups, newGroup]);
       setCurrentGroup({
@@ -162,7 +184,7 @@ const TripSetup = () => {
         size: 1,
         contactName: '',
         contactEmail: '',
-        color: GROUP_COLORS[(groups.length + 1) % GROUP_COLORS.length]
+        color: GROUP_COLORS[(groups.length + 1) % GROUP_COLORS.length] as string
       });
       setShowGroupForm(false);
     }
@@ -189,7 +211,7 @@ const TripSetup = () => {
         size: numberOfPeople,
         contactName: undefined,
         contactEmail: undefined,
-        color: GROUP_COLORS[0]
+        color: GROUP_COLORS[0] as string
       }];
     }
 
@@ -207,16 +229,15 @@ const TripSetup = () => {
       emergencyContacts: []
     };
 
-    // Save trip and navigate to new trip page
-    const updatedTrips = [...trips, newTrip];
-    const success = await saveTrips(updatedTrips);
-    if (success) {
-      // Optional: add a short delay to ensure IndexedDB is ready
-      setTimeout(() => {
-        navigate(`/trip/${newTrip.id}`);
-      }, 200);
-    } else {
-      setValidationErrors(['Failed to save trip. Please try again.']);
+    setCreating(true);
+    setCreateError('');
+    try {
+      await saveTrip(newTrip);
+      navigate(`/trip/${newTrip.id}`);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -714,6 +735,10 @@ const TripSetup = () => {
           )}
         </div>
       </div>
+
+      {/* Loading/Error Message */}
+      {creating && <div>Creating trip...</div>}
+      {createError && <div style={{color:'red'}}>Error: {createError}</div>}
     </div>
   );
 };
