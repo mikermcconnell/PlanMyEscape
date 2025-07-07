@@ -11,6 +11,7 @@ import TripOverview from './pages/TripOverview';
 import TripSchedule from './pages/TripSchedule';
 import ErrorBoundary from './components/ErrorBoundary';
 import SupaSignIn from './components/SupaSignIn';
+import Notes from './pages/Notes';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="/" element={<Layout><Dashboard /></Layout>} />
           <Route path="/trip-setup" element={<Layout><TripSetup /></Layout>} />
           <Route path="/gear-locker" element={<Layout><GearLocker /></Layout>} />
+          <Route path="/notes" element={<Layout><Notes /></Layout>} />
           <Route path="/signin" element={<SupaSignIn />} />
           
           {/* Trip-specific routes with navigation */}
