@@ -12,7 +12,7 @@ const createItem = (
   id: Math.random().toString(36).substr(2, 9),
   name,
   category,
-  quantity,
+  quantity: isPersonal ? 1 : quantity,
   weight,
   isChecked: false,
   isOwned: false,

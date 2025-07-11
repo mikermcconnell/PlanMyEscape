@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Trip, TripType, TRIP_TYPES } from '../types';
 import { getTrips } from '../utils/supabaseTrips';
-import { Tent, Compass, Mountain, Home, Calendar, Users, ArrowRight, Plus, MapPin, Activity } from 'lucide-react';
+import { Tent, Compass, Mountain, Home, Calendar, Users, ArrowRight, Plus, MapPin, Activity, Trash2 } from 'lucide-react';
+import { deleteTrip } from '../utils/storage';
 
 const Dashboard = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
@@ -172,52 +174,61 @@ const Dashboard = () => {
                 const progressPercent = (progress.completed / progress.total) * 100;
                 
                 return (
-                  <Link
+                  <div
                     key={trip.id}
-                    to={`/trip/${trip.id}`}
-                    className="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-600 transition-colors duration-150 p-4"
+                    className="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-600 transition-colors duration-150 p-4 cursor-pointer relative"
+                    onClick={() => navigate(`/trip/${trip.id}`)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <h3 className="font-medium text-gray-900 dark:text-white">
-                            {trip.tripName}
-                          </h3>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTripTypeColor(trip.tripType)}`}>
-                            {getTripTypeIcon(trip.tripType)}
-                            <span className="ml-1">{renderTripTypeText(trip.tripType)}</span>
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-1" />
-                            {new Date(trip.startDate).toLocaleDateString()}
-                          </div>
-                          {trip.location && (
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-1" />
-                              {trip.location}
-                            </div>
-                          )}
-                        </div>
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-500 dark:text-gray-400">Progress</span>
-                            <span className="text-gray-700 dark:text-gray-300 font-medium">
-                              {progress.completed}/{progress.total} complete
-                            </span>
-                          </div>
-                          <div className="mt-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div 
-                              className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${progressPercent}%` }}
-                            ></div>
-                          </div>
-                        </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-lg text-gray-900 dark:text-white">{trip.tripName}</span>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTripTypeColor(trip.tripType)}`}>
+                          {getTripTypeIcon(trip.tripType)}
+                          <span className="ml-1">{renderTripTypeText(trip.tripType)}</span>
+                        </span>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-gray-400 ml-4" />
+                      <button
+                        className="p-2 rounded-full text-red-500 hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          if (window.confirm('Are you sure you want to delete this trip? This action cannot be undone.')) {
+                            await deleteTrip(trip.id);
+                            setTrips(trips => trips.filter(t => t.id !== trip.id));
+                          }
+                        }}
+                        title="Delete trip"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
                     </div>
-                  </Link>
+                    <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {new Date(trip.startDate).toLocaleDateString()}
+                      </div>
+                      {trip.location && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          {trip.location}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">Progress</span>
+                        <span className="text-gray-700 dark:text-gray-300 font-medium">
+                          {progress.completed}/{progress.total} complete
+                        </span>
+                      </div>
+                      <div className="mt-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div 
+                          className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${progressPercent}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
             </div>
