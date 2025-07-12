@@ -29,7 +29,7 @@ const MealPlanner = () => {
   const [newIngredientQty, setNewIngredientQty] = useState<number>(1);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customMealName, setCustomMealName] = useState('');
-  const [suggestedIngredients, setSuggestedIngredients] = useState<string[]>([]);
+  const [, setSuggestedIngredients] = useState<string[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [customIngredient, setCustomIngredient] = useState('');
   const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -56,16 +56,19 @@ const MealPlanner = () => {
       return acc;
     }, {});
 
-    const aggregated: ShoppingItem[] = Object.entries(ingredientCounts).map(([name, count]) => ({
-      id: crypto.randomUUID(),
-      name,
-      quantity: count,
-      category: 'food',
-      needsToBuy: false,
-      isOwned: false
-    }));
-
-    setShoppingItems(aggregated);
+    setShoppingItems(prev => {
+      return Object.entries(ingredientCounts).map(([name, count]) => {
+        const existing = prev.find(item => item.name.toLowerCase() === name.toLowerCase());
+        return {
+          id: existing ? existing.id : crypto.randomUUID(),
+          name,
+          quantity: count,
+          category: 'food',
+          needsToBuy: existing ? existing.needsToBuy : false,
+          isOwned: existing ? existing.isOwned : false
+        };
+      });
+    });
   }, [meals, tripId]);
 
   // Helpers for toggling status
@@ -81,60 +84,53 @@ const MealPlanner = () => {
     const current = shoppingItems.find(i => i.id === itemId);
     if (!current || !tripId) return;
     const newNeedsToBuy = !current.needsToBuy;
-    updateShoppingItem(itemId, { needsToBuy: newNeedsToBuy, isOwned: false });
-
-    // Sync to global shopping list
-    const globalList = await getShoppingList(tripId);
-    const existing = globalList.find(i => i.name.toLowerCase() === current.name.toLowerCase() && i.category === 'food');
-    if (existing) {
-      // Update needsToBuy status
-      const updated = globalList.map(i =>
-        i.id === existing.id ? { ...i, needsToBuy: newNeedsToBuy, isOwned: false } : i
-      );
+    if (!newNeedsToBuy) {
+      // Remove from shopping list if unchecked
+      const updated = shoppingItems.filter(i => i.id !== itemId);
+      setShoppingItems(updated);
       await saveShoppingList(tripId, updated);
-    } else if (newNeedsToBuy) {
-      // Add new item to global shopping list
-      const newItem: ShoppingItem = {
-        id: crypto.randomUUID(),
-        name: current.name,
-        quantity: current.quantity,
-        category: 'food',
-        needsToBuy: true,
-        isOwned: false
-      };
-      await saveShoppingList(tripId, [...globalList, newItem]);
+      return;
     }
+    updateShoppingItem(itemId, { needsToBuy: true, isOwned: false });
+    setConfirmation('Added to shopping list!');
+    setTimeout(() => setConfirmation(null), 2000);
   };
 
   const handleToggleOwned = (itemId: string) => {
     const current = shoppingItems.find(i => i.id === itemId);
     if (!current) return;
     const newOwned = !current.isOwned;
-    updateShoppingItem(itemId, { isOwned: newOwned, needsToBuy: false });
-
-    // Sync to packing list when marked owned
-    if (newOwned && tripId) {
-      (async () => {
-        const packing = await getPackingList(tripId);
-        const exists = packing.find(p => p.name.toLowerCase() === current.name.toLowerCase() && p.category === 'Food');
-        if (!exists) {
-          const newPackingItem = {
-            id: crypto.randomUUID(),
-            name: current.name,
-            category: 'Food',
-            quantity: current.quantity,
-            isChecked: false,
-            isOwned: true,
-            needsToBuy: false,
-            isPacked: false,
-            required: false,
-            isPersonal: false
-          } as any;
-          await savePackingList(tripId, [...packing, newPackingItem]);
-          setConfirmation('Added to packing list!');
-          setTimeout(() => setConfirmation(null), 2000);
-        }
-      })();
+    if (newOwned) {
+      // Remove from shopping list if marked as owned
+      const updated = shoppingItems.filter(i => i.id !== itemId);
+      setShoppingItems(updated);
+      if (tripId) saveShoppingList(tripId, updated);
+      // Sync to packing list when marked owned
+      if (tripId) {
+        (async () => {
+          const packing = await getPackingList(tripId);
+          const exists = packing.find(p => p.name.toLowerCase() === current.name.toLowerCase() && p.category === 'Food');
+          if (!exists) {
+            const newPackingItem = {
+              id: crypto.randomUUID(),
+              name: current.name,
+              category: 'Food',
+              quantity: current.quantity,
+              isChecked: false,
+              isOwned: true,
+              needsToBuy: false,
+              isPacked: false,
+              required: false,
+              isPersonal: false
+            } as any;
+            await savePackingList(tripId, [...packing, newPackingItem]);
+            setConfirmation('Added to packing list!');
+            setTimeout(() => setConfirmation(null), 2000);
+          }
+        })();
+      }
+    } else {
+      updateShoppingItem(itemId, { isOwned: false });
     }
   };
 
@@ -155,19 +151,7 @@ const MealPlanner = () => {
     return Array.from({ length: days }, (_, i) => i + 1);
   };
 
-  const addMeal = (meal: Meal) => {
-    const newMeal = {
-      ...meal,
-      day: selectedDay,
-      assignedGroupId: undefined,
-      sharedServings: true,
-      servings: meal.servings || 1 // Ensure servings is defined
-    };
-    const updatedMeals = [...meals, newMeal];
-    setMeals(updatedMeals);
-    if (tripId) saveMeals(tripId, updatedMeals);
-    setShowMealModal(false);
-  };
+
 
   const deleteMeal = (mealId: string) => {
     const updatedMeals = meals.filter(meal => meal.id !== mealId);
@@ -180,7 +164,7 @@ const MealPlanner = () => {
   };
 
   // Computed ingredient list for empty state
-  const shoppingListEmpty = shoppingItems.length === 0;
+  const shoppingListEmpty = shoppingItems.filter(item => item.needsToBuy).length === 0;
 
   const addCustomMeal = () => {
     if (customMealName.trim() && selectedIngredients.length > 0) {
@@ -209,13 +193,7 @@ const MealPlanner = () => {
     }
   };
 
-  const toggleIngredient = (ingredient: string) => {
-    setSelectedIngredients(prev => 
-      prev.includes(ingredient) 
-        ? prev.filter(i => i !== ingredient)
-        : [...prev, ingredient]
-    );
-  };
+
 
   const addCustomIngredientToList = () => {
     if (customIngredient.trim() && !selectedIngredients.includes(customIngredient.trim())) {
@@ -243,7 +221,7 @@ const MealPlanner = () => {
       name: newIngredientName.trim(),
       quantity: newIngredientQty,
       category: 'food',
-      needsToBuy: false,
+      needsToBuy: true,
       isOwned: false
     };
     const updated = [...shoppingItems, newItem];
@@ -418,11 +396,6 @@ const MealPlanner = () => {
                 <ShoppingCart className="h-5 w-5 mr-2" />
                 Ingredients List
               </h2>
-              <button
-                onClick={addIngredient}
-                disabled={!newIngredientName.trim()}
-                className="ml-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-              >Add</button>
             </div>
             
             <div className="p-6">
@@ -442,6 +415,12 @@ const MealPlanner = () => {
                   onChange={e => setNewIngredientQty(parseInt(e.target.value) || 1)}
                   className="w-20 px-2 py-1 border rounded text-sm dark:bg-gray-700"
                 />
+                <button
+                  onClick={addIngredient}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                >
+                  Add
+                </button>
               </div>
               {shoppingListEmpty ? (
                 <div className="text-gray-500 dark:text-gray-400 text-center py-4">
@@ -449,7 +428,7 @@ const MealPlanner = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {shoppingItems.map((item: ShoppingItem) => (
+                  {shoppingItems.filter(item => item.needsToBuy).map((item: ShoppingItem) => (
                     <div key={item.id} className="flex items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
                       {/* Status buttons */}
                       <div className="flex items-center space-x-2 mr-3">
