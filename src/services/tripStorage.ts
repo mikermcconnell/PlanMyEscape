@@ -1,6 +1,7 @@
-import { Trip } from '../types';
+import { Trip, GroupColor } from '../types';
 import { TripSchema } from '../schemas';
 import { saveTripToDB, getTripsFromDB, deleteTripFromDB } from '../utils/db';
+import { toGroupColor } from '../utils/storage';
 
 export class ValidationError extends Error {
   constructor(message: string) {
@@ -21,13 +22,22 @@ export class TripStorage {
    * Persist a trip after validation. Throws on validation or storage failure.
    */
   async saveTrip(trip: Trip): Promise<void> {
-    const validation = TripSchema.safeParse(trip);
+    // Ensure all group colors are valid GroupColor before validation
+    const safeTrip = {
+      ...trip,
+      groups: trip.groups.map(group => ({
+        ...group,
+        color: toGroupColor(group.color) as GroupColor
+      }))
+    };
+    
+    const validation = TripSchema.safeParse(safeTrip);
     if (!validation.success) {
       throw new ValidationError(JSON.stringify(validation.error.issues));
     }
 
     try {
-      await saveTripToDB(validation.data);
+      await saveTripToDB(validation.data as Trip);
     } catch (err) {
       throw new StorageError('Failed to save trip', err);
     }
