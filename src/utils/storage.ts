@@ -1,4 +1,4 @@
-import { Trip, PackingItem, Meal, GearItem, ShoppingItem, CampingGroup, GROUP_COLORS } from '../types';
+import { Trip, PackingItem, Meal, GearItem, ShoppingItem, CampingGroup, GROUP_COLORS, GroupColor, Group } from '../types';
 import { TripSchema, PackingItemSchema, MealSchema, GearItemSchema, ShoppingItemSchema, validateData } from '../schemas';
 import {
   getTripsFromDB,
@@ -40,7 +40,11 @@ type OldTripFormat = {
 export const getTrips = async (): Promise<Trip[]> => {
   try {
     const trips = await getTripsFromDB();
-    return trips;
+    // Ensure all group colors are valid GroupColor
+    return trips.map(trip => ({
+      ...trip,
+      groups: trip.groups.map(coerceToGroup)
+    })) as Trip[];
   } catch (error) {
     console.error('Failed to get trips:', error);
     return [];
@@ -48,14 +52,22 @@ export const getTrips = async (): Promise<Trip[]> => {
 };
 
 export const saveTrip = async (trip: Trip): Promise<boolean> => {
-  const validation = validateData(TripSchema, trip);
+  // Ensure all group colors are valid before saving
+  const safeTrip = {
+    ...trip,
+    groups: trip.groups.map(group => ({
+      ...group,
+      color: toGroupColor(group.color)
+    }))
+  };
+  const validation = validateData(TripSchema, safeTrip);
   if (!validation.success) {
     console.error('Invalid trip data:', validation.error);
     return false;
   }
 
   try {
-    await saveTripToDB(validation.data);
+    await saveTripToDB(validation.data as Trip);
     return true;
   } catch (error) {
     console.error('Failed to save trip:', error);
@@ -66,12 +78,20 @@ export const saveTrip = async (trip: Trip): Promise<boolean> => {
 export const saveTrips = async (trips: Trip[]): Promise<boolean> => {
   try {
     for (const trip of trips) {
-      const validation = validateData(TripSchema, trip);
+      // Ensure all group colors are valid before saving
+      const safeTrip = {
+        ...trip,
+        groups: trip.groups.map(group => ({
+          ...group,
+          color: toGroupColor(group.color)
+        }))
+      };
+      const validation = validateData(TripSchema, safeTrip);
       if (!validation.success) {
         console.error('Invalid trip data:', validation.error);
         return false;
       }
-      await saveTripToDB(validation.data);
+      await saveTripToDB(validation.data as Trip);
     }
     return true;
   } catch (error) {
@@ -238,6 +258,25 @@ export const toggleShoppingItem = async (tripId: string, itemId: string): Promis
   await saveShoppingList(tripId, updatedList);
 };
 
+// Utility to ensure group color is a valid GroupColor
+export function toGroupColor(color: string): GroupColor {
+  return (GROUP_COLORS as readonly string[]).includes(color)
+    ? (color as GroupColor)
+    : GROUP_COLORS[0];
+}
+
+// Helper to coerce any raw group object to a valid Group
+function coerceToGroup(group: any): Group {
+  return {
+    id: group.id,
+    name: group.name,
+    size: group.size,
+    contactName: group.contactName,
+    contactEmail: group.contactEmail,
+    color: toGroupColor(group.color)
+  };
+}
+
 // Helper function to migrate old data structure to new one if needed
 export const migrateTrips = async () => {
   const trips = await getTrips();
@@ -274,6 +313,16 @@ export const migrateTrips = async () => {
                   oldTrip.type,
         tripName: (trip as any).parkName || oldTrip.tripName // Handle both old and new field names
       } as Trip;
+    }
+    // Ensure all group colors are valid
+    if (trip.groups) {
+      return {
+        ...trip,
+        groups: trip.groups.map(group => ({
+          ...group,
+          color: toGroupColor(group.color)
+        }) as Group)
+      };
     }
     return trip;
   });
