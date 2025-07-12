@@ -90,7 +90,8 @@ const TripOverview: React.FC = () => {
   };
 
   const removeGroup = async (groupId: string) => {
-    if (!confirm('Are you sure you want to remove this group? This will also remove any items assigned to this group.')) {
+    // eslint-disable-next-line no-restricted-globals
+    if (!window.confirm('Are you sure you want to remove this group? This will also remove any items assigned to this group.')) {
       return;
     }
     

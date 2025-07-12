@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Users, Mail, Search, Info, CheckCircle, AlertCircle, MapPin, Calendar, Users as UsersIcon, Compass, X } from 'lucide-react';
-import { Trip, TripType, Group, GROUP_COLORS, TRIP_TYPES } from '../types';
+import { Trip, TripType, Group, GROUP_COLORS, TRIP_TYPES, GroupColor } from '../types';
 import { saveTrip, getTrips } from '../utils/supabaseTrips';
 import { generateId } from '../utils/storage';
 
@@ -31,7 +31,7 @@ const TripSetup = () => {
     size: 1,
     contactName: '',
     contactEmail: '',
-    color: GROUP_COLORS[0] as string
+    color: GROUP_COLORS[0] as GroupColor
   });
   const [tripNameError, setTripNameError] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
@@ -175,7 +175,7 @@ const TripSetup = () => {
         id: Date.now().toString(),
         contactName: currentGroup.contactName?.trim() || undefined,
         contactEmail: currentGroup.contactEmail?.trim() || undefined,
-        color: GROUP_COLORS[groups.length % GROUP_COLORS.length] as string
+        color: GROUP_COLORS[groups.length % GROUP_COLORS.length] as GroupColor
       };
       setGroups([...groups, newGroup]);
       setCurrentGroup({
@@ -184,7 +184,7 @@ const TripSetup = () => {
         size: 1,
         contactName: '',
         contactEmail: '',
-        color: GROUP_COLORS[(groups.length + 1) % GROUP_COLORS.length] as string
+        color: GROUP_COLORS[(groups.length + 1) % GROUP_COLORS.length] as GroupColor
       });
       setShowGroupForm(false);
     }
@@ -211,7 +211,7 @@ const TripSetup = () => {
         size: numberOfPeople,
         contactName: undefined,
         contactEmail: undefined,
-        color: GROUP_COLORS[0] as string
+        color: GROUP_COLORS[0] as GroupColor
       }];
     }
 

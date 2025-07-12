@@ -413,14 +413,36 @@ const MealPlanner = () => {
         {/* Shopping List */}
         <div className="lg:col-span-1">
           <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900 dark:text-white flex items-center">
                 <ShoppingCart className="h-5 w-5 mr-2" />
                 Ingredients List
               </h2>
+              <button
+                onClick={addIngredient}
+                disabled={!newIngredientName.trim()}
+                className="ml-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
+              >Add</button>
             </div>
             
             <div className="p-6">
+              {/* Add Ingredient Form */}
+              <div className="mb-4 flex space-x-2">
+                <input
+                  type="text"
+                  placeholder="Ingredient"
+                  value={newIngredientName}
+                  onChange={e => setNewIngredientName(e.target.value)}
+                  className="flex-1 px-2 py-1 border rounded text-sm dark:bg-gray-700"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  value={newIngredientQty}
+                  onChange={e => setNewIngredientQty(parseInt(e.target.value) || 1)}
+                  className="w-20 px-2 py-1 border rounded text-sm dark:bg-gray-700"
+                />
+              </div>
               {shoppingListEmpty ? (
                 <div className="text-gray-500 dark:text-gray-400 text-center py-4">
                   Add meals to generate shopping list
@@ -481,29 +503,6 @@ const MealPlanner = () => {
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* Add Ingredient Form */}
-            <div className="mt-4 flex space-x-2">
-              <input
-                type="text"
-                placeholder="Ingredient"
-                value={newIngredientName}
-                onChange={e => setNewIngredientName(e.target.value)}
-                className="flex-1 px-2 py-1 border rounded text-sm dark:bg-gray-700"
-              />
-              <input
-                type="number"
-                min="1"
-                value={newIngredientQty}
-                onChange={e => setNewIngredientQty(parseInt(e.target.value) || 1)}
-                className="w-20 px-2 py-1 border rounded text-sm dark:bg-gray-700"
-              />
-              <button
-                onClick={addIngredient}
-                disabled={!newIngredientName.trim()}
-                className="px-3 py-1 bg-green-600 text-white rounded disabled:bg-gray-400"
-              >Add</button>
             </div>
           </div>
         </div>
