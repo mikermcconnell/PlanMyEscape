@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, CheckCircle, Circle, Mountain, Waves, GamepadIcon, AlertCircle, X } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Circle, Mountain, Waves, GamepadIcon, X } from 'lucide-react';
 import { Activity, TripType, PackingItem } from '../types';
 import { getEquipmentSuggestions, detectActivityType } from '../data/activityEquipment';
 import { getPackingList, savePackingList } from '../utils/storage';

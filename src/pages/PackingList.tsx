@@ -217,21 +217,19 @@ const PackingList = () => {
   const personalItems = useMemo(() => displayedItems.filter(item => item.isPersonal), [displayedItems]);
   const groupItems = useMemo(() => displayedItems.filter(item => !item.isPersonal), [displayedItems]);
   
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const groupedPersonalItems = useMemo(() =>
     categories.reduce((acc, category) => {
       acc[category] = personalItems.filter(item => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
-  , [personalItems]);
+  , [personalItems, categories]);
   
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const groupedGroupItems = useMemo(() =>
     categories.reduce((acc, category) => {
       acc[category] = groupItems.filter(item => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
-  , [groupItems]);
+  , [groupItems, categories]);
 
   const totalItems = displayedItems.length;
   const ownedItems = displayedItems.filter(item => item.isOwned).length;

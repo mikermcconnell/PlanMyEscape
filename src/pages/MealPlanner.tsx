@@ -6,7 +6,7 @@ import { getMeals, saveMeals } from '../utils/storage';
 import { getMealTemplates } from '../data/mealTemplates';
 import ShoppingList from '../components/ShoppingList';
 import { ShoppingItem } from '../types';
-import { saveShoppingList, getPackingList, savePackingList, getShoppingList } from '../utils/storage';
+import { saveShoppingList, getPackingList, savePackingList } from '../utils/storage';
 import { suggestIngredients } from '../data/recipeSuggestions';
 import { tripMealSuggestions } from '../data/tripMealSuggestions';
 
