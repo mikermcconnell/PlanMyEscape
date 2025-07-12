@@ -54,6 +54,10 @@ const ShoppingListPage: React.FC = () => {
     setAllItems(updated);
     await saveShoppingList(tripId, updated);
 
+    // Force refresh from storage to ensure UI is in sync
+    const refreshed = await getShoppingList(tripId);
+    setAllItems(refreshed);
+
     const toggled = updated.find(i => i.id === itemId);
     if (toggled?.isChecked) {
       toast.success(`Great! You bought ${toggled.name}.`, { autoClose: 2000 });
@@ -100,6 +104,7 @@ const ShoppingListPage: React.FC = () => {
         );
       })()}
 
+      {/* Shopping List Items */}
       {allItems.filter(i => i.needsToBuy).length === 0 ? (
         <div className="text-gray-500 dark:text-gray-400">No items marked as need to buy.</div>
       ) : (

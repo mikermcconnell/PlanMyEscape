@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trip, TripType, TRIP_TYPES } from '../types';
 import { getTrips } from '../utils/supabaseTrips';
-import { Tent, Compass, Mountain, Home, Calendar, Users, ArrowRight, Plus, MapPin, Activity, Trash2 } from 'lucide-react';
+import { Tent, Compass, Mountain, Home, Calendar, Users, Plus, MapPin, Activity, Trash2 } from 'lucide-react';
 import { deleteTrip } from '../utils/storage';
 
 const Dashboard = () => {

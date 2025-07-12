@@ -224,15 +224,13 @@ const TripOverview: React.FC = () => {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Groups</h2>
-          {trip.isCoordinated && (
-            <button
-              onClick={() => setShowAddGroup(true)}
-              className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Group
-            </button>
-          )}
+          <button
+            onClick={() => setShowAddGroup(true)}
+            className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-green-400"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Create New Group
+          </button>
         </div>
 
         {trip.groups.length === 0 ? (

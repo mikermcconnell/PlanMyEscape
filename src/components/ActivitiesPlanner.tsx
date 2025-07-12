@@ -241,7 +241,7 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
           </h3>
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-green-700 bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800 rounded-lg transition-colors"
+            className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
           >
             <Plus className="h-4 w-4 mr-1" />
             Add Activity
