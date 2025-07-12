@@ -8,7 +8,7 @@ export interface Group {
   size: number;
   contactName?: string;
   contactEmail?: string;
-  color: string;
+  color: GroupColor;
 }
 
 export interface Trip {
@@ -104,7 +104,7 @@ export interface CampingGroup {
   size: number;
   contactName: string;
   contactEmail?: string;
-  color: string;
+  color: GroupColor;
 }
 
 export interface GearItem {
@@ -125,4 +125,6 @@ export const GROUP_COLORS = [
   '#38B2AC',
   '#ED64A6',
   '#ECC94B',
-] as const; 
+] as const;
+
+export type GroupColor = typeof GROUP_COLORS[number]; 

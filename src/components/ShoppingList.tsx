@@ -92,17 +92,17 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
               {/* Status Buttons */}
               <div className="flex items-center space-x-2 mr-3">
                 {/* Checked / packed */}
-                <button
-                  onClick={() => handleToggleItem(item.id)}
+              <button
+                onClick={() => handleToggleItem(item.id)}
                   className={`p-1 rounded-full transition-colors ${
-                    item.isChecked 
+                  item.isChecked 
                       ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
-                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                  }`}
+                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                }`}
                   title={item.isChecked ? 'Purchased / Packed' : 'Mark as purchased'}
-                >
-                  <Check className="h-4 w-4" />
-                </button>
+              >
+                <Check className="h-4 w-4" />
+              </button>
                 {/* Need to buy */}
                 <button
                   onClick={() => handleToggleNeedsToBuy(item.id)}
