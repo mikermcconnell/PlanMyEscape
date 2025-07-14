@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Tent, Backpack, Map, Home, Settings as SettingsIcon } from 'lucide-react';
+import { Tent, Map, Home, Settings as SettingsIcon } from 'lucide-react';
 import LogoutButton from '../LogoutButton';
 
 interface LayoutProps {
@@ -48,10 +48,6 @@ const Layout = ({ children }: LayoutProps) => {
               <Link to="/trip-setup" className={navLinkClass('/trip-setup')}>
                 <Map className="h-5 w-5 mr-2" />
                 New Trip
-              </Link>
-              <Link to="/gear-locker" className={navLinkClass('/gear-locker')}>
-                <Backpack className="h-5 w-5 mr-2" />
-                Gear Locker
               </Link>
               <Link to="/settings" className={navLinkClass('/settings')}>
                 <SettingsIcon className="h-5 w-5 mr-2" />

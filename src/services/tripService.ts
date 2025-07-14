@@ -24,6 +24,16 @@ export class TripService {
       throw new Error('Unable to load trips');
     }
   }
+
+  async deleteTrip(tripId: string): Promise<void> {
+    try {
+      await this.adapter.deleteTrip(tripId);
+    } catch (error) {
+      console.error('Failed to delete trip:', error);
+      toast.error('Unable to delete trip');
+      throw new Error('Unable to delete trip');
+    }
+  }
 }
 
 // Default singleton instance using Hybrid

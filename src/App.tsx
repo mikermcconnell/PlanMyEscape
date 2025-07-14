@@ -6,7 +6,6 @@ import LandingPage from './pages/LandingPage';
 import TripSetup from './pages/TripSetup';
 import PackingList from './pages/PackingList';
 import MealPlanner from './pages/MealPlanner';
-import GearLocker from './pages/GearLocker';
 import TripContainer from './components/TripContainer';
 import TripOverview from './pages/TripOverview';
 import TripSchedule from './pages/TripSchedule';
@@ -38,7 +37,6 @@ function App() {
           {/* Authenticated routes */}
           <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
           <Route path="/trip-setup" element={<ProtectedRoute><Layout><TripSetup /></Layout></ProtectedRoute>} />
-          <Route path="/gear-locker" element={<ProtectedRoute><Layout><GearLocker /></Layout></ProtectedRoute>} />
           <Route path="/notes" element={<ProtectedRoute><Layout><Notes /></Layout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Layout><PrivacySettings /></Layout></ProtectedRoute>} />
           <Route path="/signin" element={<SupaSignIn />} />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Utensils, Package, Check, CheckCircle, Trash2, Plus } from 'lucide-react';
+import { ShoppingCart, Utensils, Package, Check, CheckCircle, Trash2, Plus, RotateCcw, X } from 'lucide-react';
 import { ShoppingItem } from '../types';
 import { getShoppingList, saveShoppingList } from '../utils/storage';
 
@@ -12,6 +12,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
   const [newItem, setNewItem] = useState({ name: '', category: 'camping' as 'food' | 'camping', quantity: 1 });
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
   useEffect(() => {
     const loadItems = async () => {
@@ -69,6 +70,27 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
       setNewItem({ name: '', category: 'camping', quantity: 1 });
       setShowAddForm(false);
     }
+  };
+
+  const clearUserInput = async () => {
+    // This should reset the needsToBuy flags in the source lists (packing and meals)
+    // and clear all manually added items
+    
+    // Step 1: Get current packing list and reset needsToBuy flags
+    const { getPackingList, savePackingList } = await import('../utils/storage');
+    const packingItems = await getPackingList(tripId);
+    const resetPackingItems = packingItems.map(item => ({
+      ...item,
+      needsToBuy: false // Reset all packing items
+    }));
+    await savePackingList(tripId, resetPackingItems);
+    
+    // Step 2: Clear all shopping items (both manual and auto-generated)
+    // The shopping list should regenerate from the reset sources
+    setShoppingItems([]);
+    await saveShoppingList(tripId, []);
+    
+    setShowClearConfirmation(false);
   };
 
   const foodItems = shoppingItems.filter(item => item.category === 'food');
@@ -170,12 +192,21 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
             <ShoppingCart className="h-6 w-6 mr-2" />
             Shopping List
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            ✕
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowClearConfirmation(true)}
+              className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Clear List
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
@@ -234,6 +265,31 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
             </button>
           )}
 
+          {/* Legend */}
+          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Status Icons</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+              <div className="flex items-center">
+                <div className="p-1 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 mr-2">
+                  <Check className="h-4 w-4" />
+                </div>
+                <span className="text-gray-700 dark:text-gray-300">Purchased/Packed</span>
+              </div>
+              <div className="flex items-center">
+                <div className="p-1 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 mr-2">
+                  <ShoppingCart className="h-4 w-4" />
+                </div>
+                <span className="text-gray-700 dark:text-gray-300">Need to Buy</span>
+              </div>
+              <div className="flex items-center">
+                <div className="p-1 rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 mr-2">
+                  <CheckCircle className="h-4 w-4" />
+                </div>
+                <span className="text-gray-700 dark:text-gray-300">Owned</span>
+              </div>
+            </div>
+          </div>
+
           {/* Food Items */}
           {renderItemList(foodItems, 'Food Items', <Utensils className="h-5 w-5" />)}
 
@@ -252,6 +308,46 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
           )}
         </div>
       </div>
+      
+      {/* Clear Confirmation Modal */}
+      {showClearConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Clear Shopping List
+              </h3>
+              <button
+                onClick={() => setShowClearConfirmation(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                This will clear the entire shopping list and reset all "need to buy" flags in your packing and meal lists. This means nothing will be marked as needing to be purchased.
+              </p>
+              
+              <div className="flex space-x-2 pt-4">
+                <button
+                  onClick={clearUserInput}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Clear List
+                </button>
+                <button
+                  onClick={() => setShowClearConfirmation(false)}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

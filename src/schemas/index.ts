@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { sanitizeInput } from '../utils/validation';
+// Removed problematic sanitizeInput import - will validate in components instead
 
 // Basic schemas
 const GroupSchema = z.object({
@@ -13,12 +13,12 @@ const GroupSchema = z.object({
 
 export const TripSchema = z.object({
   id: z.string().min(1),
-  tripName: z.string().min(1).max(100).transform(sanitizeInput),
+  tripName: z.string().min(1).max(100),
   tripType: z.enum(['car camping', 'canoe camping', 'hike camping', 'cottage']),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  description: z.string().max(500).transform(sanitizeInput).optional(),
-  location: z.string().max(200).transform(sanitizeInput).optional(),
+  description: z.string().max(500).optional(),
+  location: z.string().max(200).optional(),
   isCoordinated: z.boolean(),
   groups: z.array(GroupSchema),
   activities: z.array(z.any()).optional(),

@@ -52,7 +52,7 @@ export class TripStorage {
     }
   }
 
-  /** Delete trip, propagating any underlying error */
+  /** Delete a trip and all related data */
   async deleteTrip(tripId: string): Promise<void> {
     try {
       await deleteTripFromDB(tripId);

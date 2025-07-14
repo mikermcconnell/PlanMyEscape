@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Plus, Trash2, Edit3, X, ShoppingCart, Calendar, ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, ShoppingCart, Calendar, ArrowLeft, ArrowRight, CheckCircle, RotateCcw } from 'lucide-react';
 import { Meal, Trip, TripType } from '../types';
 import { getMeals, saveMeals } from '../utils/storage';
 import { getMealTemplates } from '../data/mealTemplates';
 import ShoppingList from '../components/ShoppingList';
 import { ShoppingItem } from '../types';
-import { saveShoppingList, getPackingList, savePackingList } from '../utils/storage';
+import { saveShoppingList, getShoppingList, getPackingList, savePackingList } from '../utils/storage';
 import { suggestIngredients } from '../data/recipeSuggestions';
 import { tripMealSuggestions } from '../data/tripMealSuggestions';
 
@@ -33,6 +33,7 @@ const MealPlanner = () => {
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [customIngredient, setCustomIngredient] = useState('');
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [showClearIngredientsConfirmation, setShowClearIngredientsConfirmation] = useState(false);
 
   useEffect(() => {
     const loadMeals = async () => {
@@ -46,38 +47,90 @@ const MealPlanner = () => {
     loadMeals();
   }, [tripId, trip]);
 
+  // Load shopping list on mount (only meal-related items for ingredients sidebar)
+  useEffect(() => {
+    const loadShoppingList = async () => {
+      if (!tripId) return;
+      const savedShoppingList = await getShoppingList(tripId);
+      // Filter to only show food items that are NOT from packing list
+      const mealRelatedItems = savedShoppingList.filter(item => 
+        !item.sourceItemId && item.category === 'food'
+      );
+      setShoppingItems(mealRelatedItems);
+    };
+    loadShoppingList();
+  }, [tripId]);
+
   // Synchronise shopping list when meals change
   useEffect(() => {
     if (!tripId) return;
 
     // Generate aggregated list from meals
-    const ingredientCounts = meals.flatMap(m => m.ingredients).reduce<Record<string, number>>((acc, ing) => {
-      acc[ing] = (acc[ing] || 0) + 1;
-      return acc;
-    }, {});
+    const ingredientCounts = meals.length > 0 
+      ? meals.flatMap(m => m.ingredients).reduce<Record<string, number>>((acc, ing) => {
+          acc[ing] = (acc[ing] || 0) + 1;
+          return acc;
+        }, {})
+      : {};
 
-    setShoppingItems(prev => {
-      return Object.entries(ingredientCounts).map(([name, count]) => {
-        const existing = prev.find(item => item.name.toLowerCase() === name.toLowerCase());
+    // Update the global shopping list while preserving packing items
+    (async () => {
+      const existingShoppingItems = await getShoppingList(tripId);
+      
+      // Create a map of existing items for quick lookup
+      const existingItems = new Map(existingShoppingItems.map(item => [item.name.toLowerCase(), item]));
+      
+      // Process meal ingredients only
+      const mealIngredients = Object.entries(ingredientCounts).map(([name, count]) => {
+        const existing = existingItems.get(name.toLowerCase());
         return {
           id: existing ? existing.id : crypto.randomUUID(),
           name,
           quantity: count,
-          category: 'food',
-          needsToBuy: existing ? existing.needsToBuy : false,
+          category: 'food' as const,
+          needsToBuy: existing ? existing.needsToBuy : true,
           isOwned: existing ? existing.isOwned : false
+          // No sourceItemId means it's from meals, not packing
         };
       });
-    });
+
+      // Get items from packing list (items with sourceItemId) and manually added items
+      const nonMealItems = existingShoppingItems.filter(item => 
+        item.sourceItemId || // From packing list
+        (item.category === 'camping') || // Manual camping items
+        (!Object.keys(ingredientCounts).some(ingredient => 
+          ingredient.toLowerCase() === item.name.toLowerCase()
+        ) && item.category === 'food') // Manual food items not from current meals
+      );
+
+      // Combine all items for the global shopping list
+      const allShoppingItems = [...mealIngredients, ...nonMealItems];
+      await saveShoppingList(tripId, allShoppingItems);
+      
+      // Set local state to only meal-related items for the ingredients sidebar
+      const manualFoodItems = existingShoppingItems.filter(item => 
+        !item.sourceItemId && // Not from packing
+        item.category === 'food' && // Food items only
+        !Object.keys(ingredientCounts).some(ingredient => 
+          ingredient.toLowerCase() === item.name.toLowerCase()
+        ) // Manual food items
+      );
+      
+      setShoppingItems([...mealIngredients, ...manualFoodItems]);
+    })();
   }, [meals, tripId]);
 
   // Helpers for toggling status
-  const updateShoppingItem = (itemId: string, updates: Partial<ShoppingItem>) => {
-    setShoppingItems(prev => {
-      const updated = prev.map(it => it.id === itemId ? { ...it, ...updates } : it);
-      if (tripId) saveShoppingList(tripId, updated);
-      return updated;
-    });
+  const updateShoppingItem = async (itemId: string, updates: Partial<ShoppingItem>) => {
+    // Update local ingredients list
+    setShoppingItems(prev => prev.map(it => it.id === itemId ? { ...it, ...updates } : it));
+    
+    // Update global shopping list
+    if (tripId) {
+      const allItems = await getShoppingList(tripId);
+      const updatedAllItems = allItems.map(it => it.id === itemId ? { ...it, ...updates } : it);
+      await saveShoppingList(tripId, updatedAllItems);
+    }
   };
 
   const handleToggleNeedsToBuy = async (itemId: string) => {
@@ -163,6 +216,19 @@ const MealPlanner = () => {
     return meals.filter(meal => meal.day === day && meal.type === type);
   };
 
+  const getMealTypeColor = (type: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+    switch (type) {
+      case 'breakfast':
+        return 'bg-orange-50 dark:bg-orange-700';
+      case 'lunch':
+        return 'bg-blue-50 dark:bg-blue-700';
+      case 'dinner':
+        return 'bg-purple-50 dark:bg-purple-700';
+      default:
+        return 'bg-gray-50 dark:bg-gray-700';
+    }
+  };
+
   // Computed ingredient list for empty state
   const shoppingListEmpty = shoppingItems.filter(item => item.needsToBuy).length === 0;
 
@@ -208,13 +274,19 @@ const MealPlanner = () => {
   };
 
   // Remove item from ingredients list sidebar
-  const removeShoppingItem = (itemId: string) => {
-    const updated = shoppingItems.filter(i => i.id !== itemId);
-    setShoppingItems(updated);
-    if (tripId) saveShoppingList(tripId, updated);
+  const removeShoppingItem = async (itemId: string) => {
+    // Remove from local ingredients list
+    setShoppingItems(prev => prev.filter(i => i.id !== itemId));
+    
+    // Remove from global shopping list
+    if (tripId) {
+      const allItems = await getShoppingList(tripId);
+      const updated = allItems.filter(i => i.id !== itemId);
+      await saveShoppingList(tripId, updated);
+    }
   };
 
-  const addIngredient = () => {
+  const addIngredient = async () => {
     if (!newIngredientName.trim()) return;
     const newItem: ShoppingItem = {
       id: crypto.randomUUID(),
@@ -224,17 +296,57 @@ const MealPlanner = () => {
       needsToBuy: true,
       isOwned: false
     };
-    const updated = [...shoppingItems, newItem];
-    setShoppingItems(updated);
-    if (tripId) saveShoppingList(tripId, updated);
+    
+    // Add to local ingredients list
+    setShoppingItems(prev => [...prev, newItem]);
+    
+    // Add to global shopping list
+    if (tripId) {
+      const allItems = await getShoppingList(tripId);
+      const updated = [...allItems, newItem];
+      await saveShoppingList(tripId, updated);
+    }
+    
     setNewIngredientName('');
     setNewIngredientQty(1);
   };
 
-  const saveIngredientEdit = (itemId: string, name: string, qty: number) => {
-    const updated = shoppingItems.map(i => i.id === itemId ? { ...i, name, quantity: qty } : i);
-    setShoppingItems(updated);
-    if (tripId) saveShoppingList(tripId, updated);
+  const clearIngredients = async () => {
+    // Clear all custom meals (meals with isCustom: true)
+    const clearedMeals = meals.filter(meal => !meal.isCustom);
+    setMeals(clearedMeals);
+    if (tripId) await saveMeals(tripId, clearedMeals);
+    
+    // Update global shopping list: remove custom meal ingredients, keep packing items
+    const allShoppingItems = await getShoppingList(tripId);
+    const remainingIngredients = clearedMeals.flatMap(m => m.ingredients);
+    
+    // Keep: 1) Packing items (with sourceItemId), 2) Template meal ingredients, 3) Manual food items
+    const clearedGlobalShoppingItems = allShoppingItems.filter(item => {
+      return item.sourceItemId || // From packing list
+             remainingIngredients.includes(item.name) || // From remaining template meals
+             (item.category === 'food' && !meals.flatMap(m => m.ingredients).includes(item.name)); // Manual food items
+    });
+    
+    await saveShoppingList(tripId, clearedGlobalShoppingItems);
+    
+    // Update local ingredients sidebar to show only meal-related items
+    setShoppingItems(clearedGlobalShoppingItems.filter(item => !item.sourceItemId && item.category === 'food'));
+    
+    setShowClearIngredientsConfirmation(false);
+  };
+
+  const saveIngredientEdit = async (itemId: string, name: string, qty: number) => {
+    // Update local ingredients list
+    setShoppingItems(prev => prev.map(i => i.id === itemId ? { ...i, name, quantity: qty } : i));
+    
+    // Update global shopping list
+    if (tripId) {
+      const allItems = await getShoppingList(tripId);
+      const updated = allItems.map(i => i.id === itemId ? { ...i, name, quantity: qty } : i);
+      await saveShoppingList(tripId, updated);
+    }
+    
     setEditingIngredientId(null);
   };
 
@@ -358,7 +470,7 @@ const MealPlanner = () => {
                         ) : (
                           <div className="space-y-2">
                             {dayMeals.map(meal => (
-                              <div key={meal.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                              <div key={meal.id} className={`flex items-center justify-between p-2 ${getMealTypeColor(mealType)} rounded`}>
                                 <div>
                                   <div className="font-medium text-gray-900 dark:text-white">
                                     {meal.name}
@@ -396,6 +508,13 @@ const MealPlanner = () => {
                 <ShoppingCart className="h-5 w-5 mr-2" />
                 Ingredients List
               </h2>
+              <button
+                onClick={() => setShowClearIngredientsConfirmation(true)}
+                className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Clear
+              </button>
             </div>
             
             <div className="p-6">
@@ -421,6 +540,25 @@ const MealPlanner = () => {
                 >
                   Add
                 </button>
+              </div>
+
+              {/* Legend */}
+              <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <h4 className="text-xs font-medium text-gray-900 dark:text-white mb-2">Status Icons</h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center">
+                    <div className="p-1 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 mr-2">
+                      <ShoppingCart className="h-3 w-3" />
+                    </div>
+                    <span className="text-gray-700 dark:text-gray-300">Need to Buy</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="p-1 rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 mr-2">
+                      <CheckCircle className="h-3 w-3" />
+                    </div>
+                    <span className="text-gray-700 dark:text-gray-300">Owned</span>
+                  </div>
+                </div>
               </div>
               {shoppingListEmpty ? (
                 <div className="text-gray-500 dark:text-gray-400 text-center py-4">
@@ -689,6 +827,46 @@ const MealPlanner = () => {
           </div>
         </div>
       </div>
+
+      {/* Clear Ingredients Confirmation Modal */}
+      {showClearIngredientsConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Clear Ingredients
+              </h3>
+              <button
+                onClick={() => setShowClearIngredientsConfirmation(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                This will remove all custom meals and manually added ingredients from your ingredients list. Template meals will remain unchanged, and ingredients from custom meals will be removed from the shopping list.
+              </p>
+              
+              <div className="flex space-x-2 pt-4">
+                <button
+                  onClick={clearIngredients}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Clear Ingredients
+                </button>
+                <button
+                  onClick={() => setShowClearIngredientsConfirmation(false)}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Toast */}
       {confirmation && (

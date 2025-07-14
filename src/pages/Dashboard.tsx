@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Trip, TripType, TRIP_TYPES } from '../types';
 import { getTrips } from '../utils/supabaseTrips';
 import { Tent, Compass, Mountain, Home, Calendar, Users, Plus, MapPin, Activity, Trash2 } from 'lucide-react';
-import { deleteTrip } from '../utils/storage';
+import { tripService } from '../services/tripService';
 
 const Dashboard = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -18,6 +18,15 @@ const Dashboard = () => {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleDeleteTrip = async (tripId: string) => {
+    try {
+      await tripService.deleteTrip(tripId);
+      setTrips(trips => trips.filter(t => t.id !== tripId));
+    } catch (error) {
+      console.error('Failed to delete trip:', error);
+    }
+  };
 
   const renderTripTypeText = (type: TripType): string => {
     switch (type) {
@@ -68,25 +77,6 @@ const Dashboard = () => {
     }
   };
 
-  const getTripProgress = (trip: Trip): { completed: number; total: number } => {
-    const totalTasks = 3 + (trip.activities?.length || 0);
-    let completed = 0;
-    
-    // Check if has location
-    if (trip.location) completed++;
-    
-    // Check if has activities planned
-    if (trip.activities && trip.activities.length > 0) {
-      completed++;
-      // Count completed activities
-      completed += trip.activities.filter(a => a.isCompleted).length;
-    }
-    
-    // Basic trip setup
-    completed++;
-    
-    return { completed, total: totalTasks };
-  };
 
   const getUpcomingTrips = () => {
     const now = new Date();
@@ -170,8 +160,6 @@ const Dashboard = () => {
             </h2>
             <div className="space-y-3">
               {getUpcomingTrips().map(trip => {
-                const progress = getTripProgress(trip);
-                const progressPercent = (progress.completed / progress.total) * 100;
                 
                 return (
                   <div
@@ -193,8 +181,7 @@ const Dashboard = () => {
                           e.stopPropagation();
                           e.preventDefault();
                           if (window.confirm('Are you sure you want to delete this trip? This action cannot be undone.')) {
-                            await deleteTrip(trip.id);
-                            setTrips(trips => trips.filter(t => t.id !== trip.id));
+                            await handleDeleteTrip(trip.id);
                           }
                         }}
                         title="Delete trip"
@@ -213,20 +200,6 @@ const Dashboard = () => {
                               {trip.location}
                             </div>
                           )}
-                        </div>
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-500 dark:text-gray-400">Progress</span>
-                            <span className="text-gray-700 dark:text-gray-300 font-medium">
-                              {progress.completed}/{progress.total} complete
-                            </span>
-                          </div>
-                          <div className="mt-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div 
-                              className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${progressPercent}%` }}
-                            ></div>
-                          </div>
                         </div>
                       </div>
                 );
@@ -250,16 +223,6 @@ const Dashboard = () => {
                 </div>
               </Link>
               
-              <Link
-                to="/gear-locker"
-                className="flex items-center p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:from-blue-100 hover:to-cyan-100 dark:hover:from-blue-900/30 dark:hover:to-cyan-900/30 transition-colors duration-150"
-              >
-                <Mountain className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-3" />
-                <div>
-                  <p className="font-medium text-blue-900 dark:text-blue-200">Manage Gear</p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">Organize your camping equipment</p>
-                </div>
-              </Link>
             </div>
           </div>
         </div>
@@ -290,8 +253,6 @@ const Dashboard = () => {
             </div>
           ) : (
             trips.map(trip => {
-              const progress = getTripProgress(trip);
-              const progressPercent = (progress.completed / progress.total) * 100;
               const isUpcoming = new Date(trip.startDate) >= new Date();
               
               return (
@@ -348,23 +309,6 @@ const Dashboard = () => {
                       </div>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 dark:text-gray-400">Trip Progress</span>
-                        <span className="text-gray-700 dark:text-gray-300 font-medium">
-                          {Math.round(progressPercent)}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            progressPercent === 100 ? 'bg-green-500' : 'bg-blue-500'
-                          }`}
-                          style={{ width: `${progressPercent}%` }}
-                        ></div>
-                      </div>
-                    </div>
                   </div>
                 </Link>
               );

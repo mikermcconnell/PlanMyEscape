@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle, Circle, Mountain, Waves, GamepadIcon, X } from 'lucide-react';
 import { Activity, TripType, PackingItem } from '../types';
 import { getEquipmentSuggestions, detectActivityType } from '../data/activityEquipment';
@@ -10,6 +10,7 @@ interface ActivitiesPlannerProps {
   tripType: TripType;
   tripDays: number;
   tripId: string;
+  defaultDay?: number;
 }
 
 const TIME_SLOTS = [
@@ -37,26 +38,37 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
   onActivitiesChange,
   tripType,
   tripDays,
-  tripId
+  tripId,
+  defaultDay
 }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newActivity, setNewActivity] = useState({
     name: '',
     equipment: [] as string[],
     notes: '',
-    schedules: [] as { day: number; timeOfDay: string }[]
+    schedules: defaultDay ? [{ day: defaultDay, timeOfDay: 'morning' }] : [] as { day: number; timeOfDay: string }[]
   });
   const [showEquipmentModal, setShowEquipmentModal] = useState(false);
   const [modalEquipment, setModalEquipment] = useState<{ name: string; quantity: number }[]>([]);
   const [modalActivity, setModalActivity] = useState<Omit<Activity, 'id'>>();
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
+  // Reset activity form when defaultDay changes
+  useEffect(() => {
+    setNewActivity({
+      name: '',
+      equipment: [] as string[],
+      notes: '',
+      schedules: defaultDay ? [{ day: defaultDay, timeOfDay: 'morning' }] : [] as { day: number; timeOfDay: string }[]
+    });
+  }, [defaultDay]);
+
   const getActivitySuggestions = (tripType: TripType): Omit<Activity, 'id'>[] => {
     const baseActivities = {
       'cottage': [
         { name: 'Fishing', type: 'water' as const, equipment: ['Fishing rods', 'Tackle box', 'Bait'] },
         { name: 'Swimming', type: 'water' as const, equipment: ['Towels', 'Sunscreen'] },
-        { name: 'Kayaking/Canoeing', type: 'water' as const, equipment: ['Paddles', 'Life jackets'] },
+        { name: 'Kayaking/Canoeing', type: 'water' as const, equipment: ['Paddles', 'Life jackets', 'Boat'] },
         { name: 'Hiking', type: 'outdoor' as const, equipment: ['Hiking boots', 'Water bottles'] },
         { name: 'Nature Walk', type: 'outdoor' as const, equipment: ['Comfortable shoes', 'Water bottle'] },
         { name: 'Yoga', type: 'outdoor' as const, equipment: ['Yoga mat', 'Comfortable clothes'] },
@@ -67,7 +79,15 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
         { name: 'BBQ/Grilling', type: 'outdoor' as const, equipment: ['Grill', 'Charcoal', 'Lighter'] },
         { name: 'Campfire', type: 'outdoor' as const, equipment: ['Firewood', 'Matches', 'Chairs'] },
         { name: 'Photography', type: 'outdoor' as const, equipment: ['Camera', 'Tripod'] },
-        { name: 'Bird Watching', type: 'outdoor' as const, equipment: ['Binoculars', 'Field guide'] }
+        { name: 'Bird Watching', type: 'outdoor' as const, equipment: ['Binoculars', 'Field guide'] },
+        { name: 'Water Sports', type: 'water' as const, equipment: ['Water skis', 'Wakeboard', 'Life jackets', 'Boat'] },
+        { name: 'Paddleboarding', type: 'water' as const, equipment: ['Paddleboard', 'Paddle', 'Life jacket'] },
+        { name: 'Sunset Viewing', type: 'outdoor' as const, equipment: ['Chairs', 'Blankets', 'Camera'] },
+        { name: 'Dock Reading', type: 'indoor' as const, equipment: ['Books', 'Comfortable chair', 'Sunscreen'] },
+        { name: 'Nature Journaling', type: 'outdoor' as const, equipment: ['Journal', 'Pens', 'Field guide'] },
+        { name: 'Rock Painting', type: 'entertainment' as const, equipment: ['Acrylic paints', 'Brushes', 'Rocks'] },
+        { name: 'Geocaching', type: 'outdoor' as const, equipment: ['GPS device', 'Small treasures'] },
+        { name: 'Pontoon Boat Rides', type: 'water' as const, equipment: ['Pontoon boat', 'Life jackets', 'Snacks'] }
       ],
       'car camping': [
         { name: 'Hiking', type: 'outdoor' as const, equipment: ['Hiking boots', 'Day pack'] },
@@ -80,17 +100,32 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
         { name: 'Stargazing', type: 'outdoor' as const, equipment: ['Blankets', 'Telescope (optional)'] },
         { name: 'Board Games', type: 'indoor' as const, equipment: ['Card games', 'Board games'] },
         { name: 'BBQ/Grilling', type: 'outdoor' as const, equipment: ['Grill', 'Charcoal', 'Lighter'] },
-        { name: 'Campfire', type: 'outdoor' as const, equipment: ['Firewood', 'Matches', 'Chairs'] }
+        { name: 'Campfire', type: 'outdoor' as const, equipment: ['Firewood', 'Matches', 'Chairs'] },
+        { name: 'Fishing', type: 'water' as const, equipment: ['Fishing rods', 'Tackle box', 'Fishing license'] },
+        { name: 'Mountain Biking', type: 'outdoor' as const, equipment: ['Mountain bike', 'Helmet', 'Repair kit'] },
+        { name: 'Rock Climbing', type: 'outdoor' as const, equipment: ['Climbing gear', 'Helmet', 'Ropes'] },
+        { name: 'Geocaching', type: 'outdoor' as const, equipment: ['GPS device', 'Small treasures'] },
+        { name: 'Nature Scavenger Hunt', type: 'entertainment' as const, equipment: ['List', 'Bags', 'Magnifying glass'] },
+        { name: 'Frisbee/Games', type: 'outdoor' as const, equipment: ['Frisbee', 'Football', 'Soccer ball'] },
+        { name: 'Hammock Relaxation', type: 'outdoor' as const, equipment: ['Hammock', 'Books', 'Pillow'] },
+        { name: 'Trail Running', type: 'outdoor' as const, equipment: ['Running shoes', 'Water bottle', 'Trail map'] },
+        { name: 'Wildlife Tracking', type: 'outdoor' as const, equipment: ['Field guide', 'Measuring tape', 'Camera'] }
       ],
       'canoe camping': [
-        { name: 'Paddling', type: 'water' as const, equipment: ['Paddles', 'Life jackets', 'Dry bags'] },
-        { name: 'Portaging', type: 'outdoor' as const, equipment: ['Portage yoke', 'Straps'] },
-        { name: 'Fishing', type: 'water' as const, equipment: ['Compact rod', 'Small tackle box'] },
+        { name: 'Paddling', type: 'water' as const, equipment: ['Paddles', 'Life jackets', 'Dry bags', 'Canoe'] },
+        { name: 'Portaging', type: 'outdoor' as const, equipment: ['Portage yoke', 'Straps', 'Canoe'] },
+        { name: 'Fishing', type: 'water' as const, equipment: ['Compact rod', 'Small tackle box', 'Fishing license'] },
         { name: 'Wildlife Viewing', type: 'outdoor' as const, equipment: ['Binoculars', 'Camera'] },
         { name: 'Yoga', type: 'outdoor' as const, equipment: ['Yoga mat', 'Comfortable clothes'] },
         { name: 'Camp Cooking', type: 'outdoor' as const, equipment: ['Portable stove', 'Cookware', 'Utensils'] },
         { name: 'Campfire Stories', type: 'entertainment' as const, equipment: ['Blanket', 'Flashlight'] },
-        { name: 'Stargazing', type: 'outdoor' as const, equipment: ['Blankets', 'Telescope (optional)'] }
+        { name: 'Stargazing', type: 'outdoor' as const, equipment: ['Blankets', 'Telescope (optional)'] },
+        { name: 'Water Sketching', type: 'entertainment' as const, equipment: ['Waterproof sketchbook', 'Pencils', 'Dry bag'] },
+        { name: 'Swimming', type: 'water' as const, equipment: ['Towels', 'Quick-dry clothes'] },
+        { name: 'Navigation Practice', type: 'outdoor' as const, equipment: ['Map', 'Compass', 'GPS'] },
+        { name: 'Camp Crafts', type: 'entertainment' as const, equipment: ['Rope', 'Knife', 'Natural materials'] },
+        { name: 'Nature Photography', type: 'outdoor' as const, equipment: ['Waterproof camera', 'Extra batteries'] },
+        { name: 'Bird Identification', type: 'outdoor' as const, equipment: ['Field guide', 'Binoculars', 'Journal'] }
       ],
       'hike camping': [
         { name: 'Summit Hiking', type: 'outdoor' as const, equipment: ['Trekking poles', 'Gaiters'] },
@@ -99,7 +134,15 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
         { name: 'Yoga', type: 'outdoor' as const, equipment: ['Yoga mat', 'Comfortable clothes'] },
         { name: 'Camp Cooking', type: 'outdoor' as const, equipment: ['Portable stove', 'Cookware', 'Utensils'] },
         { name: 'Campfire Stories', type: 'entertainment' as const, equipment: ['Blanket', 'Flashlight'] },
-        { name: 'Stargazing', type: 'outdoor' as const, equipment: ['Blankets', 'Telescope (optional)'] }
+        { name: 'Stargazing', type: 'outdoor' as const, equipment: ['Blankets', 'Telescope (optional)'] },
+        { name: 'Rock Scrambling', type: 'outdoor' as const, equipment: ['Helmet', 'Gloves', 'Sturdy boots'] },
+        { name: 'Alpine Photography', type: 'outdoor' as const, equipment: ['Camera', 'Tripod', 'Extra batteries'] },
+        { name: 'Meditation', type: 'outdoor' as const, equipment: ['Cushion', 'Quiet space'] },
+        { name: 'Trail Maintenance', type: 'outdoor' as const, equipment: ['Gloves', 'Small tools', 'Trash bags'] },
+        { name: 'Orienteering', type: 'outdoor' as const, equipment: ['Map', 'Compass', 'Markers'] },
+        { name: 'High Altitude Cooking', type: 'outdoor' as const, equipment: ['Lightweight stove', 'High-altitude fuel'] },
+        { name: 'Weather Observation', type: 'outdoor' as const, equipment: ['Barometer', 'Thermometer', 'Journal'] },
+        { name: 'Minimal Impact Camping', type: 'outdoor' as const, equipment: ['Trowel', 'Leave No Trace principles'] }
       ]
     };
     return baseActivities[tripType] || [];

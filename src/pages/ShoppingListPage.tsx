@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { ShoppingCart, FileDown, Check } from 'lucide-react';
+import { ShoppingCart, FileDown, Check, RotateCcw, X } from 'lucide-react';
 import { Trip, ShoppingItem } from '../types';
 import { getShoppingList, saveShoppingList } from '../utils/storage';
 
@@ -16,6 +16,7 @@ const ShoppingListPage: React.FC = () => {
   const { trip } = useOutletContext<TripContextType>();
   const tripId = trip.id;
   const [allItems, setAllItems] = useState<ShoppingItem[]>([]);
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -64,6 +65,27 @@ const ShoppingListPage: React.FC = () => {
     }
   };
 
+  const clearUserInput = async () => {
+    // This should reset the needsToBuy flags in the source lists (packing and meals)
+    // and clear all manually added items
+    
+    // Step 1: Get current packing list and reset needsToBuy flags
+    const { getPackingList, savePackingList } = await import('../utils/storage');
+    const packingItems = await getPackingList(tripId);
+    const resetPackingItems = packingItems.map(item => ({
+      ...item,
+      needsToBuy: false // Reset all packing items
+    }));
+    await savePackingList(tripId, resetPackingItems);
+    
+    // Step 2: Clear all shopping items (both manual and auto-generated)
+    // The shopping list should regenerate from the reset sources
+    setAllItems([]);
+    await saveShoppingList(tripId, []);
+    
+    setShowClearConfirmation(false);
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
@@ -71,13 +93,22 @@ const ShoppingListPage: React.FC = () => {
           <ShoppingCart className="h-5 w-5 mr-2" />
           Combined Shopping List
         </h2>
-        <button
-          onClick={exportPDF}
-          className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
-        >
-          <FileDown className="h-4 w-4 mr-2" />
-          Export PDF
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowClearConfirmation(true)}
+            className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Clear List
+          </button>
+          <button
+            onClick={exportPDF}
+            className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -104,6 +135,17 @@ const ShoppingListPage: React.FC = () => {
         );
       })()}
 
+      {/* Legend */}
+      <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg max-w-md">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Status Icons</h3>
+        <div className="flex items-center">
+          <div className="p-1 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 mr-2">
+            <Check className="h-4 w-4" />
+          </div>
+          <span className="text-gray-700 dark:text-gray-300 text-sm">Purchased/Bought</span>
+        </div>
+      </div>
+
       {/* Shopping List Items */}
       {allItems.filter(i => i.needsToBuy).length === 0 ? (
         <div className="text-gray-500 dark:text-gray-400">No items marked as need to buy.</div>
@@ -127,6 +169,47 @@ const ShoppingListPage: React.FC = () => {
           ))}
         </div>
       )}
+      
+      {/* Clear Confirmation Modal */}
+      {showClearConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Clear Shopping List
+              </h3>
+              <button
+                onClick={() => setShowClearConfirmation(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                This will clear the entire shopping list and reset all "need to buy" flags in your packing and meal lists. This means nothing will be marked as needing to be purchased.
+              </p>
+              
+              <div className="flex space-x-2 pt-4">
+                <button
+                  onClick={clearUserInput}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Clear List
+                </button>
+                <button
+                  onClick={() => setShowClearConfirmation(false)}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <ToastContainer position="bottom-right" />
     </div>
   );

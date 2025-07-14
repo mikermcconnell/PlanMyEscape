@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle } from 'lucide-react';
+import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw } from 'lucide-react';
 import { PackingItem, Trip, ShoppingItem, TripType } from '../types';
-import { getPackingList, savePackingList, addToShoppingList, getShoppingList } from '../utils/storage';
-import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
+import { getPackingList, savePackingList, addToShoppingList } from '../utils/storage';
+import { getPackingListDescription } from '../data/packingTemplates';
 import { separateAndItems, PackingSuggestion } from '../data/activityEquipment';
 import ShoppingList from '../components/ShoppingList';
 
@@ -28,13 +28,16 @@ const PackingList = () => {
   const groupOptions = [{ id: 'all', name: 'All' as const }, ...trip.groups];
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
   const categories = PACKING_CATEGORIES;
-  const [addItemForms, setAddItemForms] = useState<Record<string, { show: boolean; name: string; quantity: number }>>(
-    categories.reduce((acc, category) => ({
-      ...acc,
-      [category]: { show: false, name: '', quantity: 1 }
-    }), {})
-  );
+  const [addItemModal, setAddItemModal] = useState<{ 
+    show: boolean; 
+    category: string; 
+    name: string; 
+    quantity: number; 
+    assignedGroupId?: string; 
+    isPersonal: boolean;
+  }>({ show: false, category: '', name: '', quantity: 1, isPersonal: false });
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
   // Ref to keep track of the current timeout across renders
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -47,195 +50,62 @@ const PackingList = () => {
         clearTimeout(saveTimeoutRef.current);
       }
       saveTimeoutRef.current = setTimeout(() => {
-        savePackingList(tripId, items);
-      }, 500);
+        savePackingList(tripId, items).catch(error => {
+          console.error('Failed to save packing list:', error);
+          setUpdateError('Failed to save packing list. Please try again.');
+        });
+      }, 300);
     },
-    []
+    [] // Empty dependency array is correct here
   );
 
-  const updateItems = useCallback((newItems: PackingItem[]) => {
-    const previousItems = items;
-    setItems(newItems); // optimistic update
-    setUpdateError(null);
+  // Memoized function to update items state and trigger save
+  const updateItems = useCallback(
+    (newItems: PackingItem[]) => {
+      setItems(newItems);
+      debouncedSave(tripId, newItems);
+    },
+    [tripId, debouncedSave]
+  );
 
-    if (tripId) {
-      try {
-        debouncedSave(tripId, newItems);
-      } catch (error) {
-        console.error('Failed to save items:', error);
-        setUpdateError('Failed to save changes. Please try again.');
-        // revert
-        setItems(previousItems);
-      }
-    }
-  }, [tripId, debouncedSave, items]);
-
-  const calculateTotalCampers = (trip: Trip): number => {
-    return trip.groups.reduce((sum, group) => sum + group.size, 0);
-  };
-
-  const calculateTripDays = (startDate: string, endDate: string): number => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  };
-
+  // Clear any pending timeout on unmount
   useEffect(() => {
-    const loadPackingList = async () => {
-      if (!tripId || !trip) return;
-
-      const savedList = await getPackingList(tripId);
-      
-      if (savedList && savedList.length > 0) {
-        setItems(savedList);
-      } else {
-        // Get template with trip duration consideration
-        const groupSize = calculateTotalCampers(trip);
-        const tripDays = calculateTripDays(trip.startDate, trip.endDate);
-        const templateItems = getPackingTemplate(trip.tripType, groupSize, tripDays);
-        
-        setItems(templateItems);
-        await savePackingList(tripId, templateItems);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
     };
-    loadPackingList();
-  }, [tripId, trip]);
+  }, []);
 
-  const toggleOwned = async (itemId: string) => {
-    const updatedItems = items.map(item =>
-      item.id === itemId ? { 
-        ...item, 
-        isOwned: !item.isOwned,
-        needsToBuy: false
-      } : item
-    );
-    await updateItems(updatedItems);
-  };
-
-  const toggleNeedsToBuy = async (itemId: string) => {
-    const updatedItems = items.map(item =>
-      item.id === itemId ? { 
-        ...item, 
-        needsToBuy: !item.needsToBuy,
-        isOwned: false
-      } : item
-    );
-    await updateItems(updatedItems);
-
-    // If marking as need to buy, add to shopping list
-    if (tripId) {
-      const item = updatedItems.find(i => i.id === itemId);
-      if (item && item.needsToBuy) {
-        // Check if item is already in shopping list
-        const existingShoppingList = await getShoppingList(tripId);
-        const alreadyInList = existingShoppingList.some(shoppingItem => 
-          shoppingItem.sourceItemId === itemId
-        );
-        
-        if (!alreadyInList) {
-          const shoppingItem: ShoppingItem = {
-            id: crypto.randomUUID(),
-            name: item.name,
-            quantity: item.quantity,
-            category: item.category === 'Kitchen' ? 'food' : 'camping',
-            isChecked: false,
-            needsToBuy: true,
-            isOwned: false,
-            sourceItemId: itemId
-          };
-          await addToShoppingList(tripId, [shoppingItem]);
-        }
-      }
-    }
-  };
-
-  const togglePacked = async (itemId: string) => {
-    const updatedItems = items.map(item =>
-      item.id === itemId ? { ...item, isPacked: !item.isPacked } : item
-    );
-    await updateItems(updatedItems);
-  };
-
-  const updateItemQuantity = async (itemId: string, quantity: number) => {
-    const updatedItems = items.map(item =>
-      item.id === itemId ? { ...item, quantity } : item
-    );
-    await updateItems(updatedItems);
-  };
-
-  // Legacy function for backward compatibility
-  const updateItem = async (itemId: string, updates: Partial<PackingItem>) => {
-    const updatedItems = items.map(item =>
-      item.id === itemId ? { ...item, ...updates } : item
-    );
-    await updateItems(updatedItems);
-    setEditingItem(null);
-  };
-
-  const deleteItem = async (itemId: string) => {
-    const updatedItems = items.filter(item => item.id !== itemId);
-    await updateItems(updatedItems);
-  };
-
-  const toggleAddForm = (category: string) => {
-    setAddItemForms(prev => ({
-      ...prev,
-      [category]: { ...prev[category]!, show: !prev[category]!.show }
-    }) as Record<string, { show: boolean; name: string; quantity: number }>);
-  };
-
-  const updateAddFormField = (category: string, field: 'name' | 'quantity', value: string | number) => {
-    setAddItemForms(prev => ({
-      ...prev,
-      [category]: { ...prev[category]!, [field]: value }
-    }) as Record<string, { show: boolean; name: string; quantity: number }>);
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'Shelter': return <Home className="h-4 w-4" />;
-      case 'Kitchen': return <Utensils className="h-4 w-4" />;
-      case 'Clothing': return <Users className="h-4 w-4" />;
-      case 'Personal': return <Sun className="h-4 w-4" />;
-      case 'Tools': return <Shield className="h-4 w-4" />;
-      case 'Sleep': return <Home className="h-4 w-4" />;
-      case 'Food': return <Utensils className="h-4 w-4" />;
-      case 'Comfort': return <Sun className="h-4 w-4" />;
-      case 'Pack': return <Package className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
-    }
-  };
-
-  // Items displayed according to the selected group tab
+  // Add proper useMemo with typed parameters
   const displayedItems = useMemo(() =>
     selectedGroupId === 'all'
       ? items
-      : items.filter(i => i.assignedGroupId === selectedGroupId),
+      : items.filter((i: PackingItem) => i.assignedGroupId === selectedGroupId),
     [items, selectedGroupId]);
 
-  const personalItems = useMemo(() => displayedItems.filter(item => item.isPersonal), [displayedItems]);
-  const groupItems = useMemo(() => displayedItems.filter(item => !item.isPersonal), [displayedItems]);
+  const personalItems = useMemo(() => displayedItems.filter((item: PackingItem) => item.isPersonal), [displayedItems]);
+  const groupItems = useMemo(() => displayedItems.filter((item: PackingItem) => !item.isPersonal), [displayedItems]);
   
   const groupedPersonalItems = useMemo(() =>
-    categories.reduce((acc, category) => {
-      acc[category] = personalItems.filter(item => item.category === category);
+    categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
+      acc[category] = personalItems.filter((item: PackingItem) => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
   , [personalItems, categories]);
   
   const groupedGroupItems = useMemo(() =>
-    categories.reduce((acc, category) => {
-      acc[category] = groupItems.filter(item => item.category === category);
+    categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
+      acc[category] = groupItems.filter((item: PackingItem) => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
   , [groupItems, categories]);
 
   const totalItems = displayedItems.length;
-  const ownedItems = displayedItems.filter(item => item.isOwned).length;
-  const needToBuyItems = displayedItems.filter(item => item.needsToBuy).length;
-  const packedItems = displayedItems.filter(item => item.isPacked).length;
-  const totalWeight = displayedItems.reduce((sum, item) => sum + (item.weight || 0), 0);
+  const ownedItems = displayedItems.filter((item: PackingItem) => item.isOwned).length;
+  const needToBuyItems = displayedItems.filter((item: PackingItem) => item.needsToBuy).length;
+  const packedItems = displayedItems.filter((item: PackingItem) => item.isPacked).length;
+  const totalWeight = displayedItems.reduce((sum: number, item: PackingItem) => sum + (item.weight || 0), 0);
 
   const renderTripTypeText = (type: TripType): string => {
     switch (type) {
@@ -248,7 +118,7 @@ const PackingList = () => {
       case 'cottage':
         return 'Cottage';
       default:
-        return type;
+        return 'Trip';
     }
   };
 
@@ -257,7 +127,7 @@ const PackingList = () => {
   };
 
   const assignItemToGroup = (itemId: string, groupId: string | undefined) => {
-    const updatedItems = items.map(item => {
+    const updatedItems = items.map((item: PackingItem) => {
       if (item.id === itemId) {
         return {
           ...item,
@@ -269,15 +139,30 @@ const PackingList = () => {
     updateItems(updatedItems);
   };
 
-  const addItemToCategory = async (category: string, itemName: string, quantity: number) => {
-    if (!itemName.trim()) return;
+  const openAddItemModal = (category: string, assignedGroupId?: string, isPersonal: boolean = false) => {
+    setAddItemModal({ 
+      show: true, 
+      category: category, 
+      name: '', 
+      quantity: 1,
+      assignedGroupId: assignedGroupId,
+      isPersonal: isPersonal
+    });
+  };
+
+  const closeAddItemModal = () => {
+    setAddItemModal({ show: false, category: '', name: '', quantity: 1, isPersonal: false });
+  };
+
+  const addItemFromModal = async () => {
+    if (!addItemModal.name.trim()) return;
     
     // Create a suggestion object to use the separateAndItems function
     const suggestions = separateAndItems([{
-      name: itemName.trim(),
-      category: category,
+      name: addItemModal.name.trim(),
+      category: addItemModal.category,
       required: false,
-      quantity: quantity
+      quantity: addItemModal.quantity
     }]);
     
     // Create packing items from the separated suggestions
@@ -292,8 +177,8 @@ const PackingList = () => {
       needsToBuy: false,
       isPacked: false,
       required: suggestion.required,
-      assignedGroupId: undefined,
-      isPersonal: false // Default to group item when manually added
+      assignedGroupId: addItemModal.assignedGroupId,
+      isPersonal: addItemModal.isPersonal
     }));
     
     // Add to the current items list
@@ -301,10 +186,163 @@ const PackingList = () => {
     updateItems(updatedItems);
     
     // Reset the form
-    setAddItemForms(prev => ({
+    closeAddItemModal();
+  };
+
+  const updateAddFormField = (field: 'name' | 'quantity', value: string | number) => {
+    setAddItemModal(prev => ({
       ...prev,
-      [category]: { show: false, name: '', quantity: 1 }
+      [field]: value
     }));
+  };
+
+  const calculateTotalCampers = (trip: Trip): number => {
+    return trip.groups.reduce((total, group) => total + group.size, 0);
+  };
+
+
+
+  // Load the packing list from storage
+  useEffect(() => {
+    const loadPackingList = async () => {
+      try {
+        const savedItems = await getPackingList(tripId);
+        setItems(savedItems);
+      } catch (error) {
+        console.error('Failed to load packing list:', error);
+        setUpdateError('Failed to load packing list. Please refresh the page.');
+      }
+    };
+    
+    loadPackingList();
+  }, [tripId]);
+
+  const toggleOwned = async (itemId: string) => {
+    const updatedItems = items.map(item => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          isOwned: !item.isOwned
+        };
+      }
+      return item;
+    });
+    updateItems(updatedItems);
+  };
+
+  const toggleNeedsToBuy = async (itemId: string) => {
+    const updatedItems = items.map(item => {
+      if (item.id === itemId) {
+        const newNeedsToBuy = !item.needsToBuy;
+        // Also add to shopping list if marking as "needs to buy"
+        if (newNeedsToBuy) {
+          const shoppingItem: ShoppingItem = {
+            id: crypto.randomUUID(),
+            name: item.name,
+            category: item.category === 'Kitchen' || item.category === 'Food' ? 'food' : 'camping',
+            quantity: item.quantity,
+            isChecked: false,
+            isOwned: false,
+            needsToBuy: true,
+            sourceItemId: item.id
+          };
+          addToShoppingList(tripId, [shoppingItem]);
+        }
+        return {
+          ...item,
+          needsToBuy: newNeedsToBuy
+        };
+      }
+      return item;
+    });
+    updateItems(updatedItems);
+  };
+
+  const togglePacked = async (itemId: string) => {
+    const updatedItems = items.map(item => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          isPacked: !item.isPacked
+        };
+      }
+      return item;
+    });
+    updateItems(updatedItems);
+  };
+
+  const updateItemQuantity = async (itemId: string, quantity: number) => {
+    const updatedItems = items.map(item => {
+      if (item.id === itemId) {
+        return { ...item, quantity: quantity };
+      }
+      return item;
+    });
+    updateItems(updatedItems);
+  };
+
+  const updateItem = async (itemId: string, updates: Partial<PackingItem>) => {
+    const updatedItems = items.map(item => {
+      if (item.id === itemId) {
+        return { ...item, ...updates };
+      }
+      return item;
+    });
+    updateItems(updatedItems);
+  };
+
+  const deleteItem = async (itemId: string) => {
+    const updatedItems = items.filter(item => item.id !== itemId);
+    updateItems(updatedItems);
+  };
+
+  const clearUserInput = async () => {
+    // Reset all base items to their default state (remove user modifications)
+    // and remove all user-added items (items with required: false)
+    const clearedItems = items
+      .filter(item => item.required) // Keep only template items (required: true)
+      .map(item => ({
+        ...item,
+        isOwned: false,
+        needsToBuy: false, // Reset needsToBuy to false
+        isPacked: false,
+        assignedGroupId: undefined
+      }));
+    
+    updateItems(clearedItems);
+    
+    // Also clear shopping items that were added from this packing list
+    const { getShoppingList, saveShoppingList } = await import('../utils/storage');
+    const shoppingItems = await getShoppingList(tripId);
+    const filteredShoppingItems = shoppingItems.filter(item => !item.sourceItemId);
+    await saveShoppingList(tripId, filteredShoppingItems);
+    
+    setShowClearConfirmation(false);
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'Shelter':
+        return <Home className="h-5 w-5 mr-2" />;
+      case 'Kitchen':
+        return <Utensils className="h-5 w-5 mr-2" />;
+      case 'Clothing':
+        return <Users className="h-5 w-5 mr-2" />;
+      case 'Personal':
+        return <Shield className="h-5 w-5 mr-2" />;
+      case 'Tools':
+        return <Package className="h-5 w-5 mr-2" />;
+      case 'Sleep':
+        return <Sun className="h-5 w-5 mr-2" />;
+      case 'Comfort':
+        return <Home className="h-5 w-5 mr-2" />;
+      case 'Pack':
+        return <Package className="h-5 w-5 mr-2" />;
+      case 'Food':
+        return <Utensils className="h-5 w-5 mr-2" />;
+      default:
+        return <Package className="h-5 w-5 mr-2" />;
+    }
   };
 
   return (
@@ -330,8 +368,8 @@ const PackingList = () => {
 
       {/* Header */}
       <div className="mb-12">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex-1">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Packing List
             </h1>
@@ -348,9 +386,42 @@ const PackingList = () => {
               </p>
             )}
           </div>
-
+          <div className="flex-shrink-0">
+            <button
+              onClick={() => setShowClearConfirmation(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Clear List
+            </button>
+          </div>
         </div>
         
+        {/* Legend */}
+        <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Status Icons</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+            <div className="flex items-center">
+              <div className="p-1 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400 mr-2">
+                <ShoppingCart className="h-4 w-4" />
+              </div>
+              <span className="text-gray-700 dark:text-gray-300">Need to Buy</span>
+            </div>
+            <div className="flex items-center">
+              <div className="p-1 rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 mr-2">
+                <CheckCircle className="h-4 w-4" />
+              </div>
+              <span className="text-gray-700 dark:text-gray-300">Owned</span>
+            </div>
+            <div className="flex items-center">
+              <div className="p-1 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 mr-2">
+                <Check className="h-4 w-4" />
+              </div>
+              <span className="text-gray-700 dark:text-gray-300">Packed</span>
+            </div>
+          </div>
+        </div>
+
         {/* Stats */}
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
@@ -374,45 +445,108 @@ const PackingList = () => {
         </div>
       </div>
 
-      {/* Add Item Form */}
-      {Object.entries(addItemForms).map(([category, formData]: [string, { show: boolean; name: string; quantity: number }]) => {
-        if (!formData.show) return null;
-        return (
-          <div key={category} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <input
-                type="text"
-                placeholder="Item name"
-                value={formData.name}
-                onChange={(e) => updateAddFormField(category, 'name', e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
-              />
-              <input
-                type="number"
-                min="1"
-                value={formData.quantity}
-                onChange={(e) => updateAddFormField(category, 'quantity', parseInt(e.target.value))}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
-              />
-              <div className="flex space-x-2">
+      {/* Clear Confirmation Modal */}
+      {showClearConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Clear User Input
+              </h3>
+              <button
+                onClick={() => setShowClearConfirmation(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                This will remove all user-added items and reset the status of template items (owned, needs to buy, packed) back to their default state. Items marked as "need to buy" will also be removed from the shopping list.
+              </p>
+              
+              <div className="flex space-x-2 pt-4">
                 <button
-                  onClick={() => addItemToCategory(category, formData.name, formData.quantity)}
-                  disabled={!formData.name.trim()}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  onClick={clearUserInput}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                 >
-                  Add
+                  Clear List
                 </button>
                 <button
-                  onClick={() => toggleAddForm(category)}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                  onClick={() => setShowClearConfirmation(false)}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                 >
-                  <X className="h-4 w-4" />
+                  Cancel
                 </button>
               </div>
             </div>
           </div>
-        );
-      })}
+        </div>
+      )}
+
+      {/* Add Item Modal */}
+      {addItemModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Add Item to {addItemModal.category}
+              </h3>
+              <button
+                onClick={closeAddItemModal}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Item Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Item name"
+                  value={addItemModal.name}
+                  onChange={(e) => updateAddFormField('name', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={addItemModal.quantity}
+                  onChange={(e) => updateAddFormField('quantity', parseInt(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
+                />
+              </div>
+              
+              <div className="flex space-x-2 pt-4">
+                <button
+                  onClick={addItemFromModal}
+                  disabled={!addItemModal.name.trim()}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  Add Item
+                </button>
+                <button
+                  onClick={closeAddItemModal}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Packing List */}
       <div className="space-y-8">
@@ -441,7 +575,7 @@ const PackingList = () => {
                         <span className="ml-2">{category}</span>
                       </h3>
                       <button
-                        onClick={() => toggleAddForm(category)}
+                        onClick={() => openAddItemModal(category, selectedGroupId !== 'all' ? selectedGroupId : undefined, true)}
                         className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
                       >
                         <Plus className="h-4 w-4 mr-1" />
@@ -622,7 +756,7 @@ const PackingList = () => {
                         <span className="ml-2">{category}</span>
                       </h3>
                       <button
-                        onClick={() => toggleAddForm(category)}
+                        onClick={() => openAddItemModal(category, selectedGroupId !== 'all' ? selectedGroupId : undefined, false)}
                         className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
                       >
                         <Plus className="h-4 w-4 mr-1" />

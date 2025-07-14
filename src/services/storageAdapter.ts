@@ -1,6 +1,7 @@
 import { Trip } from '../types';
 import { supabase } from '../supabaseClient';
 import { TripStorage } from './tripStorage';
+import { toGroupColor } from '../utils/storage';
 
 /**
  * Generic interface to abstract trip storage operations
@@ -8,6 +9,19 @@ import { TripStorage } from './tripStorage';
 export interface StorageAdapter {
   saveTrip(trip: Trip): Promise<Trip>;
   getTrips(): Promise<Trip[]>;
+  deleteTrip(tripId: string): Promise<void>;
+}
+
+// Helper to coerce any raw group object to a valid Group
+function coerceToGroup(group: any): any {
+  return {
+    id: group.id,
+    name: group.name,
+    size: group.size,
+    contactName: group.contactName,
+    contactEmail: group.contactEmail,
+    color: toGroupColor(group.color)
+  };
 }
 
 /**
@@ -18,8 +32,17 @@ export class SupabaseStorageAdapter implements StorageAdapter {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) throw new Error('Not signed in');
 
+    // Ensure all group colors are valid before saving
+    const safeTrip = {
+      ...trip,
+      groups: trip.groups.map(group => ({
+        ...group,
+        color: toGroupColor(group.color)
+      }))
+    };
+
     // Map frontend Trip shape → DB columns
-    const { id, tripName, startDate, endDate, ...rest } = trip as any;
+    const { id, tripName, startDate, endDate, ...rest } = safeTrip as any;
     const payload: any = {
       id,
       name: tripName,
@@ -55,7 +78,21 @@ export class SupabaseStorageAdapter implements StorageAdapter {
       startDate: row.start,
       endDate: row.end,
       ...row.data, // spread stored jsonb back in
+      groups: (row.data?.groups || []).map(coerceToGroup)
     })) as Trip[];
+  }
+
+  async deleteTrip(tripId: string): Promise<void> {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('Not signed in');
+
+    const { error } = await supabase
+      .from('trips')
+      .delete()
+      .eq('id', tripId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
   }
 }
 
@@ -85,5 +122,12 @@ export class HybridStorageAdapter implements StorageAdapter {
     return (await this.isSignedIn())
       ? this.supabaseAdapter.getTrips()
       : this.localAdapter.getTrips();
+  }
+
+  async deleteTrip(tripId: string): Promise<void> {
+    if (await this.isSignedIn()) {
+      return this.supabaseAdapter.deleteTrip(tripId);
+    }
+    return this.localAdapter.deleteTrip(tripId);
   }
 } 
