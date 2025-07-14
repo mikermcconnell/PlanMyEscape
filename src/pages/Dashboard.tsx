@@ -22,9 +22,13 @@ const Dashboard = () => {
   const handleDeleteTrip = async (tripId: string) => {
     try {
       await tripService.deleteTrip(tripId);
-      setTrips(trips => trips.filter(t => t.id !== tripId));
+      // Force refresh from server to ensure consistency
+      const updatedTrips = await tripService.getTrips();
+      setTrips(updatedTrips);
     } catch (error) {
       console.error('Failed to delete trip:', error);
+      // Optionally show user-friendly error message
+      alert('Failed to delete trip. Please try again.');
     }
   };
 

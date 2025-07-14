@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw } from 'lucide-react';
 import { PackingItem, Trip, ShoppingItem, TripType } from '../types';
 import { getPackingList, savePackingList, addToShoppingList } from '../utils/storage';
-import { getPackingListDescription } from '../data/packingTemplates';
+import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
 import { separateAndItems, PackingSuggestion } from '../data/activityEquipment';
 import ShoppingList from '../components/ShoppingList';
 
@@ -200,6 +200,21 @@ const PackingList = () => {
     return trip.groups.reduce((total, group) => total + group.size, 0);
   };
 
+  const resetToTemplate = async () => {
+    try {
+      const totalCampers = trip.groups.reduce((sum, group) => sum + group.size, 0);
+      const tripDays = Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 60 * 60 * 24));
+      const templateItems = getPackingTemplate(trip.tripType, totalCampers, tripDays);
+      
+      // Save the template items and set them
+      await savePackingList(tripId, templateItems);
+      setItems(templateItems);
+    } catch (error) {
+      console.error('Failed to reset to template:', error);
+      setUpdateError('Failed to reset to template. Please try again.');
+    }
+  };
+
 
 
   // Load the packing list from storage
@@ -207,7 +222,19 @@ const PackingList = () => {
     const loadPackingList = async () => {
       try {
         const savedItems = await getPackingList(tripId);
-        setItems(savedItems);
+        
+        // If no saved items exist, load the appropriate template
+        if (savedItems.length === 0) {
+          const totalCampers = trip.groups.reduce((sum, group) => sum + group.size, 0);
+          const tripDays = Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 60 * 60 * 24));
+          const templateItems = getPackingTemplate(trip.tripType, totalCampers, tripDays);
+          
+          // Save the template items and set them
+          await savePackingList(tripId, templateItems);
+          setItems(templateItems);
+        } else {
+          setItems(savedItems);
+        }
       } catch (error) {
         console.error('Failed to load packing list:', error);
         setUpdateError('Failed to load packing list. Please refresh the page.');
@@ -215,7 +242,7 @@ const PackingList = () => {
     };
     
     loadPackingList();
-  }, [tripId]);
+  }, [tripId, trip.tripType, trip.groups, trip.startDate, trip.endDate]);
 
   const toggleOwned = async (itemId: string) => {
     const updatedItems = items.map(item => {
@@ -386,7 +413,14 @@ const PackingList = () => {
               </p>
             )}
           </div>
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 space-x-2">
+            <button
+              onClick={resetToTemplate}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Reset to Template
+            </button>
             <button
               onClick={() => setShowClearConfirmation(true)}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
