@@ -324,17 +324,14 @@ const PackingList = () => {
   };
 
   const clearUserInput = async () => {
-    // Reset all base items to their default state (remove user modifications)
-    // and remove all user-added items (items with required: false)
-    const clearedItems = items
-      .filter(item => item.required) // Keep only template items (required: true)
-      .map(item => ({
-        ...item,
-        isOwned: false,
-        needsToBuy: false, // Reset needsToBuy to false
-        isPacked: false,
-        assignedGroupId: undefined
-      }));
+    // Reset all items' status icons to their default state (keep all items, just reset status)
+    const clearedItems = items.map(item => ({
+      ...item,
+      isOwned: false,
+      needsToBuy: false, // Reset needsToBuy to false
+      isPacked: false,
+      assignedGroupId: undefined
+    }));
     
     updateItems(clearedItems);
     
@@ -419,20 +416,42 @@ const PackingList = () => {
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
             >
               <Package className="h-4 w-4 mr-2" />
-              Reset to Template
+              Reset {renderTripTypeText(trip.tripType)} Packing List
             </button>
             <button
               onClick={() => setShowClearConfirmation(true)}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
             >
               <RotateCcw className="h-4 w-4 mr-2" />
-              Clear List
+              Clear Status Icons
             </button>
           </div>
         </div>
+
+        {/* Stats */}
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-green-600">{packedItems}/{totalItems}</div>
+            <div className="text-sm text-gray-500">Packed</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-blue-600">{ownedItems}/{totalItems}</div>
+            <div className="text-sm text-gray-500">Owned</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-orange-600">{needToBuyItems}</div>
+            <div className="text-sm text-gray-500">Need to Buy</div>
+          </div>
+          {shouldShowWeightTracking(trip.tripType) && (
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+              <div className="text-2xl font-bold text-purple-600">{Math.round(totalWeight / 1000 * 10) / 10}kg</div>
+              <div className="text-sm text-gray-500">Total Weight</div>
+            </div>
+          )}
+        </div>
         
         {/* Legend */}
-        <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+        <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
           <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Status Icons</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
             <div className="flex items-center">
@@ -455,28 +474,6 @@ const PackingList = () => {
             </div>
           </div>
         </div>
-
-        {/* Stats */}
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-green-600">{packedItems}/{totalItems}</div>
-            <div className="text-sm text-gray-500">Packed</div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-blue-600">{ownedItems}/{totalItems}</div>
-            <div className="text-sm text-gray-500">Owned</div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-orange-600">{needToBuyItems}</div>
-            <div className="text-sm text-gray-500">Need to Buy</div>
-          </div>
-          {shouldShowWeightTracking(trip.tripType) && (
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-purple-600">{Math.round(totalWeight / 1000 * 10) / 10}kg</div>
-              <div className="text-sm text-gray-500">Total Weight</div>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Clear Confirmation Modal */}
@@ -485,7 +482,7 @@ const PackingList = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Clear User Input
+                Clear Status Icons
               </h3>
               <button
                 onClick={() => setShowClearConfirmation(false)}
@@ -497,7 +494,7 @@ const PackingList = () => {
             
             <div className="space-y-4">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                This will remove all user-added items and reset the status of template items (owned, needs to buy, packed) back to their default state. Items marked as "need to buy" will also be removed from the shopping list.
+                This will reset all status icons (owned, needs to buy, packed) back to their default state while keeping all items. Items marked as "need to buy" will also be removed from the shopping list.
               </p>
               
               <div className="flex space-x-2 pt-4">
@@ -505,7 +502,7 @@ const PackingList = () => {
                   onClick={clearUserInput}
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                 >
-                  Clear List
+                  Clear Status Icons
                 </button>
                 <button
                   onClick={() => setShowClearConfirmation(false)}

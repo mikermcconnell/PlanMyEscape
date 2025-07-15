@@ -259,10 +259,10 @@ const Dashboard = () => {
               const isUpcoming = new Date(trip.startDate) >= new Date();
               
               return (
-                <Link
+                <div
                   key={trip.id}
-                  to={`/trip/${trip.id}`}
-                  className="block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-600 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+                  className="block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-600 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 cursor-pointer relative"
+                  onClick={() => navigate(`/trip/${trip.id}`)}
                 >
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-4">
@@ -272,11 +272,26 @@ const Dashboard = () => {
                           <span>{renderTripTypeText(trip.tripType)}</span>
                         </div>
                       </div>
-                      {isUpcoming && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          Upcoming
-                        </span>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {isUpcoming && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            Upcoming
+                          </span>
+                        )}
+                        <button
+                          className="p-2 rounded-full text-red-500 hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            if (window.confirm('Are you sure you want to delete this trip? This action cannot be undone.')) {
+                              await handleDeleteTrip(trip.id);
+                            }
+                          }}
+                          title="Delete trip"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
                     </div>
                     
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
@@ -313,7 +328,7 @@ const Dashboard = () => {
                     </div>
 
                   </div>
-                </Link>
+                </div>
               );
             })
           )}

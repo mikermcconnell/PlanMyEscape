@@ -300,7 +300,7 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
             Suggested for {tripType === 'cottage' ? 'Cottage' : tripType.charAt(0).toUpperCase() + tripType.slice(1)} Trips
           </h4>
           <div className="flex flex-wrap gap-2">
-            {suggestedNotAdded.slice(0, 6).map((suggestion, index) => (
+            {suggestedNotAdded.map((suggestion, index) => (
               <button
                 key={index}
                 onClick={() => openEquipmentModal(suggestion)}

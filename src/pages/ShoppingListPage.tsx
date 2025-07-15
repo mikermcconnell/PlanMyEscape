@@ -89,10 +89,15 @@ const ShoppingListPage: React.FC = () => {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
-          <ShoppingCart className="h-5 w-5 mr-2" />
-          Combined Shopping List
-        </h2>
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+            <ShoppingCart className="h-5 w-5 mr-2" />
+            Combined Shopping List
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Automatically combines items from your packing list and meal planner that need to be purchased.
+          </p>
+        </div>
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowClearConfirmation(true)}
@@ -142,7 +147,7 @@ const ShoppingListPage: React.FC = () => {
           <div className="p-1 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 mr-2">
             <Check className="h-4 w-4" />
           </div>
-          <span className="text-gray-700 dark:text-gray-300 text-sm">Purchased/Bought</span>
+          <span className="text-gray-700 dark:text-gray-300 text-sm">Purchased</span>
         </div>
       </div>
 
@@ -158,7 +163,7 @@ const ShoppingListPage: React.FC = () => {
                 className={`p-1 rounded-full transition-colors mr-3 ${
                   item.isChecked ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
                 }`}
-                title={item.isChecked ? 'Bought' : 'Mark as bought'}
+                title={item.isChecked ? 'Purchased' : 'Mark as purchased'}
               >
                 <Check className="h-4 w-4" />
               </button>

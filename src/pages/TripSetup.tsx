@@ -21,6 +21,7 @@ const TripSetup = () => {
   const [location, setLocation] = useState('');
   const [isCoordinated, setIsCoordinated] = useState(false);
   const [numberOfPeople, setNumberOfPeople] = useState(1);
+  const [numberOfPeopleInput, setNumberOfPeopleInput] = useState('1');
   const [groups, setGroups] = useState<Group[]>([]);
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [parkSuggestions, setParkSuggestions] = useState<ParkSuggestion[]>([]);
@@ -33,6 +34,7 @@ const TripSetup = () => {
     contactEmail: '',
     color: GROUP_COLORS[0] as GroupColor
   });
+  const [currentGroupSizeInput, setCurrentGroupSizeInput] = useState('1');
   const [tripNameError, setTripNameError] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -104,7 +106,38 @@ const TripSetup = () => {
     return Math.round((steps.filter(Boolean).length / steps.length) * 100);
   };
 
+  // Get missing requirements for user feedback
+  const getMissingRequirements = () => {
+    const missing = [];
+    
+    if (!tripName.trim()) {
+      missing.push('Trip name is required');
+    }
+    if (!startDate) {
+      missing.push('Arrive date is required');
+    }
+    if (!endDate) {
+      missing.push('Departure date is required');
+    }
+    if (startDate && endDate && new Date(startDate) >= new Date(endDate)) {
+      missing.push('Departure date must be after arrive date');
+    }
+    if (isCoordinated && groups.length === 0) {
+      missing.push('At least one group is required when coordination is enabled');
+    }
+    if (!isCoordinated && numberOfPeople < 1) {
+      missing.push('Number of people must be at least 1');
+    }
+    
+    return missing;
+  };
+
   const progress = calculateProgress();
+  const missingRequirements = getMissingRequirements();
+  
+  // Debug logging
+  console.log('Progress:', progress);
+  console.log('Missing Requirements:', missingRequirements);
 
   // Validate form and update errors
   const validateForm = () => {
@@ -186,6 +219,7 @@ const TripSetup = () => {
         contactEmail: '',
         color: GROUP_COLORS[(groups.length + 1) % GROUP_COLORS.length] as GroupColor
       });
+      setCurrentGroupSizeInput('1');
       setShowGroupForm(false);
     }
   };
@@ -475,15 +509,35 @@ const TripSetup = () => {
                   Number of People <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
+                  <UsersIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
                   <input
                     type="number"
                     min="1"
-                    value={numberOfPeople}
-                    onChange={(e) => setNumberOfPeople(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+                    value={numberOfPeopleInput}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setNumberOfPeopleInput(value);
+                      
+                      // Update the actual numberOfPeople state
+                      if (value === '' || value === '0') {
+                        setNumberOfPeople(1);
+                      } else {
+                        const numValue = parseInt(value);
+                        if (!isNaN(numValue) && numValue > 0) {
+                          setNumberOfPeople(numValue);
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Ensure field shows at least 1 when user leaves the field
+                      if (e.target.value === '' || e.target.value === '0') {
+                        setNumberOfPeopleInput('1');
+                        setNumberOfPeople(1);
+                      }
+                    }}
+                    className="w-full pl-10 pr-3 py-2 border rounded-md dark:bg-gray-700"
                     placeholder="1"
                   />
-                  <UsersIcon className="absolute right-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
                   👥 This helps us calculate quantities for meals and packing items
@@ -577,13 +631,37 @@ const TripSetup = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Number of People</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={currentGroup.size}
-                      onChange={(e) => setCurrentGroup({ ...currentGroup, size: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
-                    />
+                    <div className="relative">
+                      <UsersIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
+                      <input
+                        type="number"
+                        min="1"
+                        value={currentGroupSizeInput}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setCurrentGroupSizeInput(value);
+                          
+                          // Update the actual currentGroup size
+                          if (value === '' || value === '0') {
+                            setCurrentGroup({ ...currentGroup, size: 1 });
+                          } else {
+                            const numValue = parseInt(value);
+                            if (!isNaN(numValue) && numValue > 0) {
+                              setCurrentGroup({ ...currentGroup, size: numValue });
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // Ensure field shows at least 1 when user leaves the field
+                          if (e.target.value === '' || e.target.value === '0') {
+                            setCurrentGroupSizeInput('1');
+                            setCurrentGroup({ ...currentGroup, size: 1 });
+                          }
+                        }}
+                        className="w-full pl-10 pr-3 py-2 border rounded-md dark:bg-gray-700"
+                        placeholder="1"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Contact Name (Optional)</label>
@@ -710,7 +788,7 @@ const TripSetup = () => {
         )}
 
         {/* Create Trip Button */}
-        <div className="flex flex-col items-end">
+        <div className="flex flex-col items-center">
           <button
             onClick={handleCreateTrip}
             disabled={progress < 100}
@@ -729,9 +807,32 @@ const TripSetup = () => {
             )}
           </button>
           {progress < 100 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Complete all required fields to create your trip
-            </p>
+            <div className="mt-4 w-full max-w-lg">
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 mr-2 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100 mb-2">
+                      Complete these steps to continue:
+                    </h4>
+                    {missingRequirements.length > 0 ? (
+                      <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-1">
+                        {missingRequirements.map((requirement, index) => (
+                          <li key={index} className="flex items-start">
+                            <span className="mr-2">•</span>
+                            {requirement}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                        Complete all required fields to create your trip
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
