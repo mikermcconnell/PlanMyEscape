@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Tent, Map, Home, Settings as SettingsIcon } from 'lucide-react';
 import LogoutButton from '../LogoutButton';
+import { AuthContext } from '../../contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,6 +10,7 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
+  const { user } = useContext(AuthContext);
 
   const isActiveRoute = (path: string) => {
     return location.pathname === path;
@@ -49,10 +51,12 @@ const Layout = ({ children }: LayoutProps) => {
                 <Map className="h-5 w-5 mr-2" />
                 New Trip
               </Link>
-              <Link to="/settings" className={navLinkClass('/settings')}>
-                <SettingsIcon className="h-5 w-5 mr-2" />
-                Settings
-              </Link>
+              {user && (
+                <Link to="/settings" className={navLinkClass('/settings')}>
+                  <SettingsIcon className="h-5 w-5 mr-2" />
+                  User Settings
+                </Link>
+              )}
               <LogoutButton />
             </div>
           </div>

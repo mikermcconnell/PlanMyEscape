@@ -5,12 +5,13 @@ import { AuthContext } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: ReactElement;
+  allowUnauthenticated?: boolean;
 }
 
-const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children, allowUnauthenticated = false }: ProtectedRouteProps) => {
   const { user } = useContext(AuthContext);
 
-  if (!user) {
+  if (!user && !allowUnauthenticated) {
     return <Navigate to="/signin" replace />;
   }
 

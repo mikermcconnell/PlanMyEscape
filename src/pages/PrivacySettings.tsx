@@ -47,7 +47,7 @@ const PrivacySettings = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Privacy Settings</h2>
+      <h2 className="text-2xl font-bold">User Settings</h2>
 
       <div className="space-y-4">
         <label className="flex items-center gap-2">

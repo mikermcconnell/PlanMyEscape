@@ -34,15 +34,15 @@ function App() {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/cookies" element={<CookiePolicy />} />
 
-          {/* Authenticated routes */}
-          <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
-          <Route path="/trip-setup" element={<ProtectedRoute><Layout><TripSetup /></Layout></ProtectedRoute>} />
-          <Route path="/notes" element={<ProtectedRoute><Layout><Notes /></Layout></ProtectedRoute>} />
+          {/* Main app routes - allow unauthenticated access */}
+          <Route path="/dashboard" element={<ProtectedRoute allowUnauthenticated={true}><Layout><Dashboard /></Layout></ProtectedRoute>} />
+          <Route path="/trip-setup" element={<ProtectedRoute allowUnauthenticated={true}><Layout><TripSetup /></Layout></ProtectedRoute>} />
+          <Route path="/notes" element={<ProtectedRoute allowUnauthenticated={true}><Layout><Notes /></Layout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Layout><PrivacySettings /></Layout></ProtectedRoute>} />
           <Route path="/signin" element={<SupaSignIn />} />
           
-          {/* Trip-specific routes with navigation */}
-          <Route path="/trip/:tripId" element={<ProtectedRoute><TripContainer /></ProtectedRoute>}>
+          {/* Trip-specific routes with navigation - allow unauthenticated access */}
+          <Route path="/trip/:tripId" element={<ProtectedRoute allowUnauthenticated={true}><TripContainer /></ProtectedRoute>}>
             <Route index element={<TripOverview />} />
             <Route path="packing" element={<PackingList />} />
             <Route path="meals" element={<MealPlanner />} />
