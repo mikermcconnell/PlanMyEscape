@@ -30,8 +30,23 @@ export class TripService {
       await this.adapter.deleteTrip(tripId);
     } catch (error) {
       console.error('Failed to delete trip:', error);
-      toast.error('Unable to delete trip');
-      throw new Error('Unable to delete trip');
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('Not signed in')) {
+          toast.error('Please sign in to delete trips');
+        } else if (error.message.includes('Trip not found')) {
+          toast.error('Trip not found or you do not have permission to delete it');
+        } else if (error.message.includes('permission')) {
+          toast.error('You do not have permission to delete this trip');
+        } else {
+          toast.error(`Unable to delete trip: ${error.message}`);
+        }
+      } else {
+        toast.error('Unable to delete trip');
+      }
+      
+      throw error; // Re-throw the original error for further handling
     }
   }
 }

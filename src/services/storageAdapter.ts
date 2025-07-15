@@ -84,15 +84,31 @@ export class SupabaseStorageAdapter implements StorageAdapter {
 
   async deleteTrip(tripId: string): Promise<void> {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) throw new Error('Not signed in');
+    if (userError || !user) {
+      console.error('Delete trip failed: User not authenticated', { userError });
+      throw new Error('Not signed in');
+    }
 
-    const { error } = await supabase
+    console.log('Attempting to delete trip:', { tripId, userId: user.id });
+
+    const { data, error } = await supabase
       .from('trips')
       .delete()
       .eq('id', tripId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select(); // Return deleted rows to verify deletion
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase delete error:', error);
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      console.error('No trip deleted - trip not found or access denied:', { tripId, userId: user.id });
+      throw new Error('Trip not found or you do not have permission to delete this trip');
+    }
+
+    console.log('Trip successfully deleted:', { tripId, deletedCount: data.length });
   }
 }
 

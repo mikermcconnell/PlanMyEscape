@@ -27,8 +27,7 @@ const Dashboard = () => {
       setTrips(updatedTrips);
     } catch (error) {
       console.error('Failed to delete trip:', error);
-      // Optionally show user-friendly error message
-      alert('Failed to delete trip. Please try again.');
+      // TripService already shows toast notification, no need for alert
     }
   };
 
