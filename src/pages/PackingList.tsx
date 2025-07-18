@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw } from 'lucide-react';
+import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, Activity } from 'lucide-react';
 import { PackingItem, Trip, ShoppingItem, TripType } from '../types';
 import { getPackingList, savePackingList, addToShoppingList } from '../utils/storage';
 import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
@@ -17,7 +17,7 @@ interface TripContextType {
 // ----------------------------------
 // Packing categories never change, so defining them at module level keeps
 // the array identity stable across renders and eliminates 'missing dependency' warnings.
-export const PACKING_CATEGORIES = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Food', 'Other'] as const;
+export const PACKING_CATEGORIES = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Food', 'Activity Items', 'Other'] as const;
 
 const PackingList = () => {
   const { trip } = useOutletContext<TripContextType>();
@@ -346,6 +346,8 @@ const PackingList = () => {
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
+      case 'Activity Items':
+        return <Activity className="h-5 w-5 mr-2" />;
       case 'Shelter':
         return <Home className="h-5 w-5 mr-2" />;
       case 'Kitchen':

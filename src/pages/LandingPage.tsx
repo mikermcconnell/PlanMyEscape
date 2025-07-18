@@ -230,12 +230,12 @@ export default function LandingPage() {
             Join thousands of outdoor enthusiasts who trust PlanMyEscape to coordinate, pack, and embark with
             confidence. Free forever — no credit card required.
           </p>
-          <Link
-            to="/signin"
+          <button
+            onClick={() => setShowSignIn(true)}
             className="inline-block mt-10 px-10 py-4 rounded-full bg-white text-green-700 font-semibold text-lg hover:bg-green-100 shadow-lg"
           >
             Sign Up Free
-          </Link>
+          </button>
         </section>
 
         {/* Footer */}

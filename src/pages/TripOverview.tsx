@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Calendar, MapPin, Users, Plus, Edit3, Trash2, X, Save } from 'lucide-react';
 import { Trip, TripType, Group, GROUP_COLORS, GroupColor } from '../types';
 import { saveTrip } from '../utils/supabaseTrips';
-import WeatherCard from '../components/WeatherCard';
 import ActivitiesPlanner from '../components/ActivitiesPlanner';
 
 interface TripContextType {
@@ -15,6 +14,12 @@ const TripOverview: React.FC = () => {
   const { trip, setTrip } = useOutletContext<TripContextType>();
   const [showLocationEdit, setShowLocationEdit] = useState(false);
   const [locationInput, setLocationInput] = useState(trip.location || '');
+  const [showDateEdit, setShowDateEdit] = useState(false);
+  const [dateInputs, setDateInputs] = useState({
+    startDate: trip.startDate,
+    endDate: trip.endDate
+  });
+  const [dateError, setDateError] = useState<string | null>(null);
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [newGroup, setNewGroup] = useState({
@@ -25,6 +30,14 @@ const TripOverview: React.FC = () => {
     color: GROUP_COLORS[0] as GroupColor
   });
 
+  // Sync date inputs with trip data when trip changes
+  useEffect(() => {
+    setDateInputs({
+      startDate: trip.startDate,
+      endDate: trip.endDate
+    });
+  }, [trip.startDate, trip.endDate]);
+
   const updateTripLocation = async () => {
     const updatedTrip = { ...trip, location: locationInput };
     setTrip(updatedTrip);
@@ -34,6 +47,41 @@ const TripOverview: React.FC = () => {
     } catch (error) {
       console.error('Error saving trip:', error);
     }
+  };
+
+  const updateTripDates = async () => {
+    // Clear any previous errors
+    setDateError(null);
+    
+    // Validate that end date is after start date
+    if (new Date(dateInputs.endDate) < new Date(dateInputs.startDate)) {
+      setDateError('End date must be after start date');
+      return;
+    }
+
+    const updatedTrip = { 
+      ...trip, 
+      startDate: dateInputs.startDate,
+      endDate: dateInputs.endDate
+    };
+    setTrip(updatedTrip);
+    try {
+      await saveTrip(updatedTrip);
+      setShowDateEdit(false);
+      setDateError(null);
+    } catch (error) {
+      console.error('Error saving trip:', error);
+      setDateError('Failed to save trip dates. Please try again.');
+    }
+  };
+
+  const cancelDateEdit = () => {
+    setDateInputs({
+      startDate: trip.startDate,
+      endDate: trip.endDate
+    });
+    setShowDateEdit(false);
+    setDateError(null);
   };
 
   const updateTripActivities = async (activities: Trip['activities']) => {
@@ -141,82 +189,126 @@ const TripOverview: React.FC = () => {
           </div>
         </div>
 
-        {/* Trip Details Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <Calendar className="h-5 w-5 text-gray-500 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">Dates</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
-                <MapPin className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">Location</p>
-                  {showLocationEdit ? (
-                    <div className="flex items-center space-x-2 mt-2">
+        {/* Trip Details */}
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-start">
+              <Calendar className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Dates</p>
+                {showDateEdit ? (
+                  <div className="space-y-3 mt-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Start Date
+                      </label>
                       <input
-                        type="text"
-                        value={locationInput}
-                        onChange={(e) => setLocationInput(e.target.value)}
-                        placeholder="Enter trip location..."
-                        className="flex-1 px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                        type="date"
+                        value={dateInputs.startDate}
+                        onChange={(e) => setDateInputs({ ...dateInputs, startDate: e.target.value })}
+                        className="w-full px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        End Date
+                      </label>
+                      <input
+                        type="date"
+                        value={dateInputs.endDate}
+                        onChange={(e) => setDateInputs({ ...dateInputs, endDate: e.target.value })}
+                        className="w-full px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
+                    {dateError && (
+                      <div className="text-xs text-red-600 dark:text-red-400">
+                        {dateError}
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-2">
                       <button
-                        onClick={updateTripLocation}
+                        onClick={updateTripDates}
                         className="px-3 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
                       >
                         Save
                       </button>
                       <button
-                        onClick={() => setShowLocationEdit(false)}
+                        onClick={cancelDateEdit}
                         className="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
                       >
                         Cancel
                       </button>
                     </div>
-                  ) : (
-                    <div className="flex items-center space-x-2">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {trip.location || 'No location set'}
-                      </p>
-                      <button
-                        onClick={() => setShowLocationEdit(true)}
-                        className="text-xs text-green-600 hover:text-green-700 transition-colors"
-                      >
-                        {trip.location ? 'Edit' : 'Add Location'}
-                      </button>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+                    </p>
+                    <button
+                      onClick={() => setShowDateEdit(true)}
+                      className="text-xs text-green-600 hover:text-green-700 transition-colors"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-
-            {trip.description && (
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                  Description
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {trip.description}
-                </p>
+            
+            <div className="flex items-start">
+              <MapPin className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Location</p>
+                {showLocationEdit ? (
+                  <div className="flex items-center space-x-2 mt-2">
+                    <input
+                      type="text"
+                      value={locationInput}
+                      onChange={(e) => setLocationInput(e.target.value)}
+                      placeholder="Enter trip location..."
+                      className="flex-1 px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                    />
+                    <button
+                      onClick={updateTripLocation}
+                      className="px-3 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setShowLocationEdit(false)}
+                      className="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {trip.location || 'No location set'}
+                    </p>
+                    <button
+                      onClick={() => setShowLocationEdit(true)}
+                      className="text-xs text-green-600 hover:text-green-700 transition-colors"
+                    >
+                      {trip.location ? 'Edit' : 'Add Location'}
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-          
-          <div>
-            <WeatherCard 
-              startDate={trip.startDate}
-              endDate={trip.endDate}
-              location={trip.location}
-            />
-          </div>
+
+          {trip.description && (
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                Description
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {trip.description}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

@@ -57,7 +57,7 @@ const Layout = ({ children }: LayoutProps) => {
                   User Settings
                 </Link>
               )}
-              <LogoutButton />
+              {user && <LogoutButton />}
             </div>
           </div>
         </div>

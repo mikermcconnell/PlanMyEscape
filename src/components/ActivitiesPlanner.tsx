@@ -250,7 +250,7 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
     const newPackingItems: PackingItem[] = modalEquipment.filter(e => e.name.trim()).map(e => ({
       id: crypto.randomUUID(),
       name: e.name,
-      category: 'Other', // Default, could be improved
+      category: 'Activity Items',
       quantity: e.quantity,
       isChecked: false,
       weight: undefined,
@@ -271,7 +271,7 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
       await savePackingList(tripId, [...existingPackingList, ...filteredItems]);
     }
     setShowEquipmentModal(false);
-    setConfirmation('Added to packing list!');
+    setConfirmation('Added to Activity Items in packing list!');
     setTimeout(() => setConfirmation(null), 2000);
   };
 
@@ -361,21 +361,34 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Schedule (optional)
               </label>
-              <select
-                multiple
-                value={newActivity.schedules.map(s => JSON.stringify(s))}
-                onChange={e => {
-                  const selected = Array.from(e.target.selectedOptions).map(opt => JSON.parse(opt.value));
-                  setNewActivity({ ...newActivity, schedules: selected });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
-              >
-                {getScheduleOptions(tripDays).map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <div className="max-h-32 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700">
+                {getScheduleOptions(tripDays).map(opt => {
+                  const isSelected = newActivity.schedules.some(s => JSON.stringify(s) === opt.value);
+                  return (
+                    <label key={opt.value} className={`flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer ${isSelected ? 'bg-green-50 dark:bg-green-900/30' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          const schedule = JSON.parse(opt.value);
+                          if (e.target.checked) {
+                            setNewActivity({ ...newActivity, schedules: [...newActivity.schedules, schedule] });
+                          } else {
+                            setNewActivity({ 
+                              ...newActivity, 
+                              schedules: newActivity.schedules.filter(s => JSON.stringify(s) !== opt.value) 
+                            });
+                          }
+                        }}
+                        className="mr-2 text-green-600 focus:ring-green-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Select one or more days/times for this activity (optional)
+                Check one or more days/times for this activity (optional)
               </p>
             </div>
           </div>
@@ -429,20 +442,36 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Schedule (optional)
               </label>
-              <select
-                multiple
-                value={modalActivity?.schedules?.map(s => JSON.stringify(s)) || []}
-                onChange={e => {
-                  if (!modalActivity) return;
-                  const selected = Array.from(e.target.selectedOptions).map(opt => JSON.parse(opt.value));
-                  setModalActivity({ ...modalActivity, schedules: selected });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
-              >
-                {getScheduleOptions(tripDays).map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <div className="max-h-32 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700">
+                {getScheduleOptions(tripDays).map(opt => {
+                  const isSelected = modalActivity?.schedules?.some(s => JSON.stringify(s) === opt.value) || false;
+                  return (
+                    <label key={opt.value} className={`flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer ${isSelected ? 'bg-green-50 dark:bg-green-900/30' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          if (!modalActivity) return;
+                          const schedule = JSON.parse(opt.value);
+                          if (e.target.checked) {
+                            setModalActivity({ 
+                              ...modalActivity, 
+                              schedules: [...(modalActivity.schedules || []), schedule] 
+                            });
+                          } else {
+                            setModalActivity({ 
+                              ...modalActivity, 
+                              schedules: (modalActivity.schedules || []).filter(s => JSON.stringify(s) !== opt.value) 
+                            });
+                          }
+                        }}
+                        className="mr-2 text-green-600 focus:ring-green-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
             <button
               className="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"

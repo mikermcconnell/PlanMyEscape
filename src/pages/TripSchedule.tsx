@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Calendar, Clock, Activity as ActivityIcon, Utensils } from 'lucide-react';
+import { Calendar, Clock, Activity as ActivityIcon, Utensils, Plus } from 'lucide-react';
 import { getMeals } from '../utils/storage';
 import { saveTrip } from '../utils/supabaseTrips';
 import { Trip, Meal } from '../types';
@@ -248,6 +248,22 @@ const TripSchedule: React.FC = () => {
                   className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 font-medium text-sm transition-colors"
                 >
                   + Add activities
+                </button>
+              </div>
+            )}
+
+            {/* Add Activities button for days with existing activities */}
+            {day.activities.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                <button
+                  onClick={() => {
+                    setSelectedDayForActivities(day.dayNumber);
+                    setShowActivitiesPlanner(true);
+                  }}
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add More Activities
                 </button>
               </div>
             )}
