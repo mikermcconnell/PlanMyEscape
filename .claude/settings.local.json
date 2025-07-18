@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(supabase db:*)",
+      "Bash(powershell:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm start)",
+      "Bash(npm run type-check:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": []
+  }
+}

@@ -11,6 +11,9 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const { user } = useContext(AuthContext);
+  
+  // Check if we're in a trip route
+  const isInTripRoute = location.pathname.startsWith('/trip/');
 
   const isActiveRoute = (path: string) => {
     return location.pathname === path;
@@ -64,10 +67,16 @@ const Layout = ({ children }: LayoutProps) => {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-          {children}
-        </div>
+      <main className={isInTripRoute ? "" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"}>
+        {isInTripRoute ? (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {children}
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            {children}
+          </div>
+        )}
       </main>
 
       {/* Footer */}

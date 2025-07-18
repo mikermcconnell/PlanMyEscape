@@ -1,13 +1,15 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Package, Utensils, Calendar, ShoppingCart } from 'lucide-react';
+import { Home, Package, Utensils, Calendar, ShoppingCart, Users } from 'lucide-react';
 
 interface TripNavigationProps {
   tripId: string;
   tripName: string;
+  onShowSharing?: () => void;
+  canShare?: boolean;
 }
 
-const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName }) => {
+const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onShowSharing, canShare }) => {
   const location = useLocation();
 
   const navItems = [
@@ -69,6 +71,15 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName }) => 
                 Manage all aspects of your trip
               </p>
             </div>
+            {canShare && onShowSharing && (
+              <button
+                onClick={onShowSharing}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Share Trip
+              </button>
+            )}
           </div>
         </div>
 

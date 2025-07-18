@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Users, Mail, Search, Info, CheckCircle, AlertCircle, MapPin, Calendar, Users as UsersIcon, Compass, X } from 'lucide-react';
+import { Plus, Trash2, Users, Mail, Search, Info, CheckCircle, AlertCircle, MapPin, Calendar, Users as UsersIcon, Compass, X, Edit2 } from 'lucide-react';
 import { Trip, TripType, Group, GROUP_COLORS, TRIP_TYPES, GroupColor } from '../types';
 import { saveTrip, getTrips } from '../utils/supabaseTrips';
 import { generateId } from '../utils/storage';
@@ -24,6 +24,7 @@ const TripSetup = () => {
   const [numberOfPeopleInput, setNumberOfPeopleInput] = useState('1');
   const [groups, setGroups] = useState<Group[]>([]);
   const [showGroupForm, setShowGroupForm] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [parkSuggestions, setParkSuggestions] = useState<ParkSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentGroup, setCurrentGroup] = useState<Group>({
@@ -203,14 +204,33 @@ const TripSetup = () => {
 
   const handleAddGroup = () => {
     if (currentGroup.name && currentGroup.size > 0) {
-      const newGroup: Group = {
-        ...currentGroup,
-        id: Date.now().toString(),
-        contactName: currentGroup.contactName?.trim() || undefined,
-        contactEmail: currentGroup.contactEmail?.trim() || undefined,
-        color: GROUP_COLORS[groups.length % GROUP_COLORS.length] as GroupColor
-      };
-      setGroups([...groups, newGroup]);
+      if (editingGroupId) {
+        // Update existing group
+        const updatedGroups = groups.map(group => 
+          group.id === editingGroupId 
+            ? {
+                ...currentGroup,
+                id: editingGroupId,
+                contactName: currentGroup.contactName?.trim() || undefined,
+                contactEmail: currentGroup.contactEmail?.trim() || undefined,
+                color: group.color // Keep original color
+              }
+            : group
+        );
+        setGroups(updatedGroups);
+        setEditingGroupId(null);
+      } else {
+        // Add new group
+        const newGroup: Group = {
+          ...currentGroup,
+          id: Date.now().toString(),
+          contactName: currentGroup.contactName?.trim() || undefined,
+          contactEmail: currentGroup.contactEmail?.trim() || undefined,
+          color: GROUP_COLORS[groups.length % GROUP_COLORS.length] as GroupColor
+        };
+        setGroups([...groups, newGroup]);
+      }
+      
       setCurrentGroup({
         id: '',
         name: '',
@@ -226,6 +246,34 @@ const TripSetup = () => {
 
   const handleRemoveGroup = (groupId: string) => {
     setGroups(groups.filter(g => g.id !== groupId));
+  };
+
+  const handleEditGroup = (group: Group) => {
+    setCurrentGroup({
+      id: group.id,
+      name: group.name,
+      size: group.size,
+      contactName: group.contactName || '',
+      contactEmail: group.contactEmail || '',
+      color: group.color
+    });
+    setCurrentGroupSizeInput(group.size.toString());
+    setEditingGroupId(group.id);
+    setShowGroupForm(true);
+  };
+
+  const handleCancelEdit = () => {
+    setCurrentGroup({
+      id: '',
+      name: '',
+      size: 1,
+      contactName: '',
+      contactEmail: '',
+      color: GROUP_COLORS[(groups.length + 1) % GROUP_COLORS.length] as GroupColor
+    });
+    setCurrentGroupSizeInput('1');
+    setEditingGroupId(null);
+    setShowGroupForm(false);
   };
 
   const handleCreateTrip = async () => {
@@ -289,7 +337,8 @@ const TripSetup = () => {
   const tripTypeInfo = getTripTypeInfo(tripType);
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-4xl mx-auto p-6">
       {/* Welcome Section */}
       {showWelcome && (
         <div className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6">
@@ -617,7 +666,7 @@ const TripSetup = () => {
             {/* Add Group Form */}
             {showGroupForm && (
               <div className="mb-6 p-4 border rounded-md bg-gray-50 dark:bg-gray-700">
-                <h3 className="font-medium mb-3">Add New Group</h3>
+                <h3 className="font-medium mb-3">{editingGroupId ? 'Edit Group' : 'Add New Group'}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Group Name</label>
@@ -686,7 +735,7 @@ const TripSetup = () => {
                 </div>
                 <div className="mt-4 flex justify-end space-x-2">
                   <button
-                    onClick={() => setShowGroupForm(false)}
+                    onClick={handleCancelEdit}
                     className="px-4 py-2 border rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
                     Cancel
@@ -696,7 +745,7 @@ const TripSetup = () => {
                     className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
                     disabled={!currentGroup.name || currentGroup.size < 1}
                   >
-                    Add Group
+                    {editingGroupId ? 'Update Group' : 'Add Group'}
                   </button>
                 </div>
               </div>
@@ -727,12 +776,22 @@ const TripSetup = () => {
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleRemoveGroup(group.id)}
-                    className="p-1 text-gray-500 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleEditGroup(group)}
+                      className="p-1 text-gray-500 hover:text-blue-500 transition-colors"
+                      title="Edit group"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleRemoveGroup(group.id)}
+                      className="p-1 text-gray-500 hover:text-red-500 transition-colors"
+                      title="Remove group"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -840,6 +899,7 @@ const TripSetup = () => {
       {/* Loading/Error Message */}
       {creating && <div>Creating trip...</div>}
       {createError && <div style={{color:'red'}}>Error: {createError}</div>}
+      </div>
     </div>
   );
 };

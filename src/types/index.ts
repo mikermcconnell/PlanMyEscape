@@ -56,6 +56,9 @@ export interface PackingItem {
   required: boolean;
   assignedGroupId?: string;
   isPersonal: boolean; // true for personal items (per person), false for group items (shared)
+  packedByUserId?: string; // ID of user who packed this item
+  lastModifiedBy?: string; // ID of user who last modified this item
+  lastModifiedAt?: string; // Timestamp of last modification
 }
 
 export interface ShoppingItem {
@@ -82,6 +85,8 @@ export interface Meal {
   assignedGroupId?: string;
   sharedServings?: boolean;
   servings?: number;
+  lastModifiedBy?: string; // ID of user who last modified this meal
+  lastModifiedAt?: string; // Timestamp of last modification
 }
 
 export interface RecipeSuggestion {

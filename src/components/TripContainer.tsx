@@ -70,29 +70,29 @@ const TripContainer: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div>
       {/* Back to Dashboard Link */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <Link
-            to="/"
-            className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-150"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Dashboard
-          </Link>
-        </div>
+      <div className="mb-4">
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-150"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back to Dashboard
+        </Link>
       </div>
 
       {/* Trip Navigation */}
-      <TripNavigation tripId={trip.id} tripName={trip.tripName} />
+      <TripNavigation 
+        tripId={trip.id} 
+        tripName={trip.tripName} 
+      />
 
       {/* Trip Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <Outlet context={{ trip, setTrip }} />
-        </div>
+      <div className="mt-6">
+        <Outlet context={{ trip, setTrip }} />
       </div>
+
     </div>
   );
 };

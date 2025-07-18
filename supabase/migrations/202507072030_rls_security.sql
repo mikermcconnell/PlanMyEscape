@@ -3,10 +3,10 @@
 
 -- 1. Enable RLS on tables ---------------------------------------------------
 ALTER TABLE IF EXISTS trips ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS packing_lists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS packing_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS meals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS shopping_lists ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS gear ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS gear_items ENABLE ROW LEVEL SECURITY;
 
 -- 2. Add user_id columns -----------------------------------------------------
 DO $$
@@ -18,9 +18,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns WHERE table_name = 'packing_lists' AND column_name = 'user_id'
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'packing_items' AND column_name = 'user_id'
   ) THEN
-    ALTER TABLE packing_lists ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+    ALTER TABLE packing_items ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
   END IF;
 
   IF NOT EXISTS (
@@ -30,9 +30,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns WHERE table_name = 'gear' AND column_name = 'user_id'
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'gear_items' AND column_name = 'user_id'
   ) THEN
-    ALTER TABLE gear ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+    ALTER TABLE gear_items ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
   END IF;
 
   IF NOT EXISTS (
@@ -44,9 +44,9 @@ END $$;
 
 -- 3. Create indexes ----------------------------------------------------------
 CREATE INDEX IF NOT EXISTS trips_user_id_idx ON trips(user_id);
-CREATE INDEX IF NOT EXISTS packing_lists_user_id_idx ON packing_lists(user_id);
+CREATE INDEX IF NOT EXISTS packing_items_user_id_idx ON packing_items(user_id);
 CREATE INDEX IF NOT EXISTS meals_user_id_idx ON meals(user_id);
-CREATE INDEX IF NOT EXISTS gear_user_id_idx ON gear(user_id);
+CREATE INDEX IF NOT EXISTS gear_items_user_id_idx ON gear_items(user_id);
 CREATE INDEX IF NOT EXISTS shopping_lists_user_id_idx ON shopping_lists(user_id);
 
 -- 4. Policies ----------------------------------------------------------------
@@ -55,8 +55,8 @@ CREATE POLICY "Users can only access own trips"
   FOR ALL
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can only access own packing lists"
-  ON packing_lists
+CREATE POLICY "Users can only access own packing items"
+  ON packing_items
   FOR ALL
   USING (auth.uid() = user_id);
 
@@ -65,8 +65,8 @@ CREATE POLICY "Users can only access own meals"
   FOR ALL
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can only access own gear"
-  ON gear
+CREATE POLICY "Users can only access own gear items"
+  ON gear_items
   FOR ALL
   USING (auth.uid() = user_id);
 
