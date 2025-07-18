@@ -338,20 +338,20 @@ const TripSetup = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-4xl mx-auto p-4 sm:p-6">
       {/* Welcome Section */}
       {showWelcome && (
-        <div className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6">
+        <div className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 🏕️ Plan Your Perfect Camping Trip
               </h1>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
                 Let's get you set up with everything you need for an amazing outdoor adventure. 
                 We'll help you plan meals, pack efficiently, and coordinate with your group.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 text-sm">
                 <div className="flex items-center">
                   <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
                   <span>Smart packing suggestions</span>
@@ -396,15 +396,15 @@ const TripSetup = () => {
 
       <div className="space-y-6">
         {/* Basic Trip Information */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow">
           <div className="flex items-center mb-4">
             <MapPin className="h-5 w-5 text-blue-500 mr-2" />
-            <h2 className="text-xl font-semibold">Trip Details</h2>
+            <h2 className="text-lg sm:text-xl font-semibold">Trip Details</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div className="relative">
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm sm:text-base font-medium mb-2">
                 Trip Name <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -413,12 +413,12 @@ const TripSetup = () => {
                   value={tripName}
                   onChange={handleTripNameChange}
                   onFocus={() => setShowSuggestions(true)}
-                  className={`w-full px-3 py-2 border rounded-md dark:bg-gray-700 ${
+                  className={`w-full px-3 py-3 text-base border rounded-md dark:bg-gray-700 ${
                     tripNameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                   }`}
                   placeholder="Enter a location or custom trip name"
                 />
-                <Search className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                <Search className="absolute right-3 top-3.5 h-5 w-5 text-gray-400" />
               </div>
               {showSuggestions && parkSuggestions.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 rounded-md shadow-lg border">
@@ -445,12 +445,12 @@ const TripSetup = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Location (Optional)</label>
+              <label className="block text-sm sm:text-base font-medium mb-2">Location (Optional)</label>
               <input
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+                className="w-full px-3 py-3 text-base border rounded-md dark:bg-gray-700"
                 placeholder="e.g., Algonquin Park, Muskoka, etc."
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -459,21 +459,21 @@ const TripSetup = () => {
             </div>
             
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm sm:text-base font-medium mb-3">
                 Trip Type <span className="text-red-500">*</span>
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {TRIP_TYPES.map((type) => (
-                  <label key={type} className="flex items-center space-x-2 p-3 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                  <label key={type} className="flex items-center space-x-3 p-4 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors min-h-[60px]">
                     <input
                       type="radio"
                       name="tripType"
                       value={type}
                       checked={tripType === type}
                       onChange={() => setTripType(type)}
-                      className="text-green-600"
+                      className="text-green-600 w-4 h-4 flex-shrink-0"
                     />
-                    <span className="text-sm">{type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</span>
+                    <span className="text-sm sm:text-base font-medium">{type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</span>
                   </label>
                 ))}
               </div>
@@ -503,7 +503,7 @@ const TripSetup = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm sm:text-base font-medium mb-2">
                 Arrive Date <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -511,14 +511,14 @@ const TripSetup = () => {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+                  className="w-full px-3 py-3 text-base border rounded-md dark:bg-gray-700"
                 />
-                <Calendar className="absolute right-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
+                <Calendar className="absolute right-3 top-3.5 h-5 w-5 text-gray-400 pointer-events-none" />
               </div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm sm:text-base font-medium mb-2">
                 Departure Date <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -526,9 +526,9 @@ const TripSetup = () => {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+                  className="w-full px-3 py-3 text-base border rounded-md dark:bg-gray-700"
                 />
-                <Calendar className="absolute right-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
+                <Calendar className="absolute right-3 top-3.5 h-5 w-5 text-gray-400 pointer-events-none" />
               </div>
             </div>
             
@@ -554,11 +554,11 @@ const TripSetup = () => {
             {/* Number of People - Only show when coordination is not selected */}
             {!isCoordinated && (
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm sm:text-base font-medium mb-2">
                   Number of People <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <UsersIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
+                  <UsersIcon className="absolute left-3 top-3.5 h-5 w-5 text-gray-400 pointer-events-none" />
                   <input
                     type="number"
                     min="1"
@@ -584,7 +584,7 @@ const TripSetup = () => {
                         setNumberOfPeople(1);
                       }
                     }}
-                    className="w-full pl-10 pr-3 py-2 border rounded-md dark:bg-gray-700"
+                    className="w-full pl-10 pr-3 py-3 text-base border rounded-md dark:bg-gray-700"
                     placeholder="1"
                   />
                 </div>
@@ -595,11 +595,11 @@ const TripSetup = () => {
             )}
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-1">Description (Optional)</label>
+              <label className="block text-sm sm:text-base font-medium mb-2">Description (Optional)</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+                className="w-full px-3 py-3 text-base border rounded-md dark:bg-gray-700"
                 rows={3}
                 placeholder="Add any additional details about the trip, special requirements, or notes..."
               />
@@ -609,15 +609,15 @@ const TripSetup = () => {
             </div>
             
             <div className="md:col-span-2">
-              <label className="flex items-center space-x-2 p-3 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+              <label className="flex items-center space-x-3 p-4 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
                 <input
                   type="checkbox"
                   checked={isCoordinated}
                   onChange={(e) => setIsCoordinated(e.target.checked)}
-                  className="rounded"
+                  className="rounded w-4 h-4 flex-shrink-0"
                 />
                 <div>
-                  <span className="text-sm font-medium">Coordinate meals and items between groups</span>
+                  <span className="text-sm sm:text-base font-medium">Coordinate meals and items between groups</span>
                   <p className="text-xs text-gray-500 mt-1">
                     Perfect for multiple families or groups camping together
                   </p>
@@ -629,15 +629,15 @@ const TripSetup = () => {
 
         {/* Groups Management - Only show when coordination is enabled */}
         {isCoordinated && (
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
               <div className="flex items-center">
                 <Users className="h-5 w-5 text-blue-500 mr-2" />
-                <h2 className="text-xl font-semibold">Groups/Families</h2>
+                <h2 className="text-lg sm:text-xl font-semibold">Groups/Families</h2>
               </div>
               <button
                 onClick={() => setShowGroupForm(true)}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                className="inline-flex items-center px-4 py-3 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 w-full sm:w-auto justify-center"
                 disabled={showGroupForm}
               >
                 <Plus className="h-4 w-4 mr-1" />
@@ -851,7 +851,7 @@ const TripSetup = () => {
           <button
             onClick={handleCreateTrip}
             disabled={progress < 100}
-            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-lg hover:from-blue-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-lg hover:from-blue-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-200 shadow-lg hover:shadow-xl text-base sm:text-lg"
           >
             {progress === 100 ? (
               <span className="flex items-center">
