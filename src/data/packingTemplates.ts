@@ -127,7 +127,7 @@ export const getCarCampingTemplate = (groupSize: number, tripDays: number = 2): 
   
   // Tools & Safety - Required (Mix of Personal and Group Items)
   createItem('Headlamp', 'Tools', 100, groupSize, true, true),
-  createItem('Battery pack', 'Tools', undefined, 1, true, false),
+  createItem('Battery pack', 'Tools', undefined, groupSize, true, true),
   createItem('Multi-tool', 'Tools', 100, 1, true, false),
   createItem('Duct tape', 'Tools', 50, 1, true, false),
   createItem('Paracord', 'Tools', 100, 1, true, false),
@@ -148,15 +148,15 @@ export const getCarCampingTemplate = (groupSize: number, tripDays: number = 2): 
   
   // Comfort - Optional (Mix of Personal and Group Items)
   createItem('Camp chairs', 'Comfort', undefined, groupSize, false, true),
-  createItem('Camp table', 'Comfort', undefined, 1, false, false),
-  createItem('Lantern', 'Comfort', undefined, 1, false, false),
-  createItem('Books/games', 'Comfort', undefined, 1, false, false),
-  createItem('Hammock', 'Comfort', undefined, 1, false, false),
-  createItem('Camp shower', 'Comfort', undefined, 1, false, false),
-  createItem('Portable speaker', 'Comfort', undefined, 1, false, false),
+  createItem('Camp table', 'Fun and games', undefined, 1, false, false),
+  createItem('Lantern', 'Fun and games', undefined, 1, false, false),
+  createItem('Books/games', 'Fun and games', undefined, 1, false, false),
+  createItem('Hammock', 'Fun and games', undefined, 1, false, false),
+  createItem('Camp shower', 'Fun and games', undefined, 1, false, false),
+  createItem('Portable speaker', 'Fun and games', undefined, 1, false, false),
   createItem('Camera', 'Comfort', undefined, groupSize, false, true),
-  createItem('Binoculars', 'Comfort', undefined, 1, false, false),
-  createItem('Fishing gear', 'Comfort', undefined, 1, false, false),
+  createItem('Binoculars', 'Fun and games', undefined, 1, false, false),
+  createItem('Fishing gear', 'Fun and games', undefined, 1, false, false),
 ];
   return processPackingItems(items);
 };
@@ -244,7 +244,7 @@ export const getBackcountryTemplate = (groupSize: number, tripDays: number = 3):
   
   // Tools & Safety - Required
   createItem('Headlamp', 'Tools', 100, groupSize, true, true),
-  createItem('Battery pack', 'Tools', undefined, 1, true, false),
+  createItem('Battery pack', 'Tools', undefined, groupSize, true, true),
   createItem('Multi-tool', 'Tools', 100, 1, true, false),
   createItem('Duct tape', 'Tools', 50, 1, true, false),
   createItem('Paracord', 'Tools', 100, 1, true, false),
@@ -276,12 +276,12 @@ export const getBackcountryTemplate = (groupSize: number, tripDays: number = 3):
   
   // Comfort - Optional (Mix of Personal and Group Items)
   createItem('Camp chair', 'Comfort', 500, groupSize, false, true),
-  createItem('Books/games', 'Comfort', 200, 1, false, false),
+  createItem('Books/games', 'Fun and games', 200, 1, false, false),
   createItem('Camera', 'Comfort', 300, groupSize, false, true),
-  createItem('Binoculars', 'Comfort', 400, 1, false, false),
-  createItem('Fishing gear', 'Comfort', 600, 1, false, false),
-  createItem('Portable speaker', 'Comfort', 200, 1, false, false),
-  createItem('Hammock', 'Comfort', 400, 1, false, false),
+  createItem('Binoculars', 'Fun and games', 400, 1, false, false),
+  createItem('Fishing gear', 'Fun and games', 600, 1, false, false),
+  createItem('Portable speaker', 'Fun and games', 200, 1, false, false),
+  createItem('Hammock', 'Fun and games', 400, 1, false, false),
   createItem('Trekking poles', 'Comfort', 300, groupSize, false, true),
 ];
   return processPackingItems(items);
@@ -342,7 +342,7 @@ export const getCottageTemplate = (groupSize: number, tripDays: number = 3): Pac
   
   // Tools & Safety - Required (Group Items)
   createItem('Flashlight or headlamp', 'Tools', undefined, 1, true, true),
-  createItem('Battery pack', 'Tools', undefined, 1, true, false),
+  createItem('Battery pack', 'Tools', undefined, groupSize, true, true),
   createItem('Matches/lighter', 'Tools', undefined, 1, true, false),
   createItem('Area maps/guidebooks', 'Tools', undefined, 1, true, false),
   
@@ -352,19 +352,19 @@ export const getCottageTemplate = (groupSize: number, tripDays: number = 3): Pac
   createItem('Charging cables', 'Tools', undefined, 1, false, false),
   
   // Comfort - Optional (Mix of Personal and Group Items)
-  createItem('Board games/card games', 'Comfort', undefined, Math.min(3, Math.ceil(tripDays / 2)), false, false),
-  createItem('Books/magazines', 'Comfort', undefined, Math.min(3, tripDays), false, false),
+  createItem('Board games/card games', 'Fun and games', undefined, Math.min(3, Math.ceil(tripDays / 2)), false, false),
+  createItem('Books/magazines', 'Fun and games', undefined, Math.min(3, tripDays), false, false),
   createItem('Tablet/e-reader', 'Comfort', undefined, 1, false, true),
-  createItem('Fishing gear', 'Comfort', undefined, 1, false, false),
+  createItem('Fishing gear', 'Fun and games', undefined, 1, false, false),
   createItem('Fishing license', 'Comfort', undefined, 1, false, true),
-  createItem('Water toys/floaties', 'Comfort', undefined, 1, false, false),
+  createItem('Water toys/floaties', 'Fun and games', undefined, 1, false, false),
   createItem('Beach chairs', 'Comfort', undefined, 1, false, true),
-  createItem('Beach umbrella', 'Comfort', undefined, 1, false, false),
-  createItem('Hammock', 'Comfort', undefined, 1, false, false),
-  createItem('Portable speakers', 'Comfort', undefined, 1, false, false),
+  createItem('Beach umbrella', 'Fun and games', undefined, 1, false, false),
+  createItem('Hammock', 'Fun and games', undefined, 1, false, false),
+  createItem('Portable speakers', 'Fun and games', undefined, 1, false, false),
   createItem('Camera', 'Comfort', undefined, 1, false, true),
-  createItem('Binoculars', 'Comfort', undefined, 1, false, false),
-  createItem('Outdoor games (frisbee, etc.)', 'Comfort', undefined, tripDays > 2 ? 1 : 0, false, false),
+  createItem('Binoculars', 'Fun and games', undefined, 1, false, false),
+  createItem('Outdoor games (frisbee, etc.)', 'Fun and games', undefined, tripDays > 2 ? 1 : 0, false, false),
   
   // Kitchen - Optional (Group Items)
   createItem('Favorite condiments/sauces', 'Kitchen', undefined, 1, false, false),
@@ -462,7 +462,7 @@ export const getCanoeCampingTemplate = (groupSize: number, tripDays: number = 3)
   
   // Tools & Safety - Required (Mix of Personal and Group Items)
   createItem('Headlamp or flashlight + batteries', 'Tools', 150, groupSize, true, true),
-  createItem('Battery pack', 'Tools', undefined, 1, true, false),
+  createItem('Battery pack', 'Tools', undefined, groupSize, true, true),
   createItem('Multi-tool', 'Tools', 120, 1, true, false),
   createItem('Duct tape', 'Tools', 80, 1, true, false),
   createItem('Map (in waterproof case)', 'Tools', 50, 1, true, false),
@@ -478,14 +478,14 @@ export const getCanoeCampingTemplate = (groupSize: number, tripDays: number = 3)
   
   // Comfort - Optional (Mix of Personal and Group Items)
   createItem('Waterproof camera', 'Comfort', 300, groupSize, false, true),
-  createItem('Fishing gear', 'Comfort', 500, 1, false, false),
-  createItem('Binoculars (waterproof)', 'Comfort', 400, 1, false, false),
-  createItem('Waterproof playing cards', 'Comfort', 50, 1, false, false),
+  createItem('Fishing gear', 'Fun and games', 500, 1, false, false),
+  createItem('Binoculars (waterproof)', 'Fun and games', 400, 1, false, false),
+  createItem('Waterproof playing cards', 'Fun and games', 50, 1, false, false),
   createItem('Camp chair (lightweight)', 'Comfort', 600, groupSize, false, true),
   createItem('Garden gloves', 'Comfort', 100, groupSize, false, true),
   createItem('Floaty', 'Comfort', 200, groupSize, false, true),
   createItem('Hammocks', 'Comfort', 400, groupSize, false, true),
-  createItem('Fun games (balls, things to hide, monopoly deal)', 'Comfort', 500, 1, false, false),
+  createItem('Fun games (balls, things to hide, monopoly deal)', 'Fun and games', 500, 1, false, false),
   ];
   return processPackingItems(items);
 };
@@ -537,21 +537,21 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
       { name: 'Trash bags', category: 'Kitchen' }
     ],
     recommended: [
-      { name: 'Camping chairs', category: 'Comfort' },
-      { name: 'Table', category: 'Comfort' },
+      { name: 'Camping chairs', category: 'Fun and games' },
+      { name: 'Table', category: 'Fun and games' },
       { name: 'Lantern', category: 'Tools' },
       { name: 'Cooler', category: 'Kitchen' },
       { name: 'Ice', category: 'Kitchen' },
       { name: 'Grill grate', category: 'Kitchen' },
-      { name: 'Firewood', category: 'Comfort' },
+      { name: 'Firewood', category: 'Fun and games' },
       { name: 'Matches/lighter', category: 'Tools' },
       { name: 'Rope/paracord', category: 'Tools' },
       { name: 'Multi-tool', category: 'Tools' },
       { name: 'Tarp', category: 'Shelter' },
       { name: 'Bug spray', category: 'Personal' },
       { name: 'Sunscreen', category: 'Personal' },
-      { name: 'Games/books', category: 'Comfort' },
-      { name: 'Camera', category: 'Comfort' }
+      { name: 'Games/books', category: 'Fun and games' },
+      { name: 'Camera', category: 'Fun and games' }
     ]
   },
   'canoe camping': {
@@ -576,9 +576,9 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
     recommended: [
       { name: 'Portage yoke', category: 'Transportation' },
       { name: 'Spare paddle', category: 'Transportation' },
-      { name: 'Waterproof camera', category: 'Comfort' },
-      { name: 'Fishing gear', category: 'Comfort' },
-      { name: 'Binoculars', category: 'Comfort' },
+      { name: 'Waterproof camera', category: 'Fun and games' },
+      { name: 'Fishing gear', category: 'Fun and games' },
+      { name: 'Binoculars', category: 'Fun and games' },
       { name: 'Quick-dry towel', category: 'Personal' },
       { name: 'Water shoes', category: 'Clothing' },
       { name: 'Rain gear', category: 'Clothing' },
@@ -618,8 +618,8 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
       { name: 'Portable charger', category: 'Tools' },
       { name: 'Rain gear', category: 'Clothing' },
       { name: 'Warm layers', category: 'Clothing' },
-      { name: 'Camera', category: 'Comfort' },
-      { name: 'Journal', category: 'Comfort' }
+      { name: 'Camera', category: 'Fun and games' },
+      { name: 'Journal', category: 'Fun and games' }
     ]
   },
   'cottage': {
@@ -671,21 +671,21 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
       { name: 'Shaving cream', category: 'Personal' },
       { name: 'Contact solution', category: 'Personal' },
       { name: 'Glasses', category: 'Personal' },
-      { name: 'Board games', category: 'Comfort' },
-      { name: 'Cards', category: 'Comfort' },
-      { name: 'Books', category: 'Comfort' },
-      { name: 'Magazines', category: 'Comfort' },
-      { name: 'Tablet/e-reader', category: 'Comfort' },
-      { name: 'Fishing gear', category: 'Comfort' },
-      { name: 'Fishing license', category: 'Comfort' },
-      { name: 'Water toys', category: 'Comfort' },
-      { name: 'Floaties', category: 'Comfort' },
-      { name: 'Beach chairs', category: 'Comfort' },
-      { name: 'Umbrella', category: 'Comfort' },
-      { name: 'Hammock', category: 'Comfort' },
-      { name: 'Portable speakers', category: 'Comfort' },
-      { name: 'Camera', category: 'Comfort' },
-      { name: 'Binoculars', category: 'Comfort' },
+      { name: 'Board games', category: 'Fun and games' },
+      { name: 'Cards', category: 'Fun and games' },
+      { name: 'Books', category: 'Fun and games' },
+      { name: 'Magazines', category: 'Fun and games' },
+      { name: 'Tablet/e-reader', category: 'Fun and games' },
+      { name: 'Fishing gear', category: 'Fun and games' },
+      { name: 'Fishing license', category: 'Fun and games' },
+      { name: 'Water toys', category: 'Fun and games' },
+      { name: 'Floaties', category: 'Fun and games' },
+      { name: 'Beach chairs', category: 'Fun and games' },
+      { name: 'Umbrella', category: 'Fun and games' },
+      { name: 'Hammock', category: 'Fun and games' },
+      { name: 'Portable speakers', category: 'Fun and games' },
+      { name: 'Camera', category: 'Fun and games' },
+      { name: 'Binoculars', category: 'Fun and games' },
       { name: 'Local maps', category: 'Tools' },
       { name: 'Guidebooks', category: 'Tools' },
       { name: 'Phone chargers', category: 'Tools' },
