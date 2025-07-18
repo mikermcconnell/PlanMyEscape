@@ -18,6 +18,7 @@ import TermsOfService from './pages/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy';
 import PrivacySettings from './pages/PrivacySettings';
 import ShoppingListPage from './pages/ShoppingListPage';
+import { InvitationPage } from './pages/InvitationPage';
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
           <Route path="/notes" element={<ProtectedRoute allowUnauthenticated={true}><Layout><Notes /></Layout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Layout><PrivacySettings /></Layout></ProtectedRoute>} />
           <Route path="/signin" element={<SupaSignIn />} />
+          <Route path="/invite/:token" element={<InvitationPage />} />
           
           {/* Trip-specific routes with navigation - allow unauthenticated access */}
           <Route path="/trip/:tripId" element={<ProtectedRoute allowUnauthenticated={true}><Layout><TripContainer /></Layout></ProtectedRoute>}>

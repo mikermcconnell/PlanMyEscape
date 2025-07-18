@@ -81,7 +81,7 @@ export default function LandingPage() {
     <>
       {/* Set title via useEffect to avoid additional deps */}
       {useEffect(() => {
-        document.title = 'PlanMyEscape – Effortless Camping & Outdoor Trip Planning';
+        document.title = 'PlanMyEscape – Effortless Camping & Cottage Trip Planning';
       }, [])}
       {/* Sign-in Modal */}
       {showSignIn && (

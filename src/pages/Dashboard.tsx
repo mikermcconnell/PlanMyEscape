@@ -4,6 +4,7 @@ import { Trip, TripType, TRIP_TYPES } from '../types';
 import { getTrips } from '../utils/supabaseTrips';
 import { Tent, Compass, Mountain, Home, Calendar, Users, Plus, MapPin, Activity, Trash2 } from 'lucide-react';
 import { tripService } from '../services/tripService';
+import { PendingInvitations } from '../components/PendingInvitations';
 
 const Dashboard = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -121,6 +122,11 @@ const Dashboard = () => {
           <Plus className="h-5 w-5 mr-2" />
           New Trip
         </Link>
+      </div>
+
+      {/* Pending Invitations */}
+      <div className="mb-8">
+        <PendingInvitations />
       </div>
 
       {/* Stats Overview */}

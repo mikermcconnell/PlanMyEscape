@@ -4,11 +4,17 @@ import { ArrowLeft, Tent } from 'lucide-react';
 import { Trip } from '../types';
 import { getTrips } from '../utils/supabaseTrips';
 import TripNavigation from './TripNavigation';
+import { TripSharingModal } from './TripSharingModal';
+import { useAuth } from '../contexts/AuthContext';
+import { tripSharingService } from '../services/tripSharingService';
 
 const TripContainer: React.FC = () => {
   const { tripId } = useParams<{ tripId: string }>();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showSharingModal, setShowSharingModal] = useState(false);
+  const [userPermission, setUserPermission] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     const loadTrip = async () => {
@@ -19,6 +25,17 @@ const TripContainer: React.FC = () => {
         const trips = await getTrips();
         const currentTrip = trips.find((t: Trip) => t.id === tripId);
         setTrip(currentTrip || null);
+        
+        // Check user permission for this trip
+        if (currentTrip && user) {
+          try {
+            const tripSharingData = await tripSharingService.getTripSharingDetails(tripId);
+            setUserPermission(tripSharingData?.permission_level || null);
+          } catch (error) {
+            console.error('Failed to get trip sharing details:', error);
+            setUserPermission(null);
+          }
+        }
       } catch (error) {
         console.error('Failed to load trip:', error);
       }
@@ -26,7 +43,7 @@ const TripContainer: React.FC = () => {
     };
     
     loadTrip();
-  }, [tripId]);
+  }, [tripId, user]);
 
   if (loading) {
     return (
@@ -85,13 +102,24 @@ const TripContainer: React.FC = () => {
       {/* Trip Navigation */}
       <TripNavigation 
         tripId={trip.id} 
-        tripName={trip.tripName} 
+        tripName={trip.tripName}
+        onShowSharing={() => setShowSharingModal(true)}
+        canShare={userPermission === 'owner'}
       />
 
       {/* Trip Content */}
       <div className="mt-6">
         <Outlet context={{ trip, setTrip }} />
       </div>
+
+      {/* Trip Sharing Modal */}
+      {showSharingModal && (
+        <TripSharingModal
+          isOpen={showSharingModal}
+          onClose={() => setShowSharingModal(false)}
+          tripId={trip.id}
+        />
+      )}
 
     </div>
   );

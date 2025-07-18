@@ -72,13 +72,18 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onSho
               </p>
             </div>
             {canShare && onShowSharing && (
-              <button
-                onClick={onShowSharing}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Share Trip
-              </button>
+              <div className="text-right">
+                <button
+                  onClick={onShowSharing}
+                  className="inline-flex items-center px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
+                >
+                  <Users className="h-5 w-5 mr-2" />
+                  Share Trip
+                </button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
+                  Invite others to view or collaborate on this trip
+                </p>
+              </div>
             )}
           </div>
         </div>

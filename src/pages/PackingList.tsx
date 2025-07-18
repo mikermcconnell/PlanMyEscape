@@ -17,7 +17,7 @@ interface TripContextType {
 // ----------------------------------
 // Packing categories never change, so defining them at module level keeps
 // the array identity stable across renders and eliminates 'missing dependency' warnings.
-export const PACKING_CATEGORIES = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Food', 'Activity Items', 'Other'] as const;
+export const PACKING_CATEGORIES = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Safety', 'Transportation', 'Fun and games', 'Other'] as const;
 
 const PackingList = () => {
   const { trip } = useOutletContext<TripContextType>();

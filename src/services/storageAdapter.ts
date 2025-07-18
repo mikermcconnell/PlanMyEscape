@@ -41,9 +41,9 @@ export class SupabaseStorageAdapter implements StorageAdapter {
       }))
     };
 
-    // Map frontend Trip shape → DB columns
+    // Map frontend Trip shape → DB columns (using existing schema)
     const { id, tripName, startDate, endDate, ...rest } = safeTrip as any;
-    const payload: any = {
+    const tripPayload: any = {
       id,
       name: tripName,
       start: startDate ?? null,
@@ -52,13 +52,16 @@ export class SupabaseStorageAdapter implements StorageAdapter {
       data: rest, // store the remaining fields in a jsonb column called `data`
     };
 
-    const { data, error } = await supabase
+    // Save trip first
+    const { data: tripData, error: tripError } = await supabase
       .from('trips')
-      .upsert(payload)
+      .upsert(tripPayload)
       .select()
       .single();
-    if (error) throw error;
-    return data as Trip;
+    if (tripError) throw tripError;
+
+    // Return the saved trip (existing data format)
+    return tripData as Trip;
   }
 
   async getTrips(): Promise<Trip[]> {
