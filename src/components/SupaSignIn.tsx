@@ -33,17 +33,17 @@ export default function SupaSignIn() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md sm:max-w-lg lg:max-w-xl">
+      <div className="w-full max-w-lg sm:max-w-xl lg:max-w-2xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-6">
+        <div className="text-center mb-8 px-4">
+          <div className="flex items-center justify-center gap-3 mb-6 flex-wrap">
             <Tent className="h-10 w-10 text-green-600" />
-            <span className="font-bold text-3xl text-gray-900">PlanMyEscape</span>
+            <span className="font-bold text-2xl sm:text-3xl text-gray-900 break-words">PlanMyEscape</span>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-3">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3">
             Welcome back
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-base sm:text-lg text-gray-600">
             Sign in to access your trips and plans
           </p>
         </div>
@@ -101,7 +101,10 @@ export default function SupaSignIn() {
         {/* Footer link */}
         <div className="text-center mt-8">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => {
+              // Force navigation to home page
+              window.location.href = '/';
+            }}
             className="text-green-600 hover:text-green-700 text-base font-medium"
           >
             ← Back to home
