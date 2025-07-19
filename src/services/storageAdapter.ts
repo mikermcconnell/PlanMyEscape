@@ -125,8 +125,12 @@ export class HybridStorageAdapter implements StorageAdapter {
   private localAdapter = new TripStorage();
 
   private async isSignedIn(): Promise<boolean> {
-    const { data } = await supabase.auth.getUser();
-    return !!data.user;
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      return !error && !!data.user;
+    } catch {
+      return false;
+    }
   }
 
   async saveTrip(trip: Trip): Promise<Trip> {

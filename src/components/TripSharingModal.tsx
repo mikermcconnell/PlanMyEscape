@@ -103,12 +103,12 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Share Trip</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl p-2 min-w-[48px] min-h-[48px] flex items-center justify-center -mr-2"
           >
             ×
           </button>
@@ -135,7 +135,7 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
                       <select
                         value={linkPermission}
                         onChange={(e) => setLinkPermission(e.target.value as 'read' | 'edit')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-4 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 min-h-[48px]"
                       >
                         <option value="read">Read Only</option>
                         <option value="edit">Can Edit</option>
@@ -144,7 +144,7 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
                     <button
                       type="button"
                       onClick={() => generateInviteLink(linkPermission)}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                      className="px-6 py-4 bg-blue-500 text-white rounded-md hover:bg-blue-600 min-h-[48px] font-medium"
                     >
                       Generate Link
                     </button>
@@ -199,7 +199,7 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
                                   type="email"
                                   value={editEmail}
                                   onChange={(e) => setEditEmail(e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  className="w-full px-4 py-4 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 min-h-[48px]"
                                 />
                               </div>
                               <div>
@@ -207,7 +207,7 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
                                 <select
                                   value={editPermission}
                                   onChange={(e) => setEditPermission(e.target.value as 'read' | 'edit')}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  className="w-full px-4 py-4 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 min-h-[48px]"
                                 >
                                   <option value="read">Read Only</option>
                                   <option value="edit">Can Edit</option>
@@ -240,21 +240,21 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
                               <div className="flex items-center space-x-2">
                                 <button
                                   onClick={() => generateInviteLink(invitation.permission_level)}
-                                  className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                  className="px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 min-h-[40px] min-w-[80px]"
                                   title="Copy invitation link"
                                 >
                                   Copy Link
                                 </button>
                                 <button
                                   onClick={() => handleEditInvitation(invitation)}
-                                  className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                                  className="px-3 py-2 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 min-h-[40px] min-w-[60px]"
                                   title="Edit invitation"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => handleCancelInvitation(invitation.id)}
-                                  className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                                  className="px-3 py-2 text-sm bg-red-500 text-white rounded hover:bg-red-600 min-h-[40px] min-w-[70px]"
                                   title="Cancel invitation"
                                 >
                                   Cancel

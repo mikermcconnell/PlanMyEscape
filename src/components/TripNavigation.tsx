@@ -89,7 +89,10 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onSho
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex space-x-0 overflow-x-auto">
+        <div className="relative">
+          {/* Gradient fade on right to indicate more content */}
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-gray-800 to-transparent pointer-events-none z-10 sm:hidden"></div>
+          <div className="flex space-x-0 overflow-x-auto scrollbar-hide scroll-smooth pb-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = isActiveTab(item.path);
@@ -99,7 +102,7 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onSho
                 key={item.id}
                 to={item.path}
                 className={`
-                  flex items-center px-6 py-4 text-sm font-medium border-b-2 transition-colors duration-150 ease-in-out whitespace-nowrap
+                  flex items-center px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors duration-150 ease-in-out whitespace-nowrap min-w-0 flex-shrink-0
                   ${isActive 
                     ? 'border-green-500 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' 
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
@@ -107,11 +110,12 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onSho
                 `}
                 title={item.description}
               >
-                <Icon className="h-5 w-5 mr-2" />
-                <span>{item.label}</span>
+                <Icon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 flex-shrink-0" />
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
+          </div>
         </div>
       </div>
     </div>

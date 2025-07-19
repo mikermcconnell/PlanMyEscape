@@ -21,8 +21,8 @@ const Layout = ({ children }: LayoutProps) => {
   };
 
   const navLinkClass = (path: string) => `
-    inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg
-    transition-colors duration-150 ease-in-out
+    inline-flex items-center px-3 sm:px-4 py-3 sm:py-2 text-xs sm:text-sm font-medium rounded-lg
+    transition-colors duration-150 ease-in-out min-h-[48px]
     ${isActiveRoute(path)
       ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
       : 'text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-green-900/50 hover:text-green-600 dark:hover:text-green-500'
@@ -46,19 +46,22 @@ const Layout = ({ children }: LayoutProps) => {
               </Link>
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               <Link to="/dashboard" className={navLinkClass('/dashboard')}>
-                <Home className="h-5 w-5 mr-2" />
-                Dashboard
+                <Home className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Dashboard</span>
+                <span className="sm:hidden">Home</span>
               </Link>
               <Link to="/trip-setup" className={navLinkClass('/trip-setup')}>
-                <Map className="h-5 w-5 mr-2" />
-                New Trip
+                <Map className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">New Trip</span>
+                <span className="sm:hidden">New</span>
               </Link>
               {user && (
                 <Link to="/settings" className={navLinkClass('/settings')}>
-                  <SettingsIcon className="h-5 w-5 mr-2" />
-                  User Settings
+                  <SettingsIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">User Settings</span>
+                  <span className="sm:hidden">Settings</span>
                 </Link>
               )}
               <ThemeToggle />
