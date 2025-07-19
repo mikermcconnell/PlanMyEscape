@@ -58,16 +58,16 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onSho
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div className="bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Trip Header */}
-        <div className="py-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="py-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl font-bold text-gray-900">
                 {tripName}
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-sm text-gray-500 mt-1">
                 Manage all aspects of your trip
               </p>
             </div>
@@ -80,7 +80,7 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onSho
                   <Users className="h-5 w-5 mr-2" />
                   Share Trip
                 </button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
+                <p className="text-xs text-gray-500 mt-1 max-w-xs">
                   Invite others to view or collaborate on this trip
                 </p>
               </div>
@@ -91,8 +91,8 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onSho
         {/* Navigation Tabs */}
         <div className="relative">
           {/* Gradient fade on right to indicate more content */}
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-gray-800 to-transparent pointer-events-none z-10 sm:hidden"></div>
-          <div className="flex space-x-0 overflow-x-auto scrollbar-hide scroll-smooth pb-1">
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10 sm:hidden"></div>
+          <div className="flex space-x-0 overflow-x-auto scrollbar-hide pb-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = isActiveTab(item.path);
@@ -104,8 +104,8 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onSho
                 className={`
                   flex items-center px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors duration-150 ease-in-out whitespace-nowrap min-w-0 flex-shrink-0
                   ${isActive 
-                    ? 'border-green-500 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' 
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    ? 'border-green-500 text-green-600 bg-green-50' 
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }
                 `}
                 title={item.description}
