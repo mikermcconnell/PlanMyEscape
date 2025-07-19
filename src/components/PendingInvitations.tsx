@@ -1,13 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { tripSharingService, TripInvitation } from '../services/tripSharingService';
+import { AuthContext } from '../contexts/AuthContext';
 
 export const PendingInvitations: React.FC = () => {
+  const { user } = useContext(AuthContext);
   const [invitations, setInvitations] = useState<TripInvitation[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadPendingInvitations();
-  }, []);
+    if (user) {
+      loadPendingInvitations();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const loadPendingInvitations = async () => {
     try {
@@ -38,6 +44,11 @@ export const PendingInvitations: React.FC = () => {
       console.error('Error declining invitation:', error);
     }
   };
+
+  // Don't render anything for non-authenticated users
+  if (!user) {
+    return null;
+  }
 
   if (loading) {
     return (

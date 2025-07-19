@@ -35,7 +35,7 @@ const PrivacySettings = () => {
       setDeleting(true);
       await deleteUserAccount();
       alert('Your account has been deleted. We are sad to see you go.');
-      navigate('/signin');
+      navigate('/');
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Account deletion failed', error);

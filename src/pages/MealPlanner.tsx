@@ -249,6 +249,10 @@ const MealPlanner = () => {
       setMeals(updatedMeals);
       if (tripId) saveMeals(tripId, updatedMeals);
       
+      // Show success feedback
+      setConfirmation(`${customMealName.trim()} added to ingredients list!`);
+      setTimeout(() => setConfirmation(null), 3000);
+      
       // Reset form
       setCustomMealName('');
       setSuggestedIngredients([]);
@@ -409,24 +413,6 @@ const MealPlanner = () => {
         </div>
       </div>
 
-      {/* Day Selection */}
-      <div className="flex items-center justify-between mb-6">
-        <button
-          onClick={() => setSelectedDay(prev => Math.max(1, prev - 1))}
-          className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-          disabled={selectedDay === 1}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <span className="text-lg font-medium">Day {selectedDay}</span>
-        <button
-          onClick={() => setSelectedDay(prev => Math.min(days.length, prev + 1))}
-          className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-          disabled={selectedDay === days.length}
-        >
-          <ArrowRight className="h-5 w-5" />
-        </button>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Meal Calendar */}
@@ -519,27 +505,57 @@ const MealPlanner = () => {
             
             <div className="p-6">
               {/* Add Ingredient Form */}
-              <div className="mb-4 flex space-x-2">
-                <input
-                  type="text"
-                  placeholder="Ingredient"
-                  value={newIngredientName}
-                  onChange={e => setNewIngredientName(e.target.value)}
-                  className="flex-1 px-2 py-1 border rounded text-sm dark:bg-gray-700"
-                />
-                <input
-                  type="number"
-                  min="1"
-                  value={newIngredientQty}
-                  onChange={e => setNewIngredientQty(parseInt(e.target.value) || 1)}
-                  className="w-20 px-2 py-1 border rounded text-sm dark:bg-gray-700"
-                />
-                <button
-                  onClick={addIngredient}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                >
-                  Add
-                </button>
+              <div className="mb-4 space-y-2 sm:space-y-0">
+                {/* Mobile: Stacked Layout */}
+                <div className="block sm:hidden space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Ingredient name"
+                    value={newIngredientName}
+                    onChange={e => setNewIngredientName(e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm dark:bg-gray-700"
+                  />
+                  <div className="flex space-x-2">
+                    <input
+                      type="number"
+                      min="1"
+                      value={newIngredientQty}
+                      onChange={e => setNewIngredientQty(parseInt(e.target.value) || 1)}
+                      className="w-20 px-2 py-2 border rounded text-sm dark:bg-gray-700"
+                      placeholder="Qty"
+                    />
+                    <button
+                      onClick={addIngredient}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium"
+                    >
+                      Add Ingredient
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Desktop: Horizontal Layout */}
+                <div className="hidden sm:flex space-x-2">
+                  <input
+                    type="text"
+                    placeholder="Ingredient"
+                    value={newIngredientName}
+                    onChange={e => setNewIngredientName(e.target.value)}
+                    className="flex-1 px-2 py-1 border rounded text-sm dark:bg-gray-700"
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    value={newIngredientQty}
+                    onChange={e => setNewIngredientQty(parseInt(e.target.value) || 1)}
+                    className="w-20 px-2 py-1 border rounded text-sm dark:bg-gray-700"
+                  />
+                  <button
+                    onClick={addIngredient}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
 
               {/* Legend */}
@@ -567,55 +583,125 @@ const MealPlanner = () => {
               ) : (
                 <div className="space-y-2">
                   {shoppingItems.filter(item => item.needsToBuy).map((item: ShoppingItem) => (
-                    <div key={item.id} className="flex items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                      {/* Status buttons */}
-                      <div className="flex items-center space-x-2 mr-3">
-                        {/* Removed purchased icon */}
-                        <button
-                          onClick={() => handleToggleNeedsToBuy(item.id)}
-                          className={`p-1 rounded-full transition-colors ${
-                            item.needsToBuy ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                          }`}
-                          title={item.needsToBuy ? 'Need to buy' : 'Mark as need to buy'}
-                        >
-                          <ShoppingCart className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleOwned(item.id)}
-                          className={`p-1 rounded-full transition-colors ${
-                            item.isOwned ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                          }`}
-                          title={item.isOwned ? 'Owned' : 'Mark as owned'}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </button>
-                      </div>
-                      {editingIngredientId === item.id ? (
-                        <div className="flex-1 flex items-center space-x-2">
-                          <input
-                            className="flex-1 min-w-0 px-2 py-1 border rounded text-sm dark:bg-gray-600"
-                            value={item.name}
-                            onChange={e => updateShoppingItem(item.id, { name: e.target.value })}
-                          />
-                          <input
-                            type="number"
-                            min="1"
-                            className="w-16 px-2 py-1 border rounded text-sm dark:bg-gray-600"
-                            value={item.quantity}
-                            onChange={e => updateShoppingItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
-                          />
-                          <button onClick={() => saveIngredientEdit(item.id, item.name, item.quantity)} className="text-green-600"><CheckCircle className="h-4 w-4" /></button>
+                    <div key={item.id} className="p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                      {/* Mobile Layout */}
+                      <div className="block sm:hidden space-y-2">
+                        {/* Top row: Status buttons and item name */}
+                        <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => handleToggleNeedsToBuy(item.id)}
+                              className={`p-1 rounded-full transition-colors ${
+                                item.needsToBuy ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                              }`}
+                              title={item.needsToBuy ? 'Need to buy' : 'Mark as need to buy'}
+                            >
+                              <ShoppingCart className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleToggleOwned(item.id)}
+                              className={`p-1 rounded-full transition-colors ${
+                                item.isOwned ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                              }`}
+                              title={item.isOwned ? 'Owned' : 'Mark as owned'}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          </div>
+                          
+                          {editingIngredientId === item.id ? (
+                            <div className="flex items-center space-x-2 flex-1">
+                              <input
+                                className="flex-1 min-w-0 px-2 py-1 border rounded text-sm dark:bg-gray-600"
+                                value={item.name}
+                                onChange={e => updateShoppingItem(item.id, { name: e.target.value })}
+                              />
+                              <input
+                                type="number"
+                                min="1"
+                                className="w-12 px-1 py-1 border rounded text-sm dark:bg-gray-600"
+                                value={item.quantity}
+                                onChange={e => updateShoppingItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                              />
+                              <button onClick={() => saveIngredientEdit(item.id, item.name, item.quantity)} className="text-green-600 p-1">
+                                <CheckCircle className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="flex-1 text-gray-900 dark:text-white text-sm">
+                              {item.name}{item.quantity > 1 && ` ×${item.quantity}`}
+                            </span>
+                          )}
+                          
+                          {editingIngredientId !== item.id && (
+                            <div className="flex items-center space-x-1">
+                              <button onClick={() => setEditingIngredientId(item.id)} className="text-gray-400 hover:text-blue-600 p-1">
+                                <Edit3 className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => removeShoppingItem(item.id)} className="text-gray-400 hover:text-red-600 p-1">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <span className="flex-1 text-gray-900 dark:text-white">{item.name}{item.quantity > 1 && ` ×${item.quantity}`}</span>
-                      )}
-                      {/* Edit / Delete buttons */}
-                      {editingIngredientId !== item.id && (
-                        <>
-                          <button onClick={() => setEditingIngredientId(item.id)} className="text-gray-400 hover:text-blue-600 mr-1"><Edit3 className="h-4 w-4" /></button>
-                          <button onClick={() => removeShoppingItem(item.id)} className="text-gray-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
-                        </>
-                      )}
+                      </div>
+
+                      {/* Desktop Layout */}
+                      <div className="hidden sm:flex items-center">
+                        {/* Status buttons */}
+                        <div className="flex items-center space-x-2 mr-3">
+                          <button
+                            onClick={() => handleToggleNeedsToBuy(item.id)}
+                            className={`p-1 rounded-full transition-colors ${
+                              item.needsToBuy ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                            }`}
+                            title={item.needsToBuy ? 'Need to buy' : 'Mark as need to buy'}
+                          >
+                            <ShoppingCart className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleOwned(item.id)}
+                            className={`p-1 rounded-full transition-colors ${
+                              item.isOwned ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                            }`}
+                            title={item.isOwned ? 'Owned' : 'Mark as owned'}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </button>
+                        </div>
+                        {editingIngredientId === item.id ? (
+                          <div className="flex-1 flex items-center space-x-2">
+                            <input
+                              className="flex-1 min-w-0 px-2 py-1 border rounded text-sm dark:bg-gray-600"
+                              value={item.name}
+                              onChange={e => updateShoppingItem(item.id, { name: e.target.value })}
+                            />
+                            <input
+                              type="number"
+                              min="1"
+                              className="w-16 px-2 py-1 border rounded text-sm dark:bg-gray-600"
+                              value={item.quantity}
+                              onChange={e => updateShoppingItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                            />
+                            <button onClick={() => saveIngredientEdit(item.id, item.name, item.quantity)} className="text-green-600">
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="flex-1 text-gray-900 dark:text-white">{item.name}{item.quantity > 1 && ` ×${item.quantity}`}</span>
+                        )}
+                        {/* Edit / Delete buttons */}
+                        {editingIngredientId !== item.id && (
+                          <>
+                            <button onClick={() => setEditingIngredientId(item.id)} className="text-gray-400 hover:text-blue-600 mr-1">
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => removeShoppingItem(item.id)} className="text-gray-400 hover:text-red-600">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

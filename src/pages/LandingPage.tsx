@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Leaf, Map, ShoppingCart, Car, Mountain, Home as House, Users, Brain, Utensils, CheckCircle, Tent } from 'lucide-react';
 import SupaSignIn from '../components/SupaSignIn';
 import { AuthContext } from '../contexts/AuthContext';
-import { ThemeToggle } from '../components/ThemeToggle';
 
 // Simple inline SVG for a canoe icon (not available in lucide-react)
 const CanoeIcon = () => (
@@ -87,10 +86,10 @@ export default function LandingPage() {
       {/* Sign-in Modal */}
       {showSignIn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full relative" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full relative" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => setShowSignIn(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 z-10"
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10"
               aria-label="Close sign in"
             >
               ✕
@@ -99,9 +98,9 @@ export default function LandingPage() {
               <SupaSignIn />
               
               {/* Continue without signing in option */}
-              <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-amber-800 dark:text-amber-200">
+              <div className="mt-6 border-t border-gray-200 pt-6">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-amber-800">
                     <strong>Note:</strong> If you continue without signing in, your trip data will only be saved locally on this device and won't be accessible from other devices.
                   </p>
                 </div>
@@ -110,7 +109,7 @@ export default function LandingPage() {
                     setShowSignIn(false);
                     navigate('/dashboard');
                   }}
-                  className="w-full px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  className="w-full px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Continue without signing in
                 </button>
@@ -119,7 +118,7 @@ export default function LandingPage() {
           </div>
         </div>
       )}
-      <div className="w-full bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 scroll-smooth">
+      <div className="w-full bg-gray-50 text-gray-800 scroll-smooth">
         {/* Hero */}
         <section
           ref={heroRef}
@@ -135,7 +134,6 @@ export default function LandingPage() {
               <Tent className="h-6 w-6 text-green-400" />
               <span className="font-bold text-white text-xl drop-shadow">PlanMyEscape</span>
             </div>
-            <ThemeToggle className="text-white hover:bg-white/10" />
           </div>
           {/* Dark overlay for text readability */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/80" />
@@ -158,7 +156,7 @@ export default function LandingPage() {
               </button>
               <a
                 href="#features"
-                className="px-8 py-4 rounded-full border border-green-600 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 text-lg font-semibold"
+                className="px-8 py-4 rounded-full border border-green-600 text-green-600 hover:bg-green-100 text-lg font-semibold"
               >
                 See How It Works
               </a>
@@ -187,11 +185,11 @@ export default function LandingPage() {
               {features.map((f) => (
                 <div
                   key={f.title}
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow p-8 flex flex-col items-start hover:shadow-lg transition-shadow"
+                  className="bg-white rounded-xl shadow p-8 flex flex-col items-start hover:shadow-lg transition-shadow"
                 >
                   {f.icon}
                   <h3 className="mt-4 text-xl font-semibold">{f.title}</h3>
-                  <p className="mt-2 text-gray-600 dark:text-gray-300">{f.desc}</p>
+                  <p className="mt-2 text-gray-600">{f.desc}</p>
                 </div>
               ))}
             </div>
@@ -201,7 +199,7 @@ export default function LandingPage() {
         {/* Trip Types */}
         <section
           ref={tripTypeRef}
-          className="py-20 bg-gradient-to-b from-green-50 to-white dark:from-gray-800 dark:to-gray-900 transition-all duration-700 opacity-0 translate-y-8"
+          className="py-20 bg-gradient-to-b from-green-50 to-white transition-all duration-700 opacity-0 translate-y-8"
         >
           <div className="max-w-6xl mx-auto px-6">
             <h2 className="text-3xl md:text-4xl font-bold text-center">Tailored to Any Adventure</h2>
@@ -243,7 +241,7 @@ export default function LandingPage() {
         </section>
 
         {/* Footer */}
-        <footer className="py-8 bg-gray-100 dark:bg-gray-800 text-center text-sm text-gray-600 dark:text-gray-400 space-x-2">
+        <footer className="py-8 bg-gray-100 text-center text-sm text-gray-600 space-x-2">
           <span>© {new Date().getFullYear()} PlanMyEscape. All rights reserved.</span>
           <span className="hidden sm:inline">|</span>
           <Link to="/privacy" className="text-green-600 hover:underline">Privacy Policy</Link>

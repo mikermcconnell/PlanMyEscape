@@ -247,20 +247,26 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
     onActivitiesChange([...activities, activity]);
     // Add packing items
     const existingPackingList = await getPackingList(tripId);
-    const newPackingItems: PackingItem[] = modalEquipment.filter(e => e.name.trim()).map(e => ({
-      id: crypto.randomUUID(),
-      name: e.name,
-      category: 'Activity Items',
-      quantity: e.quantity,
-      isChecked: false,
-      weight: undefined,
-      isOwned: false,
-      needsToBuy: false,
-      isPacked: false,
-      required: false,
-      assignedGroupId: undefined,
-      isPersonal: false
-    }));
+    // Get proper category suggestions for each equipment item
+    const suggestions = getEquipmentSuggestions(modalActivity.name);
+    const newPackingItems: PackingItem[] = modalEquipment.filter(e => e.name.trim()).map(e => {
+      // Find the matching suggestion to get the proper category
+      const suggestion = suggestions.find(s => s.name.toLowerCase() === e.name.toLowerCase());
+      return {
+        id: crypto.randomUUID(),
+        name: e.name,
+        category: suggestion?.category || 'Fun and games', // Default to Fun and games if no specific category found
+        quantity: e.quantity,
+        isChecked: false,
+        weight: undefined,
+        isOwned: false,
+        needsToBuy: false,
+        isPacked: false,
+        required: false,
+        assignedGroupId: undefined,
+        isPersonal: false
+      };
+    });
     // Avoid duplicates
     const filteredItems = newPackingItems.filter(newItem =>
       !existingPackingList.some(existingItem =>
@@ -271,7 +277,7 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
       await savePackingList(tripId, [...existingPackingList, ...filteredItems]);
     }
     setShowEquipmentModal(false);
-    setConfirmation('Added to Activity Items in packing list!');
+    setConfirmation('Added to packing list!');
     setTimeout(() => setConfirmation(null), 2000);
   };
 

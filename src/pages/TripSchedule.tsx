@@ -69,23 +69,61 @@ const TripSchedule: React.FC = () => {
   const scheduleData = generateDays();
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+    <div className="p-3 sm:p-6">
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-1 sm:mb-2">
           Trip Schedule
         </h2>
-        <p className="text-gray-600 dark:text-gray-400">
-          Daily itinerary and planned activities for your {scheduleData.length}-day trip
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+          Daily itinerary for your {scheduleData.length}-day trip
         </p>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-4 sm:space-y-8">
         {scheduleData.map((day) => (
           <div
             key={day.dayNumber}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 shadow-sm"
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-8 shadow-sm"
           >
-            <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-green-200 dark:border-green-800">
+            {/* Mobile Layout */}
+            <div className="block sm:hidden mb-4 pb-3 border-b border-green-200 dark:border-green-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-gradient-to-br from-green-500 to-green-600 p-2 rounded-lg">
+                    <Calendar className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Day {day.dayNumber}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {day.date.toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </p>
+                  </div>
+                </div>
+                {(day.dayNumber === 1 || (day.dayNumber === scheduleData.length && scheduleData.length > 1)) && (
+                  <div className="text-right">
+                    {day.dayNumber === 1 && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-500 text-white whitespace-nowrap">
+                        🚀 Departure
+                      </span>
+                    )}
+                    {day.dayNumber === scheduleData.length && scheduleData.length > 1 && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-500 text-white whitespace-nowrap">
+                        🏁 Return
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Desktop Layout */}
+            <div className="hidden sm:flex items-center justify-between mb-6 pb-4 border-b-2 border-green-200 dark:border-green-800">
               <div className="flex items-center space-x-4">
                 <div className="bg-gradient-to-br from-green-500 to-green-600 p-3 rounded-xl shadow-md">
                   <Calendar className="h-6 w-6 text-white" />
@@ -118,32 +156,41 @@ const TripSchedule: React.FC = () => {
               </div>
             </div>
             
-            {/* Quick Stats */}
-            <div className="flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-400 mb-6">
-              <span className="flex items-center space-x-1">
-                <span>📋</span>
-                <span>{day.activities.length} activities</span>
-              </span>
-              <span className="flex items-center space-x-1">
-                <span>✅</span>
-                <span>{day.activities.filter(a => a.isCompleted).length} completed</span>
-              </span>
-              <span className="flex items-center space-x-1">
-                <span>🍽️</span>
-                <span>{day.meals.length} meals planned</span>
-              </span>
+            {/* Quick Stats - Mobile optimized */}
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:space-x-6 text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-1 p-2 sm:p-0 bg-gray-50 sm:bg-transparent dark:bg-gray-700 sm:dark:bg-transparent rounded-lg sm:rounded-none">
+                <span className="text-base sm:text-sm">📋</span>
+                <div className="text-center sm:text-left">
+                  <span className="font-medium text-gray-900 dark:text-white block sm:inline">{day.activities.length}</span>
+                  <span className="block sm:inline text-xs sm:text-sm">activities</span>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-1 p-2 sm:p-0 bg-gray-50 sm:bg-transparent dark:bg-gray-700 sm:dark:bg-transparent rounded-lg sm:rounded-none">
+                <span className="text-base sm:text-sm">✅</span>
+                <div className="text-center sm:text-left">
+                  <span className="font-medium text-gray-900 dark:text-white block sm:inline">{day.activities.filter(a => a.isCompleted).length}</span>
+                  <span className="block sm:inline text-xs sm:text-sm">completed</span>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-1 p-2 sm:p-0 bg-gray-50 sm:bg-transparent dark:bg-gray-700 sm:dark:bg-transparent rounded-lg sm:rounded-none">
+                <span className="text-base sm:text-sm">🍽️</span>
+                <div className="text-center sm:text-left">
+                  <span className="font-medium text-gray-900 dark:text-white block sm:inline">{day.meals.length}</span>
+                  <span className="block sm:inline text-xs sm:text-sm">meals planned</span>
+                </div>
+              </div>
             </div>
 
             {/* Scheduled Meals */}
             {day.meals.length > 0 && (
-              <div className="mb-6">
-                <div className="flex items-center space-x-2 mb-3">
-                  <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                    <Utensils className="h-4 w-4 text-orange-600 dark:text-orange-400"/>
+              <div className="mb-4 sm:mb-6">
+                <div className="flex items-center space-x-2 mb-2 sm:mb-3">
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+                    <Utensils className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 dark:text-orange-400"/>
                   </div>
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Meals</h4>
+                  <h4 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">Meals</h4>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   {day.meals.map(meal => {
                     const mealIcon = meal.type === 'breakfast' ? '🍳' : meal.type === 'lunch' ? '🥪' : meal.type === 'dinner' ? '🍽️' : '🍿';
                     const getMealTypeColor = (type: string) => {
@@ -159,11 +206,11 @@ const TripSchedule: React.FC = () => {
                       }
                     };
                     return (
-                      <div key={meal.id} className={`flex items-center space-x-3 p-3 ${getMealTypeColor(meal.type)} border rounded-lg`}>
-                        <span className="text-2xl">{mealIcon}</span>
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{meal.name}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">{meal.type}</p>
+                      <div key={meal.id} className={`flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 ${getMealTypeColor(meal.type)} border rounded-lg`}>
+                        <span className="text-lg sm:text-2xl">{mealIcon}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-white truncate">{meal.name}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 capitalize">{meal.type}</p>
                         </div>
                       </div>
                     );
@@ -179,45 +226,46 @@ const TripSchedule: React.FC = () => {
               );
               if (slotActivities.length === 0) return null;
               return (
-                <div key={slot.key} className="mb-6">
-                  <div className={`flex items-center space-x-2 p-3 rounded-lg border-l-4 ${slot.color} mb-3`}>
-                    <span className="text-xl">{slot.icon}</span>
-                    <h4 className="text-lg font-bold">{slot.label}</h4>
-                    <span className="text-sm opacity-75">({slotActivities.length} activities)</span>
+                <div key={slot.key} className="mb-4 sm:mb-6">
+                  <div className={`flex items-center space-x-2 p-2 sm:p-3 rounded-lg border-l-4 ${slot.color} mb-2 sm:mb-3`}>
+                    <span className="text-lg sm:text-xl">{slot.icon}</span>
+                    <h4 className="text-base sm:text-lg font-bold">{slot.label}</h4>
+                    <span className="text-xs sm:text-sm opacity-75">({slotActivities.length})</span>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {slotActivities.map(activity => (
                       <div
                         key={activity.id}
-                        className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+                        className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow"
                       >
-                        <div className="flex items-start space-x-3">
+                        <div className="flex items-start space-x-2 sm:space-x-3">
                           <div className="flex-shrink-0 mt-0.5">
-                            <div className="w-8 h-8 bg-gray-100 dark:bg-gray-600 rounded-full flex items-center justify-center">
-                              <ActivityIcon className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+                            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-600 rounded-full flex items-center justify-center">
+                              <ActivityIcon className="h-3 w-3 sm:h-4 sm:w-4 text-gray-600 dark:text-gray-300" />
                             </div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h5 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+                            <h5 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white mb-1">
                               {activity.name}
                             </h5>
                             {activity.equipment && activity.equipment.length > 0 && (
                               <div className="flex flex-wrap gap-1 mb-2">
-                                {activity.equipment.slice(0, 3).map((item, idx) => (
-                                  <span key={idx} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-200">
+                                {activity.equipment.slice(0, 2).map((item, idx) => (
+                                  <span key={idx} className="inline-flex items-center px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-200">
                                     🎒 {item}
                                   </span>
                                 ))}
-                                {activity.equipment.length > 3 && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">+{activity.equipment.length - 3} more</span>
+                                {activity.equipment.length > 2 && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">+{activity.equipment.length - 2} more</span>
                                 )}
                               </div>
                             )}
                           </div>
                           {activity.isCompleted && (
                             <div className="flex-shrink-0">
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-500 text-white">
-                                ✓ Done
+                              <span className="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1 rounded-full text-xs font-semibold bg-green-500 text-white">
+                                <span className="hidden sm:inline">✓ Done</span>
+                                <span className="sm:hidden">✓</span>
                               </span>
                             </div>
                           )}
@@ -230,14 +278,14 @@ const TripSchedule: React.FC = () => {
             })}
             {/* If no activities at all, show empty state */}
             {day.activities.length === 0 && (
-              <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Clock className="h-8 w-8 text-gray-400" />
+              <div className="text-center py-6 sm:py-8 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                  <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
                 </div>
-                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-2">
                   Free Day Ahead!
                 </h4>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-3 sm:mb-4 px-4">
                   No activities scheduled - perfect for spontaneous adventures
                 </p>
                 <button

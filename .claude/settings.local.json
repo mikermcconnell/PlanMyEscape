@@ -16,7 +16,10 @@
       "Bash(grep:*)",
       "Bash(mkdir:*)",
       "Bash(node:*)",
-      "Bash(npm:*)"
+      "Bash(npm:*)",
+      "Bash(where:*)",
+      "Bash(npx supabase:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

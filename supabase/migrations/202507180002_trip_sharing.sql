@@ -60,6 +60,11 @@ CREATE POLICY "Shared users can update their own shared trip status"
   FOR UPDATE
   USING (auth.uid() = shared_with_id);
 
+CREATE POLICY "Users can insert shared trips when accepting invitations"
+  ON public.shared_trips
+  FOR INSERT
+  WITH CHECK (auth.uid() = shared_with_id);
+
 -- 6. Create RLS policies for trip_invitations table
 CREATE POLICY "Users can view their own trip invitations"
   ON public.trip_invitations

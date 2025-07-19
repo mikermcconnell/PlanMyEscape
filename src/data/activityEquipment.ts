@@ -150,6 +150,12 @@ export const activityEquipmentMap: Record<string, PackingSuggestion[]> = {
     { name: 'Helmet', category: 'Other', required: false },
     { name: 'Ropes', category: 'Other', required: false },
     { name: 'First Aid Kit', category: 'Personal', required: false }
+  ],
+  'yoga': [
+    { name: 'Yoga mat', category: 'Fun and games', required: false },
+    { name: 'Comfortable clothes', category: 'Clothing', required: false },
+    { name: 'Water bottle', category: 'Kitchen', required: false },
+    { name: 'Towel', category: 'Personal', required: false }
   ]
 };
 

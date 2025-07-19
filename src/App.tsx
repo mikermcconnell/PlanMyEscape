@@ -19,12 +19,10 @@ import CookiePolicy from './pages/CookiePolicy';
 import PrivacySettings from './pages/PrivacySettings';
 import ShoppingListPage from './pages/ShoppingListPage';
 import { InvitationPage } from './pages/InvitationPage';
-import { ThemeProvider } from './contexts/ThemeContext';
 
 function App() {
   return (
-    <ThemeProvider>
-      <ErrorBoundary>
+    <ErrorBoundary>
         <Router>
         <Routes>
           {/* Public landing page */}
@@ -56,7 +54,6 @@ function App() {
         </Routes>
         </Router>
       </ErrorBoundary>
-    </ThemeProvider>
   );
 }
 

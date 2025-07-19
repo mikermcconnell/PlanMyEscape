@@ -38,6 +38,7 @@ const PackingList = () => {
   }>({ show: false, category: '', name: '', quantity: 1, isPersonal: false });
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
 
   // Ref to keep track of the current timeout across renders
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -274,6 +275,9 @@ const PackingList = () => {
             sourceItemId: item.id
           };
           addToShoppingList(tripId, [shoppingItem]);
+          // Show confirmation message
+          setConfirmation(`${item.name} added to shopping list!`);
+          setTimeout(() => setConfirmation(null), 2000);
         }
         return {
           ...item,
@@ -348,6 +352,8 @@ const PackingList = () => {
     switch (category) {
       case 'Activity Items':
         return <Activity className="h-5 w-5 mr-2" />;
+      case 'Fun and games':
+        return <Activity className="h-5 w-5 mr-2" />;
       case 'Shelter':
         return <Home className="h-5 w-5 mr-2" />;
       case 'Kitchen':
@@ -372,7 +378,7 @@ const PackingList = () => {
   };
 
   return (
-    <div className="mx-auto w-full md:max-w-5xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow p-8">
+    <div className="mx-auto w-full md:max-w-5xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow p-4 sm:p-8">
       {updateError && (
         <div className="mb-4 p-3 rounded-md bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300">
           {updateError}
@@ -394,37 +400,38 @@ const PackingList = () => {
 
       {/* Header */}
       <div className="mb-12">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
               Packing List
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
               {trip.tripName} • {renderTripTypeText(trip.tripType)} • {calculateTotalCampers(trip)} person{calculateTotalCampers(trip) > 1 ? 's' : ''}
             </p>
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-xs sm:text-sm text-gray-500 mt-2">
               {getPackingListDescription(trip.tripType)}
             </p>
             {trip.isCoordinated && (
-              <p className="text-sm text-blue-500 dark:text-blue-400 mt-1">
+              <p className="text-xs sm:text-sm text-blue-500 dark:text-blue-400 mt-1">
                 <Users className="h-4 w-4 inline mr-1" />
                 Items can be assigned to specific groups
               </p>
             )}
           </div>
-          <div className="flex-shrink-0 space-x-2">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 items-center sm:items-start">
             <button
               onClick={resetToTemplate}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-green-600 hover:bg-green-700"
             >
-              <Package className="h-4 w-4 mr-2" />
-              Reset {renderTripTypeText(trip.tripType)} Packing List
+              <Package className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Reset {renderTripTypeText(trip.tripType)} Packing List</span>
+              <span className="sm:hidden">Reset Template</span>
             </button>
             <button
               onClick={() => setShowClearConfirmation(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-green-600 hover:bg-green-700"
             >
-              <RotateCcw className="h-4 w-4 mr-2" />
+              <RotateCcw className="h-4 w-4 mr-1 sm:mr-2" />
               Clear Status Icons
             </button>
           </div>
@@ -618,98 +625,126 @@ const PackingList = () => {
                   </div>
                   <div className="divide-y divide-gray-200 dark:divide-gray-700">
                     {categoryItems.map((item: PackingItem) => (
-                      <div key={item.id} className="px-6 py-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3 flex-1">
-                            {/* Status Buttons */}
+                      <div key={item.id} className="px-3 sm:px-6 py-4">
+                        {/* Mobile Layout */}
+                        <div className="block sm:hidden">
+                          <div className="space-y-3">
+                            {/* Top row: Status buttons and item name */}
                             <div className="flex items-center space-x-2">
-                              {/* Need to Buy Button - show unless owned */}
-                              {!item.isOwned && (
+                              {/* Status Buttons */}
+                              <div className="flex items-center space-x-1">
+                                {!item.isOwned && (
+                                  <button
+                                    onClick={() => toggleNeedsToBuy(item.id)}
+                                    className={`p-1 rounded-full transition-colors ${
+                                      item.needsToBuy 
+                                        ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' 
+                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                    }`}
+                                    title={item.needsToBuy ? "Need to buy this item" : "Mark as need to buy"}
+                                  >
+                                    <ShoppingCart className="h-4 w-4" />
+                                  </button>
+                                )}
                                 <button
-                                  onClick={() => toggleNeedsToBuy(item.id)}
+                                  onClick={() => toggleOwned(item.id)}
                                   className={`p-1 rounded-full transition-colors ${
-                                    item.needsToBuy 
-                                      ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' 
+                                    item.isOwned 
+                                      ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
                                       : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
                                   }`}
-                                  title={item.needsToBuy ? "Need to buy this item" : "Mark as need to buy"}
+                                  title={item.isOwned ? "You own this item" : "Mark as owned"}
                                 >
-                                  <ShoppingCart className="h-4 w-4" />
+                                  <CheckCircle className="h-4 w-4" />
                                 </button>
-                              )}
-                              {/* Owned Button - always show */}
-                              <button
-                                onClick={() => toggleOwned(item.id)}
-                                className={`p-1 rounded-full transition-colors ${
-                                  item.isOwned 
-                                    ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
-                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                }`}
-                                title={item.isOwned ? "You own this item" : "Mark as owned"}
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </button>
-                              {/* Packed Button - always show */}
-                              <button
-                                onClick={() => togglePacked(item.id)}
-                                className={`p-1 rounded-full transition-colors ${
-                                  item.isPacked 
-                                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
-                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                }`}
-                                title={item.isPacked ? "Item is packed" : "Mark as packed"}
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
-                            </div>
-                            {/* Item Details */}
-                            {editingItem === item.id ? (
-                              <div className="flex items-center space-x-2 flex-1 max-w-xl">
-                                <input
-                                  type="text"
-                                  value={item.name}
-                                  onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0"
-                                  style={{ width: `${Math.max(item.name.length * 8 + 32, 120)}px` }}
-                                />
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
-                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700"
-                                />
                                 <button
-                                  onClick={() => setEditingItem(null)}
-                                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                  onClick={() => togglePacked(item.id)}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    item.isPacked 
+                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
+                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                  }`}
+                                  title={item.isPacked ? "Item is packed" : "Mark as packed"}
                                 >
-                                  <X className="h-4 w-4" />
+                                  <Check className="h-4 w-4" />
                                 </button>
                               </div>
-                            ) : (
-                              <div className="flex items-center space-x-2 flex-1 max-w-xl">
+                              
+                              {/* Item name and details */}
+                              {editingItem === item.id ? (
+                                <div className="flex items-center space-x-2 flex-1">
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                                    className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0 text-sm"
+                                  />
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
+                                    className="w-12 px-1 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 text-sm"
+                                  />
+                                  <button
+                                    onClick={() => setEditingItem(null)}
+                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              ) : (
                                 <div 
                                   onClick={() => setEditingItem(item.id)}
-                                  className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-1 rounded flex items-center"
+                                  className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-2 rounded flex items-center justify-center"
                                 >
-                                  <span className={`${
-                                    item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                  } break-words max-w-[300px]`}>
-                                    {item.name}
-                                  </span>
-                                  {item.quantity > 1 && (
-                                    <span className="text-sm text-gray-500 ml-2">×{item.quantity}</span>
-                                  )}
-                                  {item.weight && (
-                                    <span className="text-sm text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
-                                  )}
+                                  <div className="text-center">
+                                    <span className={`${
+                                      item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                                    } text-sm break-words`}>
+                                      {item.name}
+                                    </span>
+                                    {item.quantity > 1 && (
+                                      <span className="text-xs text-gray-500 ml-2">×{item.quantity}</span>
+                                    )}
+                                    {item.weight && (
+                                      <span className="text-xs text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
+                                    )}
+                                  </div>
                                 </div>
+                              )}
+                              
+                              {/* Edit and Delete buttons */}
+                              {editingItem !== item.id && (
+                                <div className="flex items-center space-x-1">
+                                  <button
+                                    onClick={() => setEditingItem(item.id)}
+                                    className="text-gray-400 hover:text-blue-600 p-1"
+                                  >
+                                    <Edit3 className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteItem(item.id);
+                                    }}
+                                    className="text-gray-400 hover:text-red-600 p-1"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Bottom row: Group assignment and status badges */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
                                 {/* Group Assignment */}
                                 {trip.isCoordinated && (
                                   <select
                                     value={item.assignedGroupId || ''}
                                     onChange={(e) => assignItemToGroup(item.id, e.target.value || undefined)}
-                                    className="text-sm border rounded-md py-1 px-2 dark:bg-gray-700 ml-2"
+                                    className="text-xs border rounded-md py-1 px-2 dark:bg-gray-700"
                                     style={{
                                       borderColor: trip.groups.find(g => g.id === item.assignedGroupId)?.color || 'transparent',
                                       color: trip.groups.find(g => g.id === item.assignedGroupId)?.color
@@ -723,19 +758,10 @@ const PackingList = () => {
                                     ))}
                                   </select>
                                 )}
-                                <div className="flex items-center space-x-2 ml-4">
-                                  <Edit3 className="h-4 w-4 text-gray-400" />
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteItem(item.id);
-                                    }}
-                                    className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                                {/* Status Badge */}
+                              </div>
+                              
+                              {/* Status Badges */}
+                              <div className="flex items-center space-x-1">
                                 {item.isOwned && (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                     <CheckCircle className="h-3 w-3 mr-1" />
@@ -745,14 +771,145 @@ const PackingList = () => {
                                 {item.needsToBuy && (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
                                     <ShoppingCart className="h-3 w-3 mr-1" />
-                                    Need to Buy
+                                    Buy
                                   </span>
                                 )}
                               </div>
-                            )}
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            {/* Edit and Delete buttons moved to item text area */}
+                        </div>
+
+                        {/* Desktop Layout */}
+                        <div className="hidden sm:block">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3 flex-1">
+                              {/* Status Buttons */}
+                              <div className="flex items-center space-x-2">
+                                {!item.isOwned && (
+                                  <button
+                                    onClick={() => toggleNeedsToBuy(item.id)}
+                                    className={`p-1 rounded-full transition-colors ${
+                                      item.needsToBuy 
+                                        ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' 
+                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                    }`}
+                                    title={item.needsToBuy ? "Need to buy this item" : "Mark as need to buy"}
+                                  >
+                                    <ShoppingCart className="h-4 w-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => toggleOwned(item.id)}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    item.isOwned 
+                                      ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
+                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                  }`}
+                                  title={item.isOwned ? "You own this item" : "Mark as owned"}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => togglePacked(item.id)}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    item.isPacked 
+                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
+                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                  }`}
+                                  title={item.isPacked ? "Item is packed" : "Mark as packed"}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </button>
+                              </div>
+                              {/* Item Details */}
+                              {editingItem === item.id ? (
+                                <div className="flex items-center space-x-2 flex-1 max-w-xl">
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                                    className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0"
+                                    style={{ width: `${Math.max(item.name.length * 8 + 32, 120)}px` }}
+                                  />
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
+                                    className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700"
+                                  />
+                                  <button
+                                    onClick={() => setEditingItem(null)}
+                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center space-x-2 flex-1 max-w-xl">
+                                  <div 
+                                    onClick={() => setEditingItem(item.id)}
+                                    className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-1 rounded flex items-center"
+                                  >
+                                    <span className={`${
+                                      item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                                    } break-words max-w-[300px]`}>
+                                      {item.name}
+                                    </span>
+                                    {item.quantity > 1 && (
+                                      <span className="text-sm text-gray-500 ml-2">×{item.quantity}</span>
+                                    )}
+                                    {item.weight && (
+                                      <span className="text-sm text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
+                                    )}
+                                  </div>
+                                  {/* Group Assignment */}
+                                  {trip.isCoordinated && (
+                                    <select
+                                      value={item.assignedGroupId || ''}
+                                      onChange={(e) => assignItemToGroup(item.id, e.target.value || undefined)}
+                                      className="text-sm border rounded-md py-1 px-2 dark:bg-gray-700 ml-2"
+                                      style={{
+                                        borderColor: trip.groups.find(g => g.id === item.assignedGroupId)?.color || 'transparent',
+                                        color: trip.groups.find(g => g.id === item.assignedGroupId)?.color
+                                      }}
+                                    >
+                                      <option value="">Shared</option>
+                                      {trip.groups.map((group) => (
+                                        <option key={group.id} value={group.id}>
+                                          {group.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                  <div className="flex items-center space-x-2 ml-4">
+                                    <Edit3 className="h-4 w-4 text-gray-400" />
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteItem(item.id);
+                                      }}
+                                      className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                  {/* Status Badge */}
+                                  {item.isOwned && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Owned
+                                    </span>
+                                  )}
+                                  {item.needsToBuy && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                      <ShoppingCart className="h-3 w-3 mr-1" />
+                                      Need to Buy
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -799,98 +956,126 @@ const PackingList = () => {
                   </div>
                   <div className="divide-y divide-gray-200 dark:divide-gray-700">
                     {categoryItems.map((item: PackingItem) => (
-                      <div key={item.id} className="px-6 py-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3 flex-1">
-                            {/* Status Buttons */}
+                      <div key={item.id} className="px-3 sm:px-6 py-4">
+                        {/* Mobile Layout */}
+                        <div className="block sm:hidden">
+                          <div className="space-y-3">
+                            {/* Top row: Status buttons and item name */}
                             <div className="flex items-center space-x-2">
-                              {/* Need to Buy Button - show unless owned */}
-                              {!item.isOwned && (
+                              {/* Status Buttons */}
+                              <div className="flex items-center space-x-1">
+                                {!item.isOwned && (
+                                  <button
+                                    onClick={() => toggleNeedsToBuy(item.id)}
+                                    className={`p-1 rounded-full transition-colors ${
+                                      item.needsToBuy 
+                                        ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' 
+                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                    }`}
+                                    title={item.needsToBuy ? "Need to buy this item" : "Mark as need to buy"}
+                                  >
+                                    <ShoppingCart className="h-4 w-4" />
+                                  </button>
+                                )}
                                 <button
-                                  onClick={() => toggleNeedsToBuy(item.id)}
+                                  onClick={() => toggleOwned(item.id)}
                                   className={`p-1 rounded-full transition-colors ${
-                                    item.needsToBuy 
-                                      ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' 
+                                    item.isOwned 
+                                      ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
                                       : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
                                   }`}
-                                  title={item.needsToBuy ? "Need to buy this item" : "Mark as need to buy"}
+                                  title={item.isOwned ? "You own this item" : "Mark as owned"}
                                 >
-                                  <ShoppingCart className="h-4 w-4" />
+                                  <CheckCircle className="h-4 w-4" />
                                 </button>
-                              )}
-                              {/* Owned Button - always show */}
-                              <button
-                                onClick={() => toggleOwned(item.id)}
-                                className={`p-1 rounded-full transition-colors ${
-                                  item.isOwned 
-                                    ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
-                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                }`}
-                                title={item.isOwned ? "You own this item" : "Mark as owned"}
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </button>
-                              {/* Packed Button - always show */}
-                              <button
-                                onClick={() => togglePacked(item.id)}
-                                className={`p-1 rounded-full transition-colors ${
-                                  item.isPacked 
-                                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
-                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                }`}
-                                title={item.isPacked ? "Item is packed" : "Mark as packed"}
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
-                            </div>
-                            {/* Item Details */}
-                            {editingItem === item.id ? (
-                              <div className="flex items-center space-x-2 flex-1 max-w-xl">
-                                <input
-                                  type="text"
-                                  value={item.name}
-                                  onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0"
-                                  style={{ width: `${Math.max(item.name.length * 8 + 32, 120)}px` }}
-                                />
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
-                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700"
-                                />
                                 <button
-                                  onClick={() => setEditingItem(null)}
-                                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                  onClick={() => togglePacked(item.id)}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    item.isPacked 
+                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
+                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                  }`}
+                                  title={item.isPacked ? "Item is packed" : "Mark as packed"}
                                 >
-                                  <X className="h-4 w-4" />
+                                  <Check className="h-4 w-4" />
                                 </button>
                               </div>
-                            ) : (
-                              <div className="flex items-center space-x-2 flex-1 max-w-xl">
+                              
+                              {/* Item name and details */}
+                              {editingItem === item.id ? (
+                                <div className="flex items-center space-x-2 flex-1">
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                                    className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0 text-sm"
+                                  />
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
+                                    className="w-12 px-1 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 text-sm"
+                                  />
+                                  <button
+                                    onClick={() => setEditingItem(null)}
+                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              ) : (
                                 <div 
                                   onClick={() => setEditingItem(item.id)}
-                                  className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-1 rounded flex items-center"
+                                  className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-2 rounded flex items-center justify-center"
                                 >
-                                  <span className={`${
-                                    item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                  } break-words max-w-[300px]`}>
-                                    {item.name}
-                                  </span>
-                                  {item.quantity > 1 && (
-                                    <span className="text-sm text-gray-500 ml-2">×{item.quantity}</span>
-                                  )}
-                                  {item.weight && (
-                                    <span className="text-sm text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
-                                  )}
+                                  <div className="text-center">
+                                    <span className={`${
+                                      item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                                    } text-sm break-words`}>
+                                      {item.name}
+                                    </span>
+                                    {item.quantity > 1 && (
+                                      <span className="text-xs text-gray-500 ml-2">×{item.quantity}</span>
+                                    )}
+                                    {item.weight && (
+                                      <span className="text-xs text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
+                                    )}
+                                  </div>
                                 </div>
+                              )}
+                              
+                              {/* Edit and Delete buttons */}
+                              {editingItem !== item.id && (
+                                <div className="flex items-center space-x-1">
+                                  <button
+                                    onClick={() => setEditingItem(item.id)}
+                                    className="text-gray-400 hover:text-blue-600 p-1"
+                                  >
+                                    <Edit3 className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteItem(item.id);
+                                    }}
+                                    className="text-gray-400 hover:text-red-600 p-1"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Bottom row: Group assignment and status badges */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
                                 {/* Group Assignment */}
                                 {trip.isCoordinated && (
                                   <select
                                     value={item.assignedGroupId || ''}
                                     onChange={(e) => assignItemToGroup(item.id, e.target.value || undefined)}
-                                    className="text-sm border rounded-md py-1 px-2 dark:bg-gray-700 ml-2"
+                                    className="text-xs border rounded-md py-1 px-2 dark:bg-gray-700"
                                     style={{
                                       borderColor: trip.groups.find(g => g.id === item.assignedGroupId)?.color || 'transparent',
                                       color: trip.groups.find(g => g.id === item.assignedGroupId)?.color
@@ -904,19 +1089,10 @@ const PackingList = () => {
                                     ))}
                                   </select>
                                 )}
-                                <div className="flex items-center space-x-2 ml-4">
-                                  <Edit3 className="h-4 w-4 text-gray-400" />
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteItem(item.id);
-                                    }}
-                                    className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                                {/* Status Badge */}
+                              </div>
+                              
+                              {/* Status Badges */}
+                              <div className="flex items-center space-x-1">
                                 {item.isOwned && (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                     <CheckCircle className="h-3 w-3 mr-1" />
@@ -926,14 +1102,145 @@ const PackingList = () => {
                                 {item.needsToBuy && (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
                                     <ShoppingCart className="h-3 w-3 mr-1" />
-                                    Need to Buy
+                                    Buy
                                   </span>
                                 )}
                               </div>
-                            )}
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            {/* Edit and Delete buttons moved to item text area */}
+                        </div>
+
+                        {/* Desktop Layout */}
+                        <div className="hidden sm:block">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3 flex-1">
+                              {/* Status Buttons */}
+                              <div className="flex items-center space-x-2">
+                                {!item.isOwned && (
+                                  <button
+                                    onClick={() => toggleNeedsToBuy(item.id)}
+                                    className={`p-1 rounded-full transition-colors ${
+                                      item.needsToBuy 
+                                        ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' 
+                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                    }`}
+                                    title={item.needsToBuy ? "Need to buy this item" : "Mark as need to buy"}
+                                  >
+                                    <ShoppingCart className="h-4 w-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => toggleOwned(item.id)}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    item.isOwned 
+                                      ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
+                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                  }`}
+                                  title={item.isOwned ? "You own this item" : "Mark as owned"}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => togglePacked(item.id)}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    item.isPacked 
+                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
+                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                                  }`}
+                                  title={item.isPacked ? "Item is packed" : "Mark as packed"}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </button>
+                              </div>
+                              {/* Item Details */}
+                              {editingItem === item.id ? (
+                                <div className="flex items-center space-x-2 flex-1 max-w-xl">
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                                    className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0"
+                                    style={{ width: `${Math.max(item.name.length * 8 + 32, 120)}px` }}
+                                  />
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
+                                    className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700"
+                                  />
+                                  <button
+                                    onClick={() => setEditingItem(null)}
+                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center space-x-2 flex-1 max-w-xl">
+                                  <div 
+                                    onClick={() => setEditingItem(item.id)}
+                                    className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-1 rounded flex items-center"
+                                  >
+                                    <span className={`${
+                                      item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                                    } break-words max-w-[300px]`}>
+                                      {item.name}
+                                    </span>
+                                    {item.quantity > 1 && (
+                                      <span className="text-sm text-gray-500 ml-2">×{item.quantity}</span>
+                                    )}
+                                    {item.weight && (
+                                      <span className="text-sm text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
+                                    )}
+                                  </div>
+                                  {/* Group Assignment */}
+                                  {trip.isCoordinated && (
+                                    <select
+                                      value={item.assignedGroupId || ''}
+                                      onChange={(e) => assignItemToGroup(item.id, e.target.value || undefined)}
+                                      className="text-sm border rounded-md py-1 px-2 dark:bg-gray-700 ml-2"
+                                      style={{
+                                        borderColor: trip.groups.find(g => g.id === item.assignedGroupId)?.color || 'transparent',
+                                        color: trip.groups.find(g => g.id === item.assignedGroupId)?.color
+                                      }}
+                                    >
+                                      <option value="">Shared</option>
+                                      {trip.groups.map((group) => (
+                                        <option key={group.id} value={group.id}>
+                                          {group.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                  <div className="flex items-center space-x-2 ml-4">
+                                    <Edit3 className="h-4 w-4 text-gray-400" />
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteItem(item.id);
+                                      }}
+                                      className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                  {/* Status Badge */}
+                                  {item.isOwned && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Owned
+                                    </span>
+                                  )}
+                                  {item.needsToBuy && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                      <ShoppingCart className="h-3 w-3 mr-1" />
+                                      Need to Buy
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -952,6 +1259,13 @@ const PackingList = () => {
           tripId={tripId} 
           onClose={() => setShowShoppingList(false)} 
         />
+      )}
+
+      {/* Confirmation Message */}
+      {confirmation && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50">
+          {confirmation}
+        </div>
       )}
     </div>
   );
