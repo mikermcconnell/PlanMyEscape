@@ -19,11 +19,13 @@ import CookiePolicy from './pages/CookiePolicy';
 import PrivacySettings from './pages/PrivacySettings';
 import ShoppingListPage from './pages/ShoppingListPage';
 import { InvitationPage } from './pages/InvitationPage';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 function App() {
   return (
-    <ErrorBoundary>
-      <Router>
+    <ThemeProvider>
+      <ErrorBoundary>
+        <Router>
         <Routes>
           {/* Public landing page */}
           <Route path="/" element={<LandingPage />} />
@@ -52,8 +54,9 @@ function App() {
             <Route path="shopping" element={<ShoppingListPage />} />
           </Route>
         </Routes>
-      </Router>
-    </ErrorBoundary>
+        </Router>
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 }
 

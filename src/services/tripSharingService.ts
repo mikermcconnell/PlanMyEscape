@@ -36,70 +36,6 @@ export interface TripWithSharing {
 }
 
 export class TripSharingService {
-  async inviteUserToTrip(tripId: string, email: string, permissionLevel: 'read' | 'edit'): Promise<TripInvitation> {
-    try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) {
-        throw new Error('Not authenticated');
-      }
-
-      // Check if user owns the trip
-      const { data: trip, error: tripError } = await supabase
-        .from('trips')
-        .select('id, user_id')
-        .eq('id', tripId)
-        .single();
-
-      if (tripError || !trip) {
-        throw new Error('Trip not found or access denied');
-      }
-
-      if (trip.user_id !== user.user.id) {
-        throw new Error('Only trip owners can invite users');
-      }
-
-      // Check if invitation already exists
-      const { data: existingInvitation } = await supabase
-        .from('trip_invitations')
-        .select('id, status')
-        .eq('trip_id', tripId)
-        .eq('invited_email', email)
-        .single();
-
-      if (existingInvitation) {
-        if (existingInvitation.status === 'pending') {
-          throw new Error('Invitation already sent to this email');
-        }
-        if (existingInvitation.status === 'accepted') {
-          throw new Error('User already has access to this trip');
-        }
-      }
-
-      // Create invitation
-      const { data: invitation, error } = await supabase
-        .from('trip_invitations')
-        .insert({
-          trip_id: tripId,
-          owner_id: user.user.id,
-          invited_email: email,
-          permission_level: permissionLevel,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(`Failed to create invitation: ${error.message}`);
-      }
-
-      toast.success(`Invitation sent to ${email}`);
-      return invitation;
-    } catch (error) {
-      console.error('Error inviting user:', error);
-      const message = error instanceof Error ? error.message : 'Failed to invite user';
-      toast.error(message);
-      throw error;
-    }
-  }
 
   async acceptInvitation(invitationToken: string): Promise<void> {
     try {
@@ -462,6 +398,26 @@ export class TripSharingService {
 
   async generateInvitationLink(tripId: string, email: string, permissionLevel: 'read' | 'edit'): Promise<string> {
     try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Check if user owns the trip
+      const { data: trip, error: tripError } = await supabase
+        .from('trips')
+        .select('id, user_id')
+        .eq('id', tripId)
+        .single();
+
+      if (tripError || !trip) {
+        throw new Error('Trip not found or access denied');
+      }
+
+      if (trip.user_id !== user.user.id) {
+        throw new Error('Only trip owners can generate invitation links');
+      }
+
       // Check if invitation already exists for this email
       const { data: existingInvitation } = await supabase
         .from('trip_invitations')
@@ -476,8 +432,22 @@ export class TripSharingService {
         // Use existing invitation token
         invitationToken = existingInvitation.invitation_token;
       } else {
-        // Create new invitation
-        const invitation = await this.inviteUserToTrip(tripId, email, permissionLevel);
+        // Create new invitation without sending notification
+        const { data: invitation, error } = await supabase
+          .from('trip_invitations')
+          .insert({
+            trip_id: tripId,
+            owner_id: user.user.id,
+            invited_email: email,
+            permission_level: permissionLevel,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          throw new Error(`Failed to create invitation: ${error.message}`);
+        }
+
         invitationToken = invitation.invitation_token;
       }
 

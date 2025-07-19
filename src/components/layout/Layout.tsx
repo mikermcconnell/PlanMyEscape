@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Tent, Map, Home, Settings as SettingsIcon } from 'lucide-react';
 import LogoutButton from '../LogoutButton';
 import { AuthContext } from '../../contexts/AuthContext';
+import { ThemeToggle } from '../ThemeToggle';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -60,6 +61,7 @@ const Layout = ({ children }: LayoutProps) => {
                   User Settings
                 </Link>
               )}
+              <ThemeToggle />
               {user && <LogoutButton />}
             </div>
           </div>

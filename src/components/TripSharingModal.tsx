@@ -9,10 +9,8 @@ interface TripSharingModalProps {
 
 export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onClose, tripId }) => {
   const [tripData, setTripData] = useState<TripWithSharing | null>(null);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [invitePermission, setInvitePermission] = useState<'read' | 'edit'>('read');
   const [loading, setLoading] = useState(false);
-  const [inviteLoading, setInviteLoading] = useState(false);
+  const [linkPermission, setLinkPermission] = useState<'read' | 'edit'>('read');
   const [editingInvitation, setEditingInvitation] = useState<string | null>(null);
   const [editEmail, setEditEmail] = useState('');
   const [editPermission, setEditPermission] = useState<'read' | 'edit'>('read');
@@ -35,22 +33,6 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
     }
   }, [isOpen, tripId, loadTripData]);
 
-  const handleInviteUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteEmail.trim()) return;
-
-    try {
-      setInviteLoading(true);
-      await tripSharingService.inviteUserToTrip(tripId, inviteEmail.trim(), invitePermission);
-      setInviteEmail('');
-      setInvitePermission('read');
-      await loadTripData();
-    } catch (error) {
-      console.error('Error inviting user:', error);
-    } finally {
-      setInviteLoading(false);
-    }
-  };
 
   const handleRemoveUser = async (sharedTripId: string) => {
     try {
@@ -70,22 +52,14 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
     }
   };
 
-  const generateInviteLink = async (email: string, permission: 'read' | 'edit') => {
+  const generateInviteLink = async (permission: 'read' | 'edit') => {
     try {
-      if (!email.trim()) {
-        // Generate a temporary email for the link, user can share the link directly
-        const tempEmail = `temp-${Date.now()}@invitation.link`;
-        const link = await tripSharingService.generateInvitationLink(tripId, tempEmail, permission);
-        await navigator.clipboard.writeText(link);
-        alert('Invitation link copied to clipboard! Share this link with anyone you want to invite.');
-        await loadTripData();
-      } else {
-        // Generate link for specific email
-        const link = await tripSharingService.generateInvitationLink(tripId, email, permission);
-        await navigator.clipboard.writeText(link);
-        alert('Invitation link copied to clipboard!');
-        await loadTripData();
-      }
+      // Generate a temporary email for the link, user can share the link directly
+      const tempEmail = `temp-${Date.now()}@invitation.link`;
+      const link = await tripSharingService.generateInvitationLink(tripId, tempEmail, permission);
+      await navigator.clipboard.writeText(link);
+      alert('Invitation link copied to clipboard! Share this link with anyone you want to invite.');
+      await loadTripData();
     } catch (error) {
       console.error('Error generating invite link:', error);
     }
@@ -154,47 +128,27 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
             {tripData.permission_level === 'owner' && (
               <>
                 <div className="border-t pt-4">
-                  <h4 className="font-semibold mb-3">Invite Someone</h4>
-                  <form onSubmit={handleInviteUser} className="space-y-3">
+                  <h4 className="font-semibold mb-3">Generate Invitation Link</h4>
+                  <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter email address"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Permission Level</label>
+                      <label className="block text-sm font-medium mb-1">Permission Level for Link</label>
                       <select
-                        value={invitePermission}
-                        onChange={(e) => setInvitePermission(e.target.value as 'read' | 'edit')}
+                        value={linkPermission}
+                        onChange={(e) => setLinkPermission(e.target.value as 'read' | 'edit')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="read">Read Only</option>
                         <option value="edit">Can Edit</option>
                       </select>
                     </div>
-                    <div className="flex space-x-2">
-                      <button
-                        type="submit"
-                        disabled={inviteLoading}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
-                      >
-                        {inviteLoading ? 'Sending...' : 'Send Invite'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => generateInviteLink(inviteEmail, invitePermission)}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                      >
-                        Generate Link
-                      </button>
-                    </div>
-                  </form>
+                    <button
+                      type="button"
+                      onClick={() => generateInviteLink(linkPermission)}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                    >
+                      Generate Link
+                    </button>
+                  </div>
                 </div>
 
                 {tripData.shared_users.length > 0 && (
@@ -285,7 +239,7 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
                               </div>
                               <div className="flex items-center space-x-2">
                                 <button
-                                  onClick={() => generateInviteLink(invitation.invited_email, invitation.permission_level)}
+                                  onClick={() => generateInviteLink(invitation.permission_level)}
                                   className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
                                   title="Copy invitation link"
                                 >

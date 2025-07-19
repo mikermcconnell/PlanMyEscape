@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Leaf, Map, ShoppingCart, Car, Mountain, Home as House, Users, Brain, Utensils, CheckCircle, Tent } from 'lucide-react';
 import SupaSignIn from '../components/SupaSignIn';
 import { AuthContext } from '../contexts/AuthContext';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 // Simple inline SVG for a canoe icon (not available in lucide-react)
 const CanoeIcon = () => (
@@ -129,9 +130,12 @@ export default function LandingPage() {
           }}
         >
           {/* Title Bar */}
-          <div className="absolute top-6 left-6 flex items-center gap-2 z-20">
-            <Tent className="h-6 w-6 text-green-400" />
-            <span className="font-bold text-white text-xl drop-shadow">PlanMyEscape</span>
+          <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-20">
+            <div className="flex items-center gap-2">
+              <Tent className="h-6 w-6 text-green-400" />
+              <span className="font-bold text-white text-xl drop-shadow">PlanMyEscape</span>
+            </div>
+            <ThemeToggle className="text-white hover:bg-white/10" />
           </div>
           {/* Dark overlay for text readability */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/80" />
