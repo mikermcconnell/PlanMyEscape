@@ -52,7 +52,7 @@ const features = [
   {
     icon: <Leaf className="h-8 w-8 text-green-600" />,
     title: 'Intelligent Packing Lists',
-    desc: 'Weather-aware packing suggestions so you never forget essentials.'
+    desc: 'Smart packing suggestions so you never forget essentials.'
   },
   {
     icon: <ShoppingCart className="h-8 w-8 text-green-600" />,
