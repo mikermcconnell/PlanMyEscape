@@ -101,10 +101,10 @@ export default function SupaSignIn() {
         {/* Footer link */}
         <div className="text-center mt-8">
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/')}
             className="text-green-600 hover:text-green-700 text-base font-medium"
           >
-            ← Back to dashboard
+            ← Back to home
           </button>
         </div>
       </div>
