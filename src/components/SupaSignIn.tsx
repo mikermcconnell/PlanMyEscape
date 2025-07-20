@@ -33,7 +33,7 @@ export default function SupaSignIn() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-lg sm:max-w-xl lg:max-w-2xl">
+      <div className="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-3xl xl:max-w-4xl">
         {/* Header */}
         <div className="text-center mb-8 px-4">
           <div className="flex items-center justify-center gap-3 mb-6 flex-wrap">
@@ -49,7 +49,7 @@ export default function SupaSignIn() {
         </div>
 
         {/* Auth Form */}
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+        <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 lg:p-12 mb-8">
           <Auth
             supabaseClient={supabase}
             appearance={{ 
@@ -84,7 +84,7 @@ export default function SupaSignIn() {
         </div>
 
         {/* Continue without signing in */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 lg:p-12">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-5 mb-6">
             <p className="text-base text-amber-800">
               <strong>Note:</strong> If you continue without signing in, your trip data will only be saved locally on this device and won't be accessible from other devices.
