@@ -295,7 +295,7 @@ export const getCottageTemplate = (groupSize: number, tripDays: number = 3): Pac
   createItem('Aluminum foil', 'Kitchen', undefined, 1, true, false),
   createItem('Plastic wrap', 'Kitchen', undefined, 1, true, false),
   createItem('Trash bags', 'Kitchen', undefined, Math.ceil(tripDays / 2), true, false),
-  createItem('Coffee (your preferred brand)', 'Kitchen', undefined, 1, true, false),
+  createItem('Coffee', 'Kitchen', undefined, 1, true, false),
   createItem('Tea bags', 'Kitchen', undefined, 1, true, false),
   createItem('Sugar/sweetener', 'Kitchen', undefined, 1, true, false),
   createItem('Cream/milk', 'Kitchen', undefined, 1, true, false),
@@ -306,7 +306,7 @@ export const getCottageTemplate = (groupSize: number, tripDays: number = 3): Pac
   createItem('Underwear', 'Clothing', undefined, calculateClothingQuantity(1, tripDays, 'underwear'), true, true),
   createItem('Casual socks', 'Clothing', undefined, calculateClothingQuantity(1, tripDays, 'socks'), true, true),
   createItem('Comfortable shoes/sneakers', 'Clothing', undefined, 1, true, true),
-  createItem('Light jacket or sweater', 'Clothing', undefined, 1, true, true),
+  createItem('Light jacket', 'Clothing', undefined, 1, true, true),
   createItem('Sleepwear/pajamas', 'Clothing', undefined, Math.min(3, Math.ceil(tripDays / 2)), true, true),
   
   // Clothing - Optional (Personal Items - Leisure and activity wear)
@@ -318,13 +318,9 @@ export const getCottageTemplate = (groupSize: number, tripDays: number = 3): Pac
   createItem('Sunglasses', 'Clothing', undefined, 1, false, true),
   createItem('Rain jacket or windbreaker', 'Clothing', undefined, 1, false, true),
   createItem('Warm sweater (evenings)', 'Clothing', undefined, 1, false, true),
-  createItem('Dressier outfit (for dining out)', 'Clothing', undefined, (tripDays > 2 ? 1 : 0), false, true),
-  createItem('Extra loungewear', 'Clothing', undefined, (tripDays > 4 ? 1 : 0), false, true),
   
   // Personal - Required (Personal Items)
   createItem('Toilet paper (backup)', 'Personal', undefined, 1, true, false),
-  createItem('Body soap/shower gel', 'Personal', undefined, 1, true, true),
-  createItem('Shampoo/conditioner', 'Personal', undefined, 1, true, true),
   createItem('Toothbrush', 'Personal', undefined, 1, true, true),
   createItem('Toothpaste', 'Personal', undefined, 1, true, true),
   createItem('Sunscreen', 'Personal', undefined, 1, true, true),
@@ -341,7 +337,7 @@ export const getCottageTemplate = (groupSize: number, tripDays: number = 3): Pac
   createItem('Contact solution/glasses', 'Personal', undefined, 1, false, true),
   
   // Tools & Safety - Required (Group Items)
-  createItem('Flashlight or headlamp', 'Tools', undefined, 1, true, true),
+  createItem('Flashlight', 'Tools', undefined, 1, true, true),
   createItem('Battery pack', 'Tools', undefined, groupSize, true, true),
   createItem('Matches/lighter', 'Tools', undefined, 1, true, false),
   createItem('Area maps/guidebooks', 'Tools', undefined, 1, true, false),
@@ -355,8 +351,6 @@ export const getCottageTemplate = (groupSize: number, tripDays: number = 3): Pac
   createItem('Board games/card games', 'Fun and games', undefined, Math.min(3, Math.ceil(tripDays / 2)), false, false),
   createItem('Books/magazines', 'Fun and games', undefined, Math.min(3, tripDays), false, false),
   createItem('Tablet/e-reader', 'Comfort', undefined, 1, false, true),
-  createItem('Fishing gear', 'Fun and games', undefined, 1, false, false),
-  createItem('Fishing license', 'Comfort', undefined, 1, false, true),
   createItem('Water toys/floaties', 'Fun and games', undefined, 1, false, false),
   createItem('Beach chairs', 'Comfort', undefined, 1, false, true),
   createItem('Beach umbrella', 'Fun and games', undefined, 1, false, false),
@@ -634,8 +628,6 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
       { name: 'Sugar', category: 'Kitchen' },
       { name: 'Cream/milk', category: 'Kitchen' },
       { name: 'Toilet paper', category: 'Personal' },
-      { name: 'Soap', category: 'Personal' },
-      { name: 'Shampoo', category: 'Personal' },
       { name: 'Toothbrush', category: 'Personal' },
       { name: 'Toothpaste', category: 'Personal' },
       { name: 'Sunscreen', category: 'Personal' },
@@ -676,8 +668,6 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
       { name: 'Books', category: 'Fun and games' },
       { name: 'Magazines', category: 'Fun and games' },
       { name: 'Tablet/e-reader', category: 'Fun and games' },
-      { name: 'Fishing gear', category: 'Fun and games' },
-      { name: 'Fishing license', category: 'Fun and games' },
       { name: 'Water toys', category: 'Fun and games' },
       { name: 'Floaties', category: 'Fun and games' },
       { name: 'Beach chairs', category: 'Fun and games' },
