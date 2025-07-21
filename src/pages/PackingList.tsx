@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, Activity } from 'lucide-react';
+import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, Activity, Tent, UtensilsCrossed, Shirt, Wrench, Bed, Gamepad2, Backpack, Car, Zap, Camera, Flashlight, Compass, Flame, ChefHat, Coffee, Hammer, Key, Phone, Book, Music, Gift, Map, Heart, Droplets, Smile, StickyNote } from 'lucide-react';
 import { PackingItem, Trip, ShoppingItem, TripType } from '../types';
 import { getPackingList, savePackingList, addToShoppingList } from '../utils/storage';
 import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
@@ -19,11 +19,76 @@ interface TripContextType {
 // the array identity stable across renders and eliminates 'missing dependency' warnings.
 export const PACKING_CATEGORIES = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Safety', 'Transportation', 'Fun and games', 'Other'] as const;
 
+// Icon mapping function for packing items
+const getItemIcon = (itemName: string, category: string) => {
+  const name = itemName.toLowerCase();
+  
+  // Specific item name matches (highest priority)
+  if (name.includes('tent')) return { icon: Tent, color: 'text-green-500' };
+  if (name.includes('sleeping bag') || name.includes('sleep sack')) return { icon: Bed, color: 'text-blue-500' };
+  if (name.includes('pillow')) return { icon: Bed, color: 'text-purple-500' };
+  if (name.includes('flashlight') || name.includes('headlamp') || name.includes('torch')) return { icon: Flashlight, color: 'text-yellow-500' };
+  if (name.includes('first aid') || name.includes('medical')) return { icon: Heart, color: 'text-red-500' };
+  if (name.includes('knife') || name.includes('multi-tool')) return { icon: Wrench, color: 'text-gray-600' };
+  if (name.includes('compass')) return { icon: Compass, color: 'text-indigo-500' };
+  if (name.includes('map')) return { icon: Map, color: 'text-orange-500' };
+  if (name.includes('camera')) return { icon: Camera, color: 'text-pink-500' };
+  if (name.includes('phone') || name.includes('mobile')) return { icon: Phone, color: 'text-blue-600' };
+  if (name.includes('battery') || name.includes('power bank')) return { icon: Zap, color: 'text-yellow-600' };
+  if (name.includes('stove') || name.includes('burner')) return { icon: Flame, color: 'text-red-600' };
+  if (name.includes('pot') || name.includes('pan') || name.includes('cookware')) return { icon: ChefHat, color: 'text-orange-600' };
+  if (name.includes('coffee') || name.includes('tea')) return { icon: Coffee, color: 'text-amber-700' };
+  if (name.includes('water bottle') || name.includes('hydration')) return { icon: Droplets, color: 'text-blue-400' };
+  if (name.includes('backpack') || name.includes('pack') || name.includes('bag')) return { icon: Backpack, color: 'text-green-600' };
+  if (name.includes('shirt') || name.includes('t-shirt')) return { icon: Shirt, color: 'text-teal-500' };
+  if (name.includes('jacket') || name.includes('coat')) return { icon: Shield, color: 'text-gray-700' };
+  if (name.includes('soap') || name.includes('shampoo') || name.includes('wash')) return { icon: Droplets, color: 'text-cyan-500' };
+  if (name.includes('toothbrush') || name.includes('dental')) return { icon: Smile, color: 'text-green-400' };
+  if (name.includes('game') || name.includes('cards') || name.includes('puzzle')) return { icon: Gamepad2, color: 'text-purple-600' };
+  if (name.includes('book') || name.includes('journal')) return { icon: Book, color: 'text-amber-600' };
+  if (name.includes('music') || name.includes('speaker') || name.includes('headphones')) return { icon: Music, color: 'text-violet-500' };
+  if (name.includes('rope') || name.includes('cord')) return { icon: Activity, color: 'text-orange-400' };
+  if (name.includes('hammer') || name.includes('tool')) return { icon: Hammer, color: 'text-gray-500' };
+  if (name.includes('key') || name.includes('lock')) return { icon: Key, color: 'text-yellow-700' };
+  if (name.includes('gift') || name.includes('present')) return { icon: Gift, color: 'text-red-400' };
+  if (name.includes('sunscreen') || name.includes('sun protection')) return { icon: Sun, color: 'text-yellow-500' };
+  if (name.includes('insect') || name.includes('bug spray')) return { icon: Shield, color: 'text-green-500' };
+  
+  // Category-based fallbacks (lower priority)
+  switch (category.toLowerCase()) {
+    case 'shelter':
+      return { icon: Tent, color: 'text-green-500' };
+    case 'kitchen':
+      return { icon: UtensilsCrossed, color: 'text-orange-500' };
+    case 'clothing':
+      return { icon: Shirt, color: 'text-blue-500' };
+    case 'personal':
+      return { icon: Smile, color: 'text-teal-500' };
+    case 'tools':
+      return { icon: Wrench, color: 'text-gray-600' };
+    case 'sleep':
+      return { icon: Bed, color: 'text-purple-500' };
+    case 'comfort':
+    case 'fun and games':
+      return { icon: Gamepad2, color: 'text-purple-600' };
+    case 'pack':
+      return { icon: Backpack, color: 'text-green-600' };
+    case 'safety':
+      return { icon: Heart, color: 'text-red-500' };
+    case 'transportation':
+      return { icon: Car, color: 'text-blue-600' };
+    default:
+      return { icon: Package, color: 'text-gray-500' };
+  }
+};
+
 const PackingList = () => {
   const { trip } = useOutletContext<TripContextType>();
   const tripId = trip.id;
   const [items, setItems] = useState<PackingItem[]>([]);
   const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editingNotes, setEditingNotes] = useState<string | null>(null);
+  const [notesText, setNotesText] = useState<string>('');
   const [showShoppingList, setShowShoppingList] = useState(false);
   const groupOptions = [{ id: 'all', name: 'All' as const }, ...trip.groups];
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
@@ -325,6 +390,22 @@ const PackingList = () => {
   const deleteItem = async (itemId: string) => {
     const updatedItems = items.filter(item => item.id !== itemId);
     updateItems(updatedItems);
+  };
+
+  const startEditingNotes = (itemId: string, currentNotes?: string) => {
+    setEditingNotes(itemId);
+    setNotesText(currentNotes || '');
+  };
+
+  const cancelEditingNotes = () => {
+    setEditingNotes(null);
+    setNotesText('');
+  };
+
+  const saveNotes = async (itemId: string) => {
+    await updateItem(itemId, { notes: notesText.trim() || undefined });
+    setEditingNotes(null);
+    setNotesText('');
   };
 
   const clearUserInput = async () => {
@@ -699,11 +780,16 @@ const PackingList = () => {
                                   className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-2 rounded flex items-center justify-center"
                                 >
                                   <div className="text-center">
-                                    <span className={`${
-                                      item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                    } text-sm break-words`}>
-                                      {item.name}
-                                    </span>
+                                    <div className="flex items-center justify-center gap-2">
+                                      {React.createElement(getItemIcon(item.name, item.category).icon, {
+                                        className: `h-4 w-4 ${getItemIcon(item.name, item.category).color} flex-shrink-0`
+                                      })}
+                                      <span className={`${
+                                        item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                                      } text-sm break-words`}>
+                                        {item.name}
+                                      </span>
+                                    </div>
                                     {item.quantity > 1 && (
                                       <span className="text-xs text-gray-500 ml-2">×{item.quantity}</span>
                                     )}
@@ -714,7 +800,7 @@ const PackingList = () => {
                                 </div>
                               )}
                               
-                              {/* Edit and Delete buttons */}
+                              {/* Edit, Notes, and Delete buttons */}
                               {editingItem !== item.id && (
                                 <div className="flex items-center space-x-1">
                                   <button
@@ -722,6 +808,15 @@ const PackingList = () => {
                                     className="text-gray-400 hover:text-blue-600 p-1"
                                   >
                                     <Edit3 className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startEditingNotes(item.id, item.notes);
+                                    }}
+                                    className={`p-1 ${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
+                                  >
+                                    <StickyNote className="h-4 w-4" />
                                   </button>
                                   <button
                                     onClick={(e) => {
@@ -735,6 +830,48 @@ const PackingList = () => {
                                 </div>
                               )}
                             </div>
+                            
+                            {/* Notes editing section */}
+                            {editingNotes === item.id && (
+                              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <StickyNote className="h-4 w-4 text-blue-500" />
+                                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
+                                </div>
+                                <textarea
+                                  value={notesText}
+                                  onChange={(e) => setNotesText(e.target.value)}
+                                  placeholder="Add notes about this item..."
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
+                                  rows={3}
+                                  autoFocus
+                                />
+                                <div className="flex items-center gap-2 mt-2">
+                                  <button
+                                    onClick={() => saveNotes(item.id)}
+                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEditingNotes}
+                                    className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Display existing notes */}
+                            {item.notes && editingNotes !== item.id && (
+                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                                <div className="flex items-start gap-2">
+                                  <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                  <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
+                                </div>
+                              </div>
+                            )}
                             
                             {/* Bottom row: Group assignment and status badges */}
                             <div className="flex items-center justify-between">
@@ -883,7 +1020,21 @@ const PackingList = () => {
                                     </select>
                                   )}
                                   <div className="flex items-center space-x-2 ml-4">
-                                    <Edit3 className="h-4 w-4 text-gray-400" />
+                                    <button
+                                      onClick={() => setEditingItem(item.id)}
+                                      className="text-gray-400 hover:text-blue-600"
+                                    >
+                                      <Edit3 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEditingNotes(item.id, item.notes);
+                                      }}
+                                      className={`${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
+                                    >
+                                      <StickyNote className="h-4 w-4" />
+                                    </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -911,6 +1062,48 @@ const PackingList = () => {
                               )}
                             </div>
                           </div>
+                          
+                          {/* Notes editing section for desktop */}
+                          {editingNotes === item.id && (
+                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                              <div className="flex items-center gap-2 mb-2">
+                                <StickyNote className="h-4 w-4 text-blue-500" />
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
+                              </div>
+                              <textarea
+                                value={notesText}
+                                onChange={(e) => setNotesText(e.target.value)}
+                                placeholder="Add notes about this item..."
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
+                                rows={3}
+                                autoFocus
+                              />
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  onClick={() => saveNotes(item.id)}
+                                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={cancelEditingNotes}
+                                  className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Display existing notes for desktop */}
+                          {item.notes && editingNotes !== item.id && (
+                            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                              <div className="flex items-start gap-2">
+                                <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1030,11 +1223,16 @@ const PackingList = () => {
                                   className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-2 rounded flex items-center justify-center"
                                 >
                                   <div className="text-center">
-                                    <span className={`${
-                                      item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                    } text-sm break-words`}>
-                                      {item.name}
-                                    </span>
+                                    <div className="flex items-center justify-center gap-2">
+                                      {React.createElement(getItemIcon(item.name, item.category).icon, {
+                                        className: `h-4 w-4 ${getItemIcon(item.name, item.category).color} flex-shrink-0`
+                                      })}
+                                      <span className={`${
+                                        item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                                      } text-sm break-words`}>
+                                        {item.name}
+                                      </span>
+                                    </div>
                                     {item.quantity > 1 && (
                                       <span className="text-xs text-gray-500 ml-2">×{item.quantity}</span>
                                     )}
@@ -1045,7 +1243,7 @@ const PackingList = () => {
                                 </div>
                               )}
                               
-                              {/* Edit and Delete buttons */}
+                              {/* Edit, Notes, and Delete buttons */}
                               {editingItem !== item.id && (
                                 <div className="flex items-center space-x-1">
                                   <button
@@ -1053,6 +1251,15 @@ const PackingList = () => {
                                     className="text-gray-400 hover:text-blue-600 p-1"
                                   >
                                     <Edit3 className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startEditingNotes(item.id, item.notes);
+                                    }}
+                                    className={`p-1 ${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
+                                  >
+                                    <StickyNote className="h-4 w-4" />
                                   </button>
                                   <button
                                     onClick={(e) => {
@@ -1066,6 +1273,48 @@ const PackingList = () => {
                                 </div>
                               )}
                             </div>
+                            
+                            {/* Notes editing section */}
+                            {editingNotes === item.id && (
+                              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <StickyNote className="h-4 w-4 text-blue-500" />
+                                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
+                                </div>
+                                <textarea
+                                  value={notesText}
+                                  onChange={(e) => setNotesText(e.target.value)}
+                                  placeholder="Add notes about this item..."
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
+                                  rows={3}
+                                  autoFocus
+                                />
+                                <div className="flex items-center gap-2 mt-2">
+                                  <button
+                                    onClick={() => saveNotes(item.id)}
+                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEditingNotes}
+                                    className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Display existing notes */}
+                            {item.notes && editingNotes !== item.id && (
+                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                                <div className="flex items-start gap-2">
+                                  <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                  <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
+                                </div>
+                              </div>
+                            )}
                             
                             {/* Bottom row: Group assignment and status badges */}
                             <div className="flex items-center justify-between">
@@ -1214,7 +1463,21 @@ const PackingList = () => {
                                     </select>
                                   )}
                                   <div className="flex items-center space-x-2 ml-4">
-                                    <Edit3 className="h-4 w-4 text-gray-400" />
+                                    <button
+                                      onClick={() => setEditingItem(item.id)}
+                                      className="text-gray-400 hover:text-blue-600"
+                                    >
+                                      <Edit3 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEditingNotes(item.id, item.notes);
+                                      }}
+                                      className={`${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
+                                    >
+                                      <StickyNote className="h-4 w-4" />
+                                    </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1242,6 +1505,48 @@ const PackingList = () => {
                               )}
                             </div>
                           </div>
+                          
+                          {/* Notes editing section for desktop */}
+                          {editingNotes === item.id && (
+                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                              <div className="flex items-center gap-2 mb-2">
+                                <StickyNote className="h-4 w-4 text-blue-500" />
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
+                              </div>
+                              <textarea
+                                value={notesText}
+                                onChange={(e) => setNotesText(e.target.value)}
+                                placeholder="Add notes about this item..."
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
+                                rows={3}
+                                autoFocus
+                              />
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  onClick={() => saveNotes(item.id)}
+                                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={cancelEditingNotes}
+                                  className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Display existing notes for desktop */}
+                          {item.notes && editingNotes !== item.id && (
+                            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                              <div className="flex items-start gap-2">
+                                <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

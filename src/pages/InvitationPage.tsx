@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tripSharingService } from '../services/tripSharingService';
 import { useAuth } from '../contexts/AuthContext';
+import { Tent } from 'lucide-react';
 
 export const InvitationPage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
@@ -57,16 +58,23 @@ export const InvitationPage: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-          <h1 className="text-2xl font-bold text-center mb-4">Trip Invitation</h1>
-          <p className="text-gray-600 text-center mb-6">
-            You need to sign in to view this invitation.
-          </p>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-2 sm:p-4">
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 max-w-sm sm:max-w-md w-full">
+          {/* Header */}
+          <div className="text-center mb-4 sm:mb-6">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <Tent className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
+              <span className="font-bold text-lg sm:text-xl text-gray-900">PlanMyEscape</span>
+            </div>
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Trip Invitation</h1>
+            <p className="text-sm sm:text-base text-gray-600">
+              You need to sign in to view this invitation.
+            </p>
+          </div>
           <div className="text-center">
             <button
               onClick={() => navigate(`/signin?invitation=${token}`)}
-              className="px-6 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+              className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm sm:text-base"
             >
               Sign In
             </button>
@@ -77,41 +85,48 @@ export const InvitationPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-        <h1 className="text-2xl font-bold text-center mb-4">Trip Invitation</h1>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 max-w-sm sm:max-w-md w-full">
+        {/* Header */}
+        <div className="text-center mb-4 sm:mb-6">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Tent className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
+            <span className="font-bold text-lg sm:text-xl text-gray-900">PlanMyEscape</span>
+          </div>
+          <h1 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Trip Invitation</h1>
+        </div>
         
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
-            <p className="text-red-800">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+            <p className="text-red-800 text-sm">{error}</p>
           </div>
         )}
 
-        <p className="text-gray-600 text-center mb-6">
+        <p className="text-gray-600 text-center mb-4 sm:mb-6 text-sm sm:text-base">
           You have been invited to collaborate on a trip. Would you like to accept this invitation?
         </p>
 
-        <div className="flex space-x-4">
+        <div className="space-y-3 mb-4">
           <button
             onClick={handleAccept}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:opacity-50"
+            className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors font-medium text-sm sm:text-base"
           >
             {loading ? 'Processing...' : 'Accept Invitation'}
           </button>
           <button
             onClick={handleDecline}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50"
+            className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors font-medium text-sm sm:text-base"
           >
             {loading ? 'Processing...' : 'Decline'}
           </button>
         </div>
 
-        <div className="mt-4 text-center">
+        <div className="text-center">
           <button
             onClick={() => navigate('/dashboard')}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-green-600 hover:text-green-700 text-sm font-medium"
           >
             Go to Dashboard
           </button>

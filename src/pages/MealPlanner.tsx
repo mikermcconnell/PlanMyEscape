@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Plus, Trash2, Edit3, X, ShoppingCart, Calendar, ArrowLeft, ArrowRight, CheckCircle, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, ShoppingCart, Calendar, CheckCircle, RotateCcw } from 'lucide-react';
 import { Meal, Trip, TripType } from '../types';
 import { getMeals, saveMeals } from '../utils/storage';
 import { getMealTemplates } from '../data/mealTemplates';

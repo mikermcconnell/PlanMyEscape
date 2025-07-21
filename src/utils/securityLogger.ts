@@ -1,6 +1,6 @@
 import { supabase } from '../supabaseClient';
 
-export type SecurityEventType = 'login' | 'failed_login' | 'data_access' | 'data_export';
+export type SecurityEventType = 'login' | 'failed_login' | 'data_access' | 'data_export' | 'password_reset' | 'password_reset_initiated' | 'password_updated';
 
 interface SecurityEvent {
   type: SecurityEventType;

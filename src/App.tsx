@@ -11,6 +11,7 @@ import TripOverview from './pages/TripOverview';
 import TripSchedule from './pages/TripSchedule';
 import ErrorBoundary from './components/ErrorBoundary';
 import SupaSignIn from './components/SupaSignIn';
+import PasswordReset from './pages/PasswordReset';
 import ProtectedRoute from './components/ProtectedRoute';
 import Notes from './pages/Notes';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -19,11 +20,14 @@ import CookiePolicy from './pages/CookiePolicy';
 import PrivacySettings from './pages/PrivacySettings';
 import ShoppingListPage from './pages/ShoppingListPage';
 import { InvitationPage } from './pages/InvitationPage';
+import { GlobalPasswordResetDetector } from './components/GlobalPasswordResetDetector';
 
 function App() {
   return (
     <ErrorBoundary>
         <Router>
+        {/* Global password reset detector */}
+        <GlobalPasswordResetDetector />
         <Routes>
           {/* Public landing page */}
           <Route path="/" element={<LandingPage />} />
@@ -41,6 +45,7 @@ function App() {
           <Route path="/notes" element={<ProtectedRoute allowUnauthenticated={true}><Layout><Notes /></Layout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Layout><PrivacySettings /></Layout></ProtectedRoute>} />
           <Route path="/signin" element={<SupaSignIn />} />
+          <Route path="/reset-password" element={<PasswordReset />} />
           <Route path="/invite/:token" element={<InvitationPage />} />
           
           {/* Trip-specific routes with navigation - allow unauthenticated access */}

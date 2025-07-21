@@ -59,6 +59,7 @@ export interface PackingItem {
   packedByUserId?: string; // ID of user who packed this item
   lastModifiedBy?: string; // ID of user who last modified this item
   lastModifiedAt?: string; // Timestamp of last modification
+  notes?: string; // User notes for this item
 }
 
 export interface ShoppingItem {

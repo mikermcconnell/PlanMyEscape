@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Leaf, Map, ShoppingCart, Car, Mountain, Home as House, Users, Brain, Utensils, CheckCircle, Tent } from 'lucide-react';
-import SupaSignIn from '../components/SupaSignIn';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { supabase } from '../supabaseClient';
 import { AuthContext } from '../contexts/AuthContext';
+import { logSecurityEvent } from '../utils/securityLogger';
 
 // Simple inline SVG for a canoe icon (not available in lucide-react)
 const CanoeIcon = () => (
@@ -77,6 +80,29 @@ export default function LandingPage() {
     }
   }, [user, navigate]);
 
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        await logSecurityEvent({
+          type: 'login',
+          userId: session.user.id,
+          userAgent: navigator.userAgent
+        });
+        setShowSignIn(false);
+        navigate('/dashboard');
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        await logSecurityEvent({
+          type: 'password_updated',
+          userId: session.user.id,
+          userAgent: navigator.userAgent
+        });
+        setShowSignIn(false);
+        navigate('/dashboard');
+      }
+    });
+    return () => listener.subscription.unsubscribe();
+  }, [navigate]);
+
   return (
     <>
       {/* Set title via useEffect to avoid additional deps */}
@@ -85,23 +111,84 @@ export default function LandingPage() {
       }, [])}
       {/* Sign-in Modal */}
       {showSignIn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full relative" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm sm:max-w-md w-full relative max-h-[95vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => setShowSignIn(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10"
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 z-10 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
               aria-label="Close sign in"
             >
               ✕
             </button>
-            <div className="p-6">
-              <SupaSignIn />
+            <div className="p-4 sm:p-6 pt-10">
+              {/* Compact Header */}
+              <div className="text-center mb-4">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <Tent className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
+                  <span className="font-bold text-lg sm:text-xl text-gray-900">PlanMyEscape</span>
+                </div>
+                <h1 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">
+                  Welcome back
+                </h1>
+                <p className="text-sm text-gray-600">
+                  Sign in to access your trips
+                </p>
+              </div>
+
+              {/* Auth Form - compact inline version */}
+              <div className="mb-4">
+                <Auth
+                  supabaseClient={supabase}
+                  appearance={{ 
+                    theme: ThemeSupa,
+                    style: {
+                      button: {
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        padding: '0.625rem 1rem',
+                        fontWeight: '500',
+                        marginBottom: '0.5rem',
+                      },
+                      input: {
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        padding: '0.625rem 0.75rem',
+                        border: '1px solid #d1d5db',
+                        marginBottom: '0.75rem',
+                      },
+                      label: {
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        color: '#374151',
+                        marginBottom: '0.25rem',
+                      },
+                      container: {
+                        gap: '0.75rem',
+                      },
+                      anchor: {
+                        fontSize: '0.75rem',
+                        marginTop: '0.5rem',
+                      },
+                      divider: {
+                        margin: '0.5rem 0',
+                      },
+                      message: {
+                        fontSize: '0.75rem',
+                        padding: '0.5rem',
+                        marginBottom: '0.5rem',
+                      }
+                    }
+                  }}
+                  providers={[]}
+                  theme="default"
+                />
+              </div>
               
               {/* Continue without signing in option */}
-              <div className="mt-6 border-t border-gray-200 pt-6">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-amber-800">
-                    <strong>Note:</strong> If you continue without signing in, your trip data will only be saved locally on this device and won't be accessible from other devices.
+              <div className="border-t border-gray-200 pt-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                  <p className="text-xs sm:text-sm text-amber-800">
+                    <strong>Note:</strong> Without signing in, data stays on this device only.
                   </p>
                 </div>
                 <button
@@ -109,7 +196,7 @@ export default function LandingPage() {
                     setShowSignIn(false);
                     navigate('/dashboard');
                   }}
-                  className="w-full px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full px-4 py-2.5 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm sm:text-base font-medium"
                 >
                   Continue without signing in
                 </button>
