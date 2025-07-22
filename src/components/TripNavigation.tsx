@@ -36,7 +36,7 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName, onSho
     },
     {
       id: 'shopping',
-      label: 'Complete Shopping List',
+      label: 'Shopping List',
       icon: ShoppingCart,
       path: `/trip/${tripId}/shopping`,
       description: 'Combined shopping list'

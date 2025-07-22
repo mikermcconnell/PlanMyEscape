@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Utensils, Package, Check, CheckCircle, Trash2, Plus, RotateCcw, X } from 'lucide-react';
-import { ShoppingItem } from '../types';
+import { ShoppingCart, Utensils, Package, Check, CheckCircle, Trash2, Plus, RotateCcw, X, Calculator, DollarSign } from 'lucide-react';
+import { ShoppingItem, Group } from '../types';
 import { getShoppingList, saveShoppingList } from '../utils/storage';
+import CostSplitter from './CostSplitter';
 
 interface ShoppingListProps {
   tripId: string;
+  groups?: Group[];
   onClose: () => void;
 }
 
-const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
+const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, groups = [], onClose }) => {
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
   const [newItem, setNewItem] = useState({ name: '', category: 'camping' as 'food' | 'camping', quantity: 1 });
   const [showAddForm, setShowAddForm] = useState(false);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const [editingCostItem, setEditingCostItem] = useState<ShoppingItem | null>(null);
 
   useEffect(() => {
     const loadItems = async () => {
@@ -50,6 +53,15 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
     const updatedItems = shoppingItems.filter(item => item.id !== itemId);
     setShoppingItems(updatedItems);
     await saveShoppingList(tripId, updatedItems);
+  };
+
+  const handleSaveCostSplit = async (updatedItem: ShoppingItem) => {
+    const updatedItems = shoppingItems.map(item => 
+      item.id === updatedItem.id ? updatedItem : item
+    );
+    setShoppingItems(updatedItems);
+    await saveShoppingList(tripId, updatedItems);
+    setEditingCostItem(null);
   };
 
   const handleAddItem = async () => {
@@ -151,11 +163,20 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
                 </button>
               </div>
               <div className="flex-1">
-                <span className={`${item.isChecked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                <div className={`${item.isChecked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
                   {item.name}
-                </span>
-                {item.quantity > 1 && (
-                  <span className="ml-2 text-sm text-gray-500">×{item.quantity}</span>
+                  {item.quantity > 1 && (
+                    <span className="ml-2 text-sm text-gray-500">×{item.quantity}</span>
+                  )}
+                </div>
+                {item.cost && item.cost > 0 && (
+                  <div className="text-sm text-gray-500 mt-1">
+                    ${item.cost.toFixed(2)}
+                    {item.paidByGroupId && groups.length > 0 && (
+                      <span className="ml-2">• Paid by {groups.find(g => g.id === item.paidByGroupId)?.name}</span>
+                    )}
+                    {item.splits && <span className="ml-2">• Split {item.splits.length} ways</span>}
+                  </div>
                 )}
               </div>
               {/* Status Badges */}
@@ -171,12 +192,28 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
                   Need to Buy
                 </span>
               )}
-              <button
-                onClick={() => handleRemoveItem(item.id)}
-                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex items-center space-x-2">
+                {item.cost && item.cost > 0 && (
+                  <div className="p-1 rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400">
+                    <DollarSign className="h-3 w-3" />
+                  </div>
+                )}
+                {groups.length > 0 && (
+                  <button
+                    onClick={() => setEditingCostItem(item)}
+                    className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-full transition-colors"
+                    title={item.cost ? 'Edit cost split' : 'Add cost split'}
+                  >
+                    <Calculator className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => handleRemoveItem(item.id)}
+                  className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -347,6 +384,15 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, onClose }) => {
             </div>
           </div>
         </div>
+      )}
+      {/* Cost Splitter Modal */}
+      {editingCostItem && (
+        <CostSplitter
+          item={editingCostItem}
+          groups={groups}
+          onSave={handleSaveCostSplit}
+          onCancel={() => setEditingCostItem(null)}
+        />
       )}
     </div>
   );

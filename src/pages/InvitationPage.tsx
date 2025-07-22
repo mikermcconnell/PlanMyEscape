@@ -66,9 +66,9 @@ export const InvitationPage: React.FC = () => {
               <Tent className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
               <span className="font-bold text-lg sm:text-xl text-gray-900">PlanMyEscape</span>
             </div>
-            <h1 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Trip Invitation</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Join Trip</h1>
             <p className="text-sm sm:text-base text-gray-600">
-              You need to sign in to view this invitation.
+              You've been invited to join a camping trip! Sign in to continue.
             </p>
           </div>
           <div className="text-center">
@@ -93,7 +93,7 @@ export const InvitationPage: React.FC = () => {
             <Tent className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
             <span className="font-bold text-lg sm:text-xl text-gray-900">PlanMyEscape</span>
           </div>
-          <h1 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Trip Invitation</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Join Trip</h1>
         </div>
         
         {error && (
@@ -102,9 +102,14 @@ export const InvitationPage: React.FC = () => {
           </div>
         )}
 
-        <p className="text-gray-600 text-center mb-4 sm:mb-6 text-sm sm:text-base">
-          You have been invited to collaborate on a trip. Would you like to accept this invitation?
-        </p>
+        <div className="text-center mb-4 sm:mb-6">
+          <p className="text-gray-600 text-sm sm:text-base mb-3">
+            🏕️ You've been invited to join a camping trip!
+          </p>
+          <p className="text-gray-500 text-xs sm:text-sm">
+            Click "Join Trip" to collaborate on trip planning, packing lists, meals, and more.
+          </p>
+        </div>
 
         <div className="space-y-3 mb-4">
           <button
@@ -112,14 +117,14 @@ export const InvitationPage: React.FC = () => {
             disabled={loading}
             className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors font-medium text-sm sm:text-base"
           >
-            {loading ? 'Processing...' : 'Accept Invitation'}
+{loading ? 'Joining...' : '🏕️ Join Trip'}
           </button>
           <button
             onClick={handleDecline}
             disabled={loading}
             className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors font-medium text-sm sm:text-base"
           >
-            {loading ? 'Processing...' : 'Decline'}
+{loading ? 'Processing...' : 'No Thanks'}
           </button>
         </div>
 

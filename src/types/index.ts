@@ -74,6 +74,16 @@ export interface ShoppingItem {
   needsToBuy?: boolean;
   sourceItemId?: string;
   assignedGroupId?: string;
+  // Cost splitting features
+  cost?: number;
+  currency?: string;
+  paidByGroupId?: string;
+  paidByUserName?: string;
+  splitType?: 'equal' | 'custom' | 'by_group';
+  splits?: ItemSplit[];
+  receiptUrl?: string;
+  purchaseDate?: string;
+  notes?: string;
 }
 
 export interface Meal {
@@ -133,4 +143,40 @@ export const GROUP_COLORS = [
   '#ECC94B',
 ] as const;
 
-export type GroupColor = typeof GROUP_COLORS[number]; 
+export type GroupColor = typeof GROUP_COLORS[number];
+
+// Cost splitting types
+export interface ItemSplit {
+  groupId: string;
+  groupName: string;
+  amount: number;
+  isSettled?: boolean;
+}
+
+export interface ExpenseSummary {
+  groupId: string;
+  groupName: string;
+  totalPaid: number;
+  totalOwed: number;
+  balance: number; // positive = owed money, negative = owes money
+}
+
+export interface Settlement {
+  id: string;
+  fromGroupId: string;
+  toGroupId: string;
+  amount: number;
+  currency: string;
+  description: string;
+  isSettled: boolean;
+  settledDate?: string;
+  createdDate: string;
+}
+
+export interface ExpenseMetrics {
+  totalCost: number;
+  totalPaid: number;
+  totalPending: number;
+  currency: string;
+  settlements: Settlement[];
+} 

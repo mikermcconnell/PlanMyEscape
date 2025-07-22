@@ -19,7 +19,10 @@
       "Bash(npm:*)",
       "Bash(where:*)",
       "Bash(npx supabase:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(set PORT=3001)",
+      "Bash(taskkill:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }

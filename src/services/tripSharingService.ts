@@ -44,31 +44,31 @@ export class TripSharingService {
         throw new Error('Not authenticated');
       }
 
-      // Get invitation details - first try with user's email, then try general invitations
+      // Get invitation details - support multiple invitation types
       let { data: invitation, error: invitationError } = await supabase
         .from('trip_invitations')
         .select('*')
         .eq('invitation_token', invitationToken)
-        .eq('invited_email', user.user.email)
         .single();
 
-      // If not found with user's email, try to find a general invitation (temp email)
+      // If invitation not found at all, it's invalid
       if (invitationError || !invitation) {
-        const { data: generalInvitation, error: generalError } = await supabase
-          .from('trip_invitations')
-          .select('*')
-          .eq('invitation_token', invitationToken)
-          .like('invited_email', 'temp-%@invitation.link')
-          .single();
-
-        if (generalError || !generalInvitation) {
-          throw new Error('Invalid or expired invitation');
-        }
-        
-        invitation = generalInvitation;
+        throw new Error('Invalid or expired invitation link');
       }
 
-      if (invitation.status !== 'pending') {
+      // Check if this is a reusable invitation or a specific email invitation
+      const isReusableInvitation = invitation.invited_email.includes('@reusable.invitation') || 
+                                   invitation.invited_email.includes('temp-') ||
+                                   invitation.invited_email.includes('@invitation.link');
+
+      // For specific email invitations, verify the user's email matches
+      if (!isReusableInvitation && invitation.invited_email !== user.user.email) {
+        throw new Error('This invitation was sent to a different email address');
+      }
+
+      // For reusable invitations, don't check status (they stay pending for multiple uses)
+      // For specific email invitations, check status
+      if (!isReusableInvitation && invitation.status !== 'pending') {
         throw new Error('Invitation is no longer valid');
       }
 
@@ -76,30 +76,77 @@ export class TripSharingService {
         throw new Error('Invitation has expired');
       }
 
-      // Create shared trip record (use actual user email, not temp email)
-      const { error: sharedTripError } = await supabase
+      // Check if shared trip record already exists
+      const { data: existingSharedTrip, error: existingError } = await supabase
         .from('shared_trips')
-        .insert({
-          trip_id: invitation.trip_id,
-          owner_id: invitation.owner_id,
-          shared_with_id: user.user.id,
-          shared_with_email: user.user.email || invitation.invited_email,
-          permission_level: invitation.permission_level,
-          status: 'accepted',
-        });
+        .select('id, status')
+        .eq('trip_id', invitation.trip_id)
+        .eq('shared_with_id', user.user.id)
+        .maybeSingle(); // Use maybeSingle instead of single to avoid error if not found
 
-      if (sharedTripError) {
-        throw new Error(`Failed to accept invitation: ${sharedTripError.message}`);
+      if (existingError) {
+        console.error('Error checking existing shared trip:', existingError);
+        // Continue with creating new record if check fails
       }
 
-      // Update invitation status
-      const { error: updateError } = await supabase
-        .from('trip_invitations')
-        .update({ status: 'accepted', updated_at: new Date().toISOString() })
-        .eq('id', invitation.id);
+      if (existingSharedTrip) {
+        if (existingSharedTrip.status === 'accepted') {
+          // Already accepted - just update invitation status and return
+          const { error: updateError } = await supabase
+            .from('trip_invitations')
+            .update({ status: 'accepted', updated_at: new Date().toISOString() })
+            .eq('id', invitation.id);
 
-      if (updateError) {
-        console.error('Failed to update invitation status:', updateError);
+          if (updateError) {
+            console.error('Failed to update invitation status:', updateError);
+          }
+          
+          toast.success('You have already accepted this invitation');
+          return;
+        } else {
+          // Update existing record to accepted
+          const { error: updateSharedTripError } = await supabase
+            .from('shared_trips')
+            .update({ 
+              status: 'accepted',
+              permission_level: invitation.permission_level,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingSharedTrip.id);
+
+          if (updateSharedTripError) {
+            throw new Error(`Failed to accept invitation: ${updateSharedTripError.message}`);
+          }
+        }
+      } else {
+        // Create new shared trip record (use actual user email, not temp email)
+        const { error: sharedTripError } = await supabase
+          .from('shared_trips')
+          .insert({
+            trip_id: invitation.trip_id,
+            owner_id: invitation.owner_id,
+            shared_with_id: user.user.id,
+            shared_with_email: user.user.email || invitation.invited_email,
+            permission_level: invitation.permission_level,
+            status: 'accepted',
+          });
+
+        if (sharedTripError) {
+          throw new Error(`Failed to accept invitation: ${sharedTripError.message}`);
+        }
+      }
+
+      // Update invitation status only for specific email invitations
+      // Reusable invitations stay pending so others can use them
+      if (!isReusableInvitation) {
+        const { error: updateError } = await supabase
+          .from('trip_invitations')
+          .update({ status: 'accepted', updated_at: new Date().toISOString() })
+          .eq('id', invitation.id);
+
+        if (updateError) {
+          console.error('Failed to update invitation status:', updateError);
+        }
       }
 
       toast.success('Invitation accepted successfully');
@@ -418,28 +465,33 @@ export class TripSharingService {
         throw new Error('Only trip owners can generate invitation links');
       }
 
-      // Check if invitation already exists for this email
+      // Check if a reusable invitation already exists for this trip and permission level
+      // Use a special pattern for multi-user invitations
+      const reusableEmail = `join-${permissionLevel}-${tripId}@reusable.invitation`;
+      
       const { data: existingInvitation } = await supabase
         .from('trip_invitations')
         .select('invitation_token')
         .eq('trip_id', tripId)
-        .eq('invited_email', email)
+        .eq('invited_email', reusableEmail)
+        .eq('permission_level', permissionLevel)
         .eq('status', 'pending')
         .single();
 
       let invitationToken;
       if (existingInvitation) {
-        // Use existing invitation token
+        // Use existing reusable invitation token
         invitationToken = existingInvitation.invitation_token;
       } else {
-        // Create new invitation without sending notification
+        // Create new reusable invitation
         const { data: invitation, error } = await supabase
           .from('trip_invitations')
           .insert({
             trip_id: tripId,
             owner_id: user.user.id,
-            invited_email: email,
+            invited_email: reusableEmail,
             permission_level: permissionLevel,
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days instead of 7
           })
           .select()
           .single();

@@ -54,14 +54,15 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
 
   const generateInviteLink = async (permission: 'read' | 'edit') => {
     try {
-      // Generate a temporary email for the link, user can share the link directly
-      const tempEmail = `temp-${Date.now()}@invitation.link`;
-      const link = await tripSharingService.generateInvitationLink(tripId, tempEmail, permission);
+      // Generate a reusable join link that multiple people can use
+      const reusableEmail = `join-${permission}-${tripId}@reusable.invitation`;
+      const link = await tripSharingService.generateInvitationLink(tripId, reusableEmail, permission);
       await navigator.clipboard.writeText(link);
-      alert('Invitation link copied to clipboard! Share this link with anyone you want to invite.');
+      alert(`🔗 Shareable join link copied to clipboard!\n\n✅ Multiple people can use this same link\n✅ Valid for 30 days\n✅ ${permission === 'edit' ? 'Edit' : 'View-only'} permissions\n\nShare this link with anyone you want to invite to your trip!`);
       await loadTripData();
     } catch (error) {
       console.error('Error generating invite link:', error);
+      alert('Failed to generate invitation link. Please try again.');
     }
   };
 
@@ -128,26 +129,34 @@ export const TripSharingModal: React.FC<TripSharingModalProps> = ({ isOpen, onCl
             {tripData.permission_level === 'owner' && (
               <>
                 <div className="border-t pt-4">
-                  <h4 className="font-semibold mb-3">Generate Invitation Link</h4>
+                  <h4 className="font-semibold mb-2">Generate Shareable Join Link</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    🔗 Create a link that multiple people can use to join your trip. The same link can be shared with everyone - no need to generate individual invitations!
+                  </p>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Permission Level for Link</label>
+                      <label className="block text-sm font-medium mb-1">Permission Level for Anyone Using This Link</label>
                       <select
                         value={linkPermission}
                         onChange={(e) => setLinkPermission(e.target.value as 'read' | 'edit')}
                         className="w-full px-4 py-4 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 min-h-[48px]"
                       >
-                        <option value="read">Read Only</option>
-                        <option value="edit">Can Edit</option>
+                        <option value="read">👀 View Only - Can see trip details</option>
+                        <option value="edit">✏️ Can Edit - Can modify trip content</option>
                       </select>
                     </div>
                     <button
                       type="button"
                       onClick={() => generateInviteLink(linkPermission)}
-                      className="px-6 py-4 bg-blue-500 text-white rounded-md hover:bg-blue-600 min-h-[48px] font-medium"
+                      className="w-full px-6 py-4 bg-green-500 text-white rounded-md hover:bg-green-600 min-h-[48px] font-medium"
                     >
-                      Generate Link
+                      🔗 Generate Shareable Link
                     </button>
+                    <div className="text-xs text-gray-500 bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                      ✅ Same link works for multiple people<br/>
+                      ✅ Valid for 30 days<br/>
+                      ✅ Anyone with the link can join instantly
+                    </div>
                   </div>
                 </div>
 

@@ -1561,7 +1561,8 @@ const PackingList = () => {
       {/* Shopping List Modal */}
       {showShoppingList && tripId && (
         <ShoppingList 
-          tripId={tripId} 
+          tripId={tripId}
+          groups={trip.groups}
           onClose={() => setShowShoppingList(false)} 
         />
       )}
