@@ -76,6 +76,11 @@ export class TripSharingService {
         throw new Error('Invitation has expired');
       }
 
+      // Prevent users from accepting invitations to their own trips
+      if (invitation.owner_id === user.user.id) {
+        throw new Error('You cannot accept an invitation to your own trip');
+      }
+
       // Check if shared trip record already exists
       const { data: existingSharedTrip, error: existingError } = await supabase
         .from('shared_trips')

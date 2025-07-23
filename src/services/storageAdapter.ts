@@ -68,14 +68,23 @@ export class SupabaseStorageAdapter implements StorageAdapter {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) throw new Error('Not signed in');
 
+    // The RLS policy "Users can access owned and shared trips" will automatically
+    // return both owned trips and shared trips with status='accepted'
     const { data, error } = await supabase
       .from('trips')
-      .select('*')
-      .eq('user_id', user.id);
+      .select('*');
 
     if (error) throw error;
 
-    return (data ?? []).map((row: any) => ({
+    // Remove potential duplicates (edge case: if somehow the same trip appears multiple times)
+    const uniqueTrips = (data ?? []).reduce((acc: any[], row: any) => {
+      if (!acc.find(trip => trip.id === row.id)) {
+        acc.push(row);
+      }
+      return acc;
+    }, []);
+
+    return uniqueTrips.map((row: any) => ({
       id: row.id,
       tripName: row.name,
       startDate: row.start,

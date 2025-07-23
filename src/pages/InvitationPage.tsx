@@ -15,6 +15,23 @@ export const InvitationPage: React.FC = () => {
     if (!user) {
       // Redirect to sign in with invitation token in URL
       navigate(`/signin?invitation=${token}`);
+    } else if (user && token) {
+      // User is signed in and we have a token - automatically accept the invitation
+      // This happens when they just signed in from the invitation link
+      const acceptInvitationAutomatically = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          await tripSharingService.acceptInvitation(token);
+          navigate('/dashboard');
+        } catch (error) {
+          console.error('Error auto-accepting invitation:', error);
+          setError(error instanceof Error ? error.message : 'Failed to accept invitation');
+          setLoading(false);
+        }
+      };
+      
+      acceptInvitationAutomatically();
     }
   }, [user, token, navigate]);
 

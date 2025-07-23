@@ -12,6 +12,10 @@ export default function SupaSignIn() {
   const navigate = useNavigate();
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [showManualRecovery, setShowManualRecovery] = useState(false);
+  
+  // Check for invitation token in URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const invitationToken = urlParams.get('invitation');
 
   // Check for password recovery tokens in URL fragments
   useEffect(() => {
@@ -125,9 +129,14 @@ export default function SupaSignIn() {
 
   useEffect(() => {
     if (user && !isPasswordRecovery) {
-      navigate('/dashboard');
+      // If there's an invitation token, redirect back to the invitation page
+      if (invitationToken) {
+        navigate(`/invite/${invitationToken}`);
+      } else {
+        navigate('/dashboard');
+      }
     }
-  }, [user, navigate, isPasswordRecovery]);
+  }, [user, navigate, isPasswordRecovery, invitationToken]);
 
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -137,7 +146,12 @@ export default function SupaSignIn() {
           userId: session.user.id,
           userAgent: navigator.userAgent
         });
-        navigate('/dashboard');
+        // If there's an invitation token, redirect back to the invitation page
+        if (invitationToken) {
+          navigate(`/invite/${invitationToken}`);
+        } else {
+          navigate('/dashboard');
+        }
       } else if (event === 'PASSWORD_RECOVERY' && session?.user) {
         setIsPasswordRecovery(true);
         await logSecurityEvent({
@@ -157,7 +171,7 @@ export default function SupaSignIn() {
       }
     });
     return () => listener.subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, invitationToken]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-2 sm:p-4">
