@@ -138,7 +138,7 @@ const ExpenseSummary: React.FC<ExpenseSummaryProps> = ({
                       <div className="flex-1">
                         <div className="font-medium text-gray-900 dark:text-white">{item.name}</div>
                         <div className="text-sm text-gray-500">
-                          Paid by {paidByGroup?.name || 'Unknown'} • {item.splitType || 'equal'} split
+                          Paid by {paidByGroup?.name || 'Unknown'} • {item.splits && item.splits.length > 0 ? 'custom' : 'equal'} split
                         </div>
                       </div>
                       <div className="text-right">

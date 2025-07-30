@@ -74,6 +74,23 @@ export interface ShoppingItem {
   needsToBuy?: boolean;
   sourceItemId?: string;
   assignedGroupId?: string;
+  cost?: number;
+  paidByGroupId?: string;
+  paidByUserName?: string;
+  splits?: CostSplit[];
+}
+
+export interface CostSplit {
+  groupId: string;
+  amount: number;
+}
+
+export interface Settlement {
+  fromGroupId: string;
+  toGroupId: string;
+  amount: number;
+  description: string;
+  isSettled?: boolean;
 }
 
 export interface Meal {
