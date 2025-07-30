@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(supabase db:*)",
+      "Bash(powershell:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm start)",
+      "Bash(npm run type-check:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(copy icon-5122.png icon-512.png)",
+      "Bash(cp:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(where:*)",
+      "Bash(npx supabase:*)",
+      "Bash(rm:*)",
+      "Bash(set PORT=3001)",
+      "Bash(taskkill:*)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(cmd /c:*)",
+      "Bash(git init:*)"
+    ],
+    "deny": []
+  }
+}

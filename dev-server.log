@@ -1,0 +1,403 @@
+
+> planmyescape@0.1.0 start
+> react-scripts start
+
+[HPM] Proxy created: /  -> https://developer.nps.gov
+[HPM] Proxy rewrite rule created: "^/api/parks" ~> "/api/v1/parks"
+(node:185580) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:185580) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+Starting the development server...
+
+Compiled successfully!
+
+You can now view planmyescape in the browser.
+
+  Local:            http://localhost:3004
+  On Your Network:  http://192.168.40.181:3004
+
+Note that the development build is not optimized.
+To create a production build, use npm run build.
+
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Failed to compile.
+
+SyntaxError: /home/ike_connell/Mike Projects (Linx)/PlanMyEscape/src/pages/Dashboard.tsx: Expected corresponding JSX closing tag for <div>. (331:16)
+  329 |
+  330 |                   </div>
+> 331 |                 </Link>
+      |                 ^
+  332 |               );
+  333 |             })
+  334 |           )}
+ERROR in ./src/pages/Dashboard.tsx
+Module build failed (from ./node_modules/babel-loader/lib/index.js):
+SyntaxError: /home/ike_connell/Mike Projects (Linx)/PlanMyEscape/src/pages/Dashboard.tsx: Expected corresponding JSX closing tag for <div>. (331:16)
+
+  329 |
+  330 |                   </div>
+> 331 |                 </Link>
+      |                 ^
+  332 |               );
+  333 |             })
+  334 |           )}
+    at constructor (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:363:19)
+    at TypeScriptParserMixin.raise (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:6609:19)
+    at TypeScriptParserMixin.jsxParseElementAt (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:4739:16)
+    at TypeScriptParserMixin.jsxParseElement (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:4761:17)
+    at TypeScriptParserMixin.parseExprAtom (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:4771:19)
+    at TypeScriptParserMixin.parseExprSubscripts (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:11012:23)
+    at TypeScriptParserMixin.parseUpdate (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10997:21)
+    at TypeScriptParserMixin.parseMaybeUnary (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10977:23)
+    at TypeScriptParserMixin.parseMaybeUnary (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:9794:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10830:61)
+    at TypeScriptParserMixin.parseExprOps (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10835:23)
+    at TypeScriptParserMixin.parseMaybeConditional (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10812:23)
+    at TypeScriptParserMixin.parseMaybeAssign (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10765:21)
+    at /home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:9732:39
+    at TypeScriptParserMixin.tryParse (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:6918:20)
+    at TypeScriptParserMixin.parseMaybeAssign (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:9732:18)
+    at /home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10734:39
+    at TypeScriptParserMixin.allowInAnd (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:12361:12)
+    at TypeScriptParserMixin.parseMaybeAssignAllowIn (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10734:17)
+    at TypeScriptParserMixin.parseParenAndDistinguishExpression (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:11608:28)
+    at TypeScriptParserMixin.parseExprAtom (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:11262:23)
+    at TypeScriptParserMixin.parseExprAtom (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:4776:20)
+    at TypeScriptParserMixin.parseExprSubscripts (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:11012:23)
+    at TypeScriptParserMixin.parseUpdate (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10997:21)
+    at TypeScriptParserMixin.parseMaybeUnary (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10977:23)
+    at TypeScriptParserMixin.parseMaybeUnary (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:9794:18)
+    at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10830:61)
+    at TypeScriptParserMixin.parseExprOps (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10835:23)
+    at TypeScriptParserMixin.parseMaybeConditional (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10812:23)
+    at TypeScriptParserMixin.parseMaybeAssign (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10765:21)
+    at TypeScriptParserMixin.parseMaybeAssign (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:9743:20)
+    at TypeScriptParserMixin.parseExpressionBase (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10718:23)
+    at /home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10714:39
+    at TypeScriptParserMixin.allowInAnd (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:12356:16)
+    at TypeScriptParserMixin.parseExpression (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10714:17)
+    at TypeScriptParserMixin.parseReturnStatement (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:13061:28)
+    at TypeScriptParserMixin.parseStatementContent (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:12716:21)
+    at TypeScriptParserMixin.parseStatementContent (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:9469:18)
+    at TypeScriptParserMixin.parseStatementLike (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:12685:17)
+    at TypeScriptParserMixin.parseStatementListItem (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:12665:17)
+    at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:13235:61)
+    at TypeScriptParserMixin.parseBlockBody (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:13228:10)
+    at TypeScriptParserMixin.parseBlock (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:13216:10)
+    at TypeScriptParserMixin.parseFunctionBody (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:12035:24)
+    at TypeScriptParserMixin.parseArrowExpression (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:12010:10)
+    at TypeScriptParserMixin.parseExprAtom (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:11374:25)
+    at TypeScriptParserMixin.parseExprAtom (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:4776:20)
+    at TypeScriptParserMixin.parseExprSubscripts (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:11012:23)
+    at TypeScriptParserMixin.parseUpdate (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10997:21)
+    at TypeScriptParserMixin.parseMaybeUnary (/home/ike_connell/Mike Projects (Linx)/PlanMyEscape/node_modules/@babel/parser/lib/index.js:10977:23)
+
+webpack compiled with 1 error
+ERROR in src/pages/Dashboard.tsx:331:19
+TS17002: Expected corresponding JSX closing tag for 'div'.
+    329 |
+    330 |                   </div>
+  > 331 |                 </Link>
+        |                   ^^^^
+    332 |               );
+    333 |             })
+    334 |           )}
+
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+ERROR in src/pages/TripSchedule.tsx:265:20
+TS2304: Cannot find name 'Plus'.
+    263 |                   className="inline-flex items-center px-3 py-2 text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+    264 |                 >
+  > 265 |                   <Plus className="h-4 w-4 mr-1" />
+        |                    ^^^^
+    266 |                   Add More Activities
+    267 |                 </button>
+    268 |               </div>
+
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+ERROR in src/pages/TripOverview.tsx:316:14
+TS2304: Cannot find name 'WeatherCard'.
+    314 |           
+    315 |           <div>
+  > 316 |             <WeatherCard 
+        |              ^^^^^^^^^^^
+    317 |               startDate={trip.startDate}
+    318 |               endDate={trip.endDate}
+    319 |               location={trip.location}
+
+Compiling...
+Compiled successfully!
+webpack compiled successfully
+No issues found.
