@@ -25,7 +25,9 @@
       "Bash(pkill:*)",
       "Bash(true)",
       "Bash(cmd /c:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git config:*)"
     ],
     "deny": []
   }
