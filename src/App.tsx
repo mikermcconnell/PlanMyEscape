@@ -9,6 +9,7 @@ import MealPlanner from './pages/MealPlanner';
 import TripContainer from './components/TripContainer';
 import TripOverview from './pages/TripOverview';
 import TripSchedule from './pages/TripSchedule';
+import TodoList from './pages/TodoList';
 import ErrorBoundary from './components/ErrorBoundary';
 import SupaSignIn from './components/SupaSignIn';
 import PasswordReset from './pages/PasswordReset';
@@ -52,6 +53,7 @@ function App() {
             <Route path="packing" element={<PackingList />} />
             <Route path="meals" element={<MealPlanner />} />
             <Route path="schedule" element={<TripSchedule />} />
+            <Route path="todos" element={<TodoList />} />
             <Route path="shopping" element={<ShoppingListPage />} />
           </Route>
         </Routes>

@@ -76,6 +76,15 @@ export const ShoppingItemSchema = z.object({
   sourceItemId: z.string().optional()
 });
 
+export const TodoItemSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1).max(500),
+  isCompleted: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  displayOrder: z.number().int().min(0)
+});
+
 // Helper function to validate data
 export const validateData = <T>(schema: z.ZodType<T>, data: unknown): { success: true; data: T } | { success: false; error: z.ZodError } => {
   try {

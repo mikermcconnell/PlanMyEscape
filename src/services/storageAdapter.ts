@@ -29,7 +29,18 @@ function coerceToGroup(group: any): any {
  */
 export class SupabaseStorageAdapter implements StorageAdapter {
   async saveTrip(trip: Trip): Promise<Trip> {
+    console.log('🔍 [SupabaseStorageAdapter.saveTrip] Input trip:', {
+      id: trip.id,
+      tripName: trip.tripName,
+      startDate: trip.startDate,
+      endDate: trip.endDate,
+      startDateType: typeof trip.startDate,
+      endDateType: typeof trip.endDate,
+      rawTrip: trip
+    });
+
     const { data: { user }, error: userError } = await supabase.auth.getUser();
+    console.log('🔍 [SupabaseStorageAdapter.saveTrip] Auth check:', { user: !!user, userError });
     if (userError || !user) throw new Error('Not signed in');
 
     // Ensure all group colors are valid before saving
@@ -45,12 +56,22 @@ export class SupabaseStorageAdapter implements StorageAdapter {
     const { id, tripName, startDate, endDate, ...rest } = safeTrip as any;
     const tripPayload: any = {
       id,
-      name: tripName,
-      start: startDate ?? null,
-      end: endDate ?? null,
+      trip_name: tripName,
+      start_date: startDate ?? null,
+      end_date: endDate ?? null,
       user_id: user.id,
       data: rest, // store the remaining fields in a jsonb column called `data`
     };
+
+    console.log('🔍 [SupabaseStorageAdapter.saveTrip] Trip payload to save:', {
+      id: tripPayload.id,
+      trip_name: tripPayload.trip_name,
+      start_date: tripPayload.start_date,
+      end_date: tripPayload.end_date,
+      start_date_type: typeof tripPayload.start_date,
+      end_date_type: typeof tripPayload.end_date,
+      fullPayload: tripPayload
+    });
 
     // Save trip first
     const { data: tripData, error: tripError } = await supabase
@@ -58,14 +79,46 @@ export class SupabaseStorageAdapter implements StorageAdapter {
       .upsert(tripPayload)
       .select()
       .single();
+    
+    console.log('🔍 [SupabaseStorageAdapter.saveTrip] Supabase response:', {
+      tripData,
+      tripError,
+      saved_start_date: tripData?.start_date,
+      saved_end_date: tripData?.end_date,
+      saved_start_date_type: typeof tripData?.start_date,
+      saved_end_date_type: typeof tripData?.end_date
+    });
+    
     if (tripError) throw tripError;
 
-    // Return the saved trip (existing data format)
-    return tripData as Trip;
+    // Transform the saved data back to Trip format (same logic as getTrips)
+    const transformedTrip = {
+      ...tripData.data, // spread stored jsonb back in first
+      id: tripData.id,
+      tripName: tripData.trip_name, // Override with correct DB column
+      startDate: tripData.start_date, // Override with correct DB column  
+      endDate: tripData.end_date, // Override with correct DB column
+      groups: (tripData.data?.groups || []).map(coerceToGroup)
+    };
+
+    console.log('🔍 [SupabaseStorageAdapter.saveTrip] Transformed trip result:', {
+      id: transformedTrip.id,
+      tripName: transformedTrip.tripName,
+      startDate: transformedTrip.startDate,
+      endDate: transformedTrip.endDate,
+      startDateType: typeof transformedTrip.startDate,
+      endDateType: typeof transformedTrip.endDate,
+      fullTrip: transformedTrip
+    });
+
+    return transformedTrip as Trip;
   }
 
   async getTrips(): Promise<Trip[]> {
+    console.log('🔍 [SupabaseStorageAdapter.getTrips] Starting...');
+    
     const { data: { user }, error: userError } = await supabase.auth.getUser();
+    console.log('🔍 [SupabaseStorageAdapter.getTrips] Auth check:', { user: !!user, userError });
     if (userError || !user) throw new Error('Not signed in');
 
     // The RLS policy "Users can access owned and shared trips" will automatically
@@ -73,6 +126,13 @@ export class SupabaseStorageAdapter implements StorageAdapter {
     const { data, error } = await supabase
       .from('trips')
       .select('*');
+
+    console.log('🔍 [SupabaseStorageAdapter.getTrips] Raw Supabase response:', {
+      data,
+      error,
+      dataLength: data?.length,
+      firstTrip: data?.[0]
+    });
 
     if (error) throw error;
 
@@ -84,14 +144,53 @@ export class SupabaseStorageAdapter implements StorageAdapter {
       return acc;
     }, []);
 
-    return uniqueTrips.map((row: any) => ({
-      id: row.id,
-      tripName: row.name,
-      startDate: row.start,
-      endDate: row.end,
-      ...row.data, // spread stored jsonb back in
-      groups: (row.data?.groups || []).map(coerceToGroup)
-    })) as Trip[];
+    const transformedTrips = uniqueTrips.map((row: any) => {
+      console.log('🔍 [SupabaseStorageAdapter.getTrips] Processing row:', {
+        id: row.id,
+        trip_name: row.trip_name,
+        start_date: row.start_date,
+        end_date: row.end_date,
+        start_date_type: typeof row.start_date,
+        end_date_type: typeof row.end_date,
+        fullRow: row
+      });
+      
+      // First spread the jsonb data, then override with the correctly mapped DB columns
+      // This ensures DB columns take precedence over potentially stale data in the jsonb field
+      const transformed = {
+        ...row.data, // spread stored jsonb back in first
+        id: row.id,
+        tripName: row.trip_name, // Override with correct DB column
+        startDate: row.start_date, // Override with correct DB column  
+        endDate: row.end_date, // Override with correct DB column
+        groups: (row.data?.groups || []).map(coerceToGroup)
+      };
+      
+      console.log('🔍 [SupabaseStorageAdapter.getTrips] Transformed trip:', {
+        id: transformed.id,
+        tripName: transformed.tripName,
+        startDate: transformed.startDate,
+        endDate: transformed.endDate,
+        startDateType: typeof transformed.startDate,
+        endDateType: typeof transformed.endDate
+      });
+      
+      return transformed;
+    }) as Trip[];
+    
+    console.log('🔍 [SupabaseStorageAdapter.getTrips] Final result:', {
+      tripCount: transformedTrips.length,
+      trips: transformedTrips.map(t => ({
+        id: t.id,
+        tripName: t.tripName,
+        startDate: t.startDate,
+        endDate: t.endDate,
+        startDateType: typeof t.startDate,
+        endDateType: typeof t.endDate
+      }))
+    });
+    
+    return transformedTrips;
   }
 
   async deleteTrip(tripId: string): Promise<void> {
@@ -136,14 +235,20 @@ export class HybridStorageAdapter implements StorageAdapter {
   private async isSignedIn(): Promise<boolean> {
     try {
       const { data, error } = await supabase.auth.getUser();
-      return !error && !!data.user;
-    } catch {
+      const signedIn = !error && !!data.user;
+      console.log('🔍 [HybridStorageAdapter.isSignedIn] Auth status:', { signedIn, user: !!data.user, error });
+      return signedIn;
+    } catch (e) {
+      console.log('🔍 [HybridStorageAdapter.isSignedIn] Exception:', e);
       return false;
     }
   }
 
   async saveTrip(trip: Trip): Promise<Trip> {
-    if (await this.isSignedIn()) {
+    const isSignedIn = await this.isSignedIn();
+    console.log('🔍 [HybridStorageAdapter.saveTrip] Using storage:', isSignedIn ? 'Supabase' : 'Local');
+    
+    if (isSignedIn) {
       return this.supabaseAdapter.saveTrip(trip);
     }
     await this.localAdapter.saveTrip(trip);
@@ -151,7 +256,10 @@ export class HybridStorageAdapter implements StorageAdapter {
   }
 
   async getTrips(): Promise<Trip[]> {
-    return (await this.isSignedIn())
+    const isSignedIn = await this.isSignedIn();
+    console.log('🔍 [HybridStorageAdapter.getTrips] Using storage:', isSignedIn ? 'Supabase' : 'Local');
+    
+    return isSignedIn
       ? this.supabaseAdapter.getTrips()
       : this.localAdapter.getTrips();
   }

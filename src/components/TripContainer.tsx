@@ -12,16 +12,46 @@ const TripContainer: React.FC = () => {
 
   useEffect(() => {
     const loadTrip = async () => {
-      if (!tripId) return;
+      if (!tripId) {
+        console.log('🔍 [TripContainer] No tripId provided');
+        return;
+      }
       
+      console.log('🔍 [TripContainer] Loading trip:', { tripId });
       setLoading(true);
       try {
         const trips = await getTrips();
+        console.log('🔍 [TripContainer] All trips loaded:', {
+          tripCount: trips.length,
+          trips: trips.map(t => ({
+            id: t.id,
+            tripName: t.tripName,
+            startDate: t.startDate,
+            endDate: t.endDate,
+            startDateType: typeof t.startDate,
+            endDateType: typeof t.endDate
+          }))
+        });
+        
         const currentTrip = trips.find((t: Trip) => t.id === tripId);
+        console.log('🔍 [TripContainer] Found trip:', {
+          tripId,
+          found: !!currentTrip,
+          trip: currentTrip ? {
+            id: currentTrip.id,
+            tripName: currentTrip.tripName,
+            startDate: currentTrip.startDate,
+            endDate: currentTrip.endDate,
+            startDateType: typeof currentTrip.startDate,
+            endDateType: typeof currentTrip.endDate,
+            fullTrip: currentTrip
+          } : null
+        });
+        
         setTrip(currentTrip || null);
         
       } catch (error) {
-        console.error('Failed to load trip:', error);
+        console.error('🔴 [TripContainer] Failed to load trip:', error);
       }
       setLoading(false);
     };

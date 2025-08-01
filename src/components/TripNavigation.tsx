@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Package, Utensils, Calendar, ShoppingCart } from 'lucide-react';
+import { Home, Package, Utensils, Calendar, ShoppingCart, CheckSquare } from 'lucide-react';
 
 interface TripNavigationProps {
   tripId: string;
@@ -45,6 +45,13 @@ const TripNavigation: React.FC<TripNavigationProps> = ({ tripId, tripName }) => 
       icon: Calendar,
       path: `/trip/${tripId}/schedule`,
       description: 'Daily schedule and activities'
+    },
+    {
+      id: 'todos',
+      label: 'Todo List',
+      icon: CheckSquare,
+      path: `/trip/${tripId}/todos`,
+      description: 'Trip tasks and reminders'
     }
   ];
 

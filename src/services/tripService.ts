@@ -7,9 +7,29 @@ export class TripService {
 
   async saveTrip(trip: Trip): Promise<Trip> {
     try {
-      return await this.adapter.saveTrip(trip);
+      console.log('🔍 [TripService.saveTrip] Input:', {
+        id: trip.id,
+        tripName: trip.tripName,
+        startDate: trip.startDate,
+        endDate: trip.endDate,
+        startDateType: typeof trip.startDate,
+        endDateType: typeof trip.endDate
+      });
+      
+      const result = await this.adapter.saveTrip(trip);
+      
+      console.log('🔍 [TripService.saveTrip] Result:', {
+        id: result.id,
+        tripName: result.tripName,
+        startDate: result.startDate,
+        endDate: result.endDate,
+        startDateType: typeof result.startDate,
+        endDateType: typeof result.endDate
+      });
+      
+      return result;
     } catch (error) {
-      console.error('Failed to save trip:', error);
+      console.error('🔴 [TripService.saveTrip] Error:', error);
       toast.error('Unable to save trip');
       throw new Error('Unable to save trip');
     }
@@ -17,9 +37,25 @@ export class TripService {
 
   async getTrips(): Promise<Trip[]> {
     try {
-      return await this.adapter.getTrips();
+      console.log('🔍 [TripService.getTrips] Starting...');
+      
+      const trips = await this.adapter.getTrips();
+      
+      console.log('🔍 [TripService.getTrips] Result:', {
+        tripCount: trips.length,
+        trips: trips.map(t => ({
+          id: t.id,
+          tripName: t.tripName,
+          startDate: t.startDate,
+          endDate: t.endDate,
+          startDateType: typeof t.startDate,
+          endDateType: typeof t.endDate
+        }))
+      });
+      
+      return trips;
     } catch (error) {
-      console.error('Failed to load trips:', error);
+      console.error('🔴 [TripService.getTrips] Error:', error);
       toast.error('Unable to load trips');
       throw new Error('Unable to load trips');
     }

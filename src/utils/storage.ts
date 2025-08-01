@@ -1,5 +1,5 @@
-import { Trip, PackingItem, Meal, GearItem, ShoppingItem, CampingGroup, GROUP_COLORS, GroupColor, Group } from '../types';
-import { TripSchema, PackingItemSchema, MealSchema, GearItemSchema, ShoppingItemSchema, validateData } from '../schemas';
+import { Trip, PackingItem, Meal, GearItem, ShoppingItem, CampingGroup, GROUP_COLORS, GroupColor, Group, TodoItem } from '../types';
+import { TripSchema, PackingItemSchema, MealSchema, GearItemSchema, ShoppingItemSchema, TodoItemSchema, validateData } from '../schemas';
 import { getPackingTemplate } from '../data/packingTemplates';
 import {
   getTripsFromDB,
@@ -17,6 +17,8 @@ import {
   addToShoppingListDB,
   getDeletedIngredientsFromDB,
   saveDeletedIngredientsToDB,
+  getTodoItemsFromDB,
+  saveTodoItemsToDB,
   initDB
 } from './db';
 
@@ -393,4 +395,32 @@ export const migrateTrips = async () => {
     return trip;
   });
   await saveTrips(migratedTrips);
+};
+
+// Todo Items Storage
+export const getTodoItems = async (tripId: string): Promise<TodoItem[]> => {
+  try {
+    const items = await getTodoItemsFromDB(tripId);
+    return items;
+  } catch (error) {
+    console.error('Failed to get todo items:', error);
+    return [];
+  }
+};
+
+export const saveTodoItems = async (tripId: string, items: TodoItem[]): Promise<boolean> => {
+  try {
+    for (const item of items) {
+      const validation = validateData(TodoItemSchema, item);
+      if (!validation.success) {
+        console.error('Invalid todo item:', validation.error);
+        return false;
+      }
+    }
+    await saveTodoItemsToDB(tripId, items);
+    return true;
+  } catch (error) {
+    console.error('Failed to save todo items:', error);
+    return false;
+  }
 }; 

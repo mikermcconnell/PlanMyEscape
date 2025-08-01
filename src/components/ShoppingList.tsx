@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Utensils, Package, Check, CheckCircle, Trash2, Plus, RotateCcw, X } from 'lucide-react';
 import { ShoppingItem, Group } from '../types';
-import { getShoppingList, saveShoppingList } from '../utils/storage';
+import { hybridDataService } from '../services/hybridDataService';
 
 interface ShoppingListProps {
   tripId: string;
@@ -17,7 +17,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, groups = [], onClos
 
   useEffect(() => {
     const loadItems = async () => {
-      const items = await getShoppingList(tripId);
+      const items = await hybridDataService.getShoppingItems(tripId);
       setShoppingItems(items);
     };
     loadItems();
@@ -28,7 +28,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, groups = [], onClos
       item.id === itemId ? { ...item, isChecked: !item.isChecked } : item
     );
     setShoppingItems(updatedItems);
-    await saveShoppingList(tripId, updatedItems);
+    await hybridDataService.saveShoppingItems(tripId, updatedItems);
   };
 
   const handleToggleNeedsToBuy = async (itemId: string) => {
@@ -36,7 +36,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, groups = [], onClos
       item.id === itemId ? { ...item, needsToBuy: !item.needsToBuy, isOwned: false } : item
     );
     setShoppingItems(updatedItems);
-    await saveShoppingList(tripId, updatedItems);
+    await hybridDataService.saveShoppingItems(tripId, updatedItems);
   };
 
   const handleToggleOwned = async (itemId: string) => {
@@ -44,13 +44,13 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, groups = [], onClos
       item.id === itemId ? { ...item, isOwned: !item.isOwned, needsToBuy: false } : item
     );
     setShoppingItems(updatedItems);
-    await saveShoppingList(tripId, updatedItems);
+    await hybridDataService.saveShoppingItems(tripId, updatedItems);
   };
 
   const handleRemoveItem = async (itemId: string) => {
     const updatedItems = shoppingItems.filter(item => item.id !== itemId);
     setShoppingItems(updatedItems);
-    await saveShoppingList(tripId, updatedItems);
+    await hybridDataService.saveShoppingItems(tripId, updatedItems);
   };
 
 
@@ -68,7 +68,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, groups = [], onClos
       
       const updatedItems = [...shoppingItems, item];
       setShoppingItems(updatedItems);
-      await saveShoppingList(tripId, updatedItems);
+      await hybridDataService.saveShoppingItems(tripId, updatedItems);
       setNewItem({ name: '', category: 'camping', quantity: 1 });
       setShowAddForm(false);
     }
@@ -79,18 +79,17 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ tripId, groups = [], onClos
     // and clear all manually added items
     
     // Step 1: Get current packing list and reset needsToBuy flags
-    const { getPackingList, savePackingList } = await import('../utils/storage');
-    const packingItems = await getPackingList(tripId);
+    const packingItems = await hybridDataService.getPackingItems(tripId);
     const resetPackingItems = packingItems.map(item => ({
       ...item,
       needsToBuy: false // Reset all packing items
     }));
-    await savePackingList(tripId, resetPackingItems);
+    await hybridDataService.savePackingItems(tripId, resetPackingItems);
     
     // Step 2: Clear all shopping items (both manual and auto-generated)
     // The shopping list should regenerate from the reset sources
     setShoppingItems([]);
-    await saveShoppingList(tripId, []);
+    await hybridDataService.saveShoppingItems(tripId, []);
     
     setShowClearConfirmation(false);
   };

@@ -1,5 +1,5 @@
 import { openDB, deleteDB, DBSchema, IDBPDatabase } from 'idb';
-import { Trip, PackingItem, Meal, GearItem, ShoppingItem } from '../types';
+import { Trip, PackingItem, Meal, GearItem, ShoppingItem, TodoItem } from '../types';
 
 interface PlanMyEscapeDB extends DBSchema {
   trips: {
@@ -28,13 +28,18 @@ interface PlanMyEscapeDB extends DBSchema {
     key: string;
     value: string[];
   };
+  todo_items: {
+    key: string;
+    value: TodoItem[];
+  };
 }
 
 const DB_NAME = 'planmyescape_db';
 // v2: removed invalid keyPath definitions for stores that save raw arrays (packing_lists, meals, shopping_lists) - DESTRUCTIVE!
 // v3: added deleted_ingredients store to persist ingredient deletion state across page navigation
 // v4: added data preservation logic to prevent future data loss during migrations
-const DB_VERSION = 4;
+// v5: added todo_items store for trip todo lists
+const DB_VERSION = 5;
 
 // Centralised upgrade callback – keeps store definition in one place
 // Handles fresh installs and migrations. 
@@ -58,6 +63,7 @@ const upgrade = (
   
     db.createObjectStore('shopping_lists');
     db.createObjectStore('deleted_ingredients');
+    db.createObjectStore('todo_items');
   }
 
   // v2 migration – remove mistaken keyPath from array stores created in v1
@@ -85,6 +91,11 @@ const upgrade = (
   if (oldVersion === 3) {
     // No changes needed, just version increment
     console.log('Database upgraded to v4 - no schema changes');
+  }
+
+  // v5 migration – add todo_items store
+  if (oldVersion === 4) {
+    db.createObjectStore('todo_items');
   }
 };
 
@@ -241,4 +252,15 @@ export const getDeletedIngredientsFromDB = async (tripId: string): Promise<strin
 export const saveDeletedIngredientsToDB = async (tripId: string, deletedIngredients: string[]): Promise<void> => {
   const db = await initDB();
   await db.put('deleted_ingredients', deletedIngredients, tripId);
+};
+
+// Todo items operations
+export const getTodoItemsFromDB = async (tripId: string): Promise<TodoItem[]> => {
+  const db = await initDB();
+  return (await db.get('todo_items', tripId)) || [];
+};
+
+export const saveTodoItemsToDB = async (tripId: string, items: TodoItem[]): Promise<void> => {
+  const db = await initDB();
+  await db.put('todo_items', items, tripId);
 }; 

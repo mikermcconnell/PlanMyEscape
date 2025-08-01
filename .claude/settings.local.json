@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "Bash(ls:*)",
@@ -27,7 +28,16 @@
       "Bash(cmd /c:*)",
       "Bash(git init:*)",
       "Bash(gh repo create:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(scoop install:*)",
+      "Bash(tar:*)",
+      "Bash(./supabase --version)",
+      "Bash(./supabase.exe --version)",
+      "Bash(./supabase.exe db push)",
+      "Bash(./supabase.exe login)",
+      "Bash(./supabase.exe link:*)",
+      "Bash(./supabase.exe db push --include-all --debug)",
+      "Bash(./supabase.exe db push:*)"
     ],
     "deny": []
   }

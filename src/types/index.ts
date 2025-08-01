@@ -152,4 +152,13 @@ export const GROUP_COLORS = [
 
 export type GroupColor = typeof GROUP_COLORS[number];
 
+export interface TodoItem {
+  id: string;
+  text: string;
+  isCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  displayOrder: number;
+}
+
  

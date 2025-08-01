@@ -1,692 +1,183 @@
-# PlanMyEscape
+# Supabase CLI
 
-PlanMyEscape is a modern, full-stack camping and trip planning web application built with React, TypeScript, and Supabase. It allows users to plan trips, manage packing lists, coordinate meals, and collaborate with groups.
+[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
+](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
 
----
+[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
 
-## 🚀 Features
+This repository contains all the functionality for Supabase CLI.
 
-- **Authentication**: Google, Facebook, and Email/Password via Supabase Auth
-- **Secure Data Storage**: Per-user trip storage with Row Level Security (RLS)
-- **Trip Management**: Create, view, edit, and delete trips with full CRUD operations
-- **Packing Lists**: Smart templates and customizable packing items
-- **Meal Planning**: Recipe suggestions and shopping list generation
-- **Group Coordination**: Multi-group trip planning with contact management
-- **Responsive Design**: Modern UI with Tailwind CSS, works on all devices
-- **Real-time Updates**: Live data synchronization across devices
+- [x] Running Supabase locally
+- [x] Managing database migrations
+- [x] Creating and deploying Supabase Functions
+- [x] Generating types directly from your database schema
+- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
 
----
+## Getting started
 
-## 📋 Prerequisites
+### Install the CLI
 
-- **Node.js**: 18.0.0 or higher
-- **npm**: 9.0.0 or higher
-- **Git**: For version control
-- **Supabase Account**: For authentication and database
-- **Modern Browser**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
-
----
-
-## 🛠️ Getting Started
-
-### 1. Clone the Repository
-```bash
-git clone https://github.com/mikermcconnell/PlanMyEscape.git
-cd PlanMyEscape
-```
-
-### 2. Install Dependencies
-```bash
-npm install
-```
-
-### 3. Environment Setup
-
-Create environment files for different environments:
-
-**Development** (`.env.development.local`):
-```env
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-# Optional: Analytics
-NEXT_PUBLIC_GA_TRACKING_ID=your-ga-tracking-id
-```
-
-**Production** (`.env.production.local`):
-```env
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-# Production Analytics
-NEXT_PUBLIC_GA_TRACKING_ID=your-ga-tracking-id
-```
-
-**Example** (`.env.example`):
-```env
-# Copy this file to .env.development.local and fill in your values
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-NEXT_PUBLIC_GA_TRACKING_ID=G-XXXXXXXXXX
-```
-
-### 4. Supabase Setup
-
-#### Database Schema
-
-Run these SQL commands in your Supabase SQL editor:
-
-```sql
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Trips table
-CREATE TABLE trips (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  trip_name TEXT NOT NULL,
-  trip_type TEXT NOT NULL CHECK (trip_type IN ('car camping', 'canoe camping', 'hike camping', 'cottage')),
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
-  description TEXT,
-  location TEXT,
-  is_coordinated BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
--- Groups table
-CREATE TABLE groups (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  size INTEGER NOT NULL CHECK (size > 0),
-  contact_name TEXT,
-  contact_email TEXT,
-  color TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
--- Packing items table
-CREATE TABLE packing_items (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  category TEXT NOT NULL,
-  quantity INTEGER NOT NULL DEFAULT 1,
-  is_checked BOOLEAN DEFAULT false,
-  weight DECIMAL(5,2),
-  is_owned BOOLEAN DEFAULT false,
-  needs_to_buy BOOLEAN DEFAULT false,
-  is_packed BOOLEAN DEFAULT false,
-  required BOOLEAN DEFAULT true,
-  assigned_group_id UUID REFERENCES groups(id) ON DELETE SET NULL,
-  is_personal BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
--- Meals table
-CREATE TABLE meals (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  day INTEGER NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('breakfast', 'lunch', 'dinner', 'snack')),
-  ingredients JSONB NOT NULL DEFAULT '[]',
-  is_custom BOOLEAN DEFAULT false,
-  assigned_group_id UUID REFERENCES groups(id) ON DELETE SET NULL,
-  shared_servings BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
--- Gear items table
-CREATE TABLE gear_items (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  category TEXT NOT NULL,
-  weight DECIMAL(5,2),
-  notes TEXT,
-  assigned_trips JSONB DEFAULT '[]',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
--- Enable Row Level Security
-ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
-ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
-ALTER TABLE packing_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE meals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE gear_items ENABLE ROW LEVEL SECURITY;
-
--- RLS Policies
-CREATE POLICY "Users can access their own trips" ON trips
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can access groups for their trips" ON groups
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM trips 
-      WHERE trips.id = groups.trip_id 
-      AND trips.user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can access packing items for their trips" ON packing_items
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM trips 
-      WHERE trips.id = packing_items.trip_id 
-      AND trips.user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can access meals for their trips" ON meals
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM trips 
-      WHERE trips.id = meals.trip_id 
-      AND trips.user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can access their own gear" ON gear_items
-  FOR ALL USING (auth.uid() = user_id);
-
--- Create indexes for better performance
-CREATE INDEX idx_trips_user_id ON trips(user_id);
-CREATE INDEX idx_trips_created_at ON trips(created_at);
-CREATE INDEX idx_groups_trip_id ON groups(trip_id);
-CREATE INDEX idx_packing_items_trip_id ON packing_items(trip_id);
-CREATE INDEX idx_meals_trip_id ON meals(trip_id);
-CREATE INDEX idx_gear_items_user_id ON gear_items(user_id);
-```
-
-#### Authentication Setup
-
-1. **Enable Auth Providers** in Supabase Dashboard:
-   - Go to Authentication > Providers
-   - Enable Google, Facebook, and Email providers
-   - Configure OAuth settings for each provider
-
-2. **Configure Redirect URLs**:
-   - Add `http://localhost:3000/auth/callback` for development
-   - Add your production domain for production
-
-### 5. Run the Development Server
-```bash
-npm start
-```
-
-The app will be available at http://localhost:3000
-
----
-
-## 🏗️ Project Structure
-
-```
-PlanMyEscape/
-├── public/                    # Static assets
-│   ├── index.html
-│   ├── favicon.ico
-│   └── sitemap.xml
-├── src/                       # Source code
-│   ├── components/            # Reusable UI components
-│   │   ├── layout/
-│   │   │   └── Layout.tsx
-│   │   ├── TripContainer.tsx
-│   │   ├── TripNavigation.tsx
-│   │   └── WeatherCard.tsx
-│   ├── pages/                 # Page components
-│   │   ├── Dashboard.tsx
-│   │   ├── TripSetup.tsx
-│   │   ├── TripDetail.tsx
-│   │   ├── PackingList.tsx
-│   │   ├── MealPlanner.tsx
-│   │   └── GearLocker.tsx
-│   ├── utils/                 # Utility functions
-│   │   ├── supabaseClient.ts  # Supabase client configuration
-│   │   ├── supabaseTrips.ts   # Trip-related Supabase operations
-│   │   └── storage.ts         # Local storage utilities
-│   ├── types/                 # TypeScript type definitions
-│   │   └── index.ts
-│   ├── data/                  # Static data and templates
-│   │   ├── packingTemplates.ts
-│   │   ├── mealTemplates.ts
-│   │   └── activityEquipment.ts
-│   ├── App.tsx               # Main app component
-│   └── index.tsx             # App entry point
-├── .env.development.local    # Development environment variables
-├── .env.example              # Environment variables template
-├── package.json              # Dependencies and scripts
-├── tsconfig.json             # TypeScript configuration
-├── tailwind.config.js        # Tailwind CSS configuration
-└── README.md                 # This file
-```
-
----
-
-## 🧪 Testing
-
-### Unit and Integration Tests
-
-We use Jest and React Testing Library for comprehensive testing:
+Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
 ```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm test -- --watch
-
-# Run tests with coverage
-npm test -- --coverage
+npm i supabase --save-dev
 ```
 
-#### Test Examples
-
-**Trip Storage Tests**:
-```typescript
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { saveTrip, getTrips } from '../utils/supabaseTrips';
-import { setupTestUser, createTestTrip } from '../utils/testHelpers';
-
-describe('Trip Storage', () => {
-  beforeEach(async () => {
-    await setupTestUser();
-  });
-
-  it('should save and fetch a trip', async () => {
-    const trip = createTestTrip({
-      tripName: 'Test Camping Trip',
-      tripType: 'car camping',
-      startDate: '2024-07-01',
-      endDate: '2024-07-05'
-    });
-
-    const savedTrip = await saveTrip(trip);
-    expect(savedTrip.id).toBeDefined();
-
-    const trips = await getTrips();
-    expect(trips).toContainEqual(
-      expect.objectContaining({
-        tripName: 'Test Camping Trip',
-        tripType: 'car camping'
-      })
-    );
-  });
-
-  it('should handle save errors gracefully', async () => {
-    const invalidTrip = createTestTrip({
-      tripName: '', // Invalid: empty name
-      tripType: 'invalid-type' as any
-    });
-
-    await expect(saveTrip(invalidTrip)).rejects.toThrow();
-  });
-});
-```
-
-**Component Tests**:
-```typescript
-import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import TripSetup from '../pages/TripSetup';
-
-describe('TripSetup Component', () => {
-  const renderWithRouter = (component: React.ReactElement) => {
-    return render(
-      <BrowserRouter>
-        {component}
-      </BrowserRouter>
-    );
-  };
-
-  it('should render trip setup form', () => {
-    renderWithRouter(<TripSetup />);
-    
-    expect(screen.getByLabelText(/trip name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/trip type/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/start date/i)).toBeInTheDocument();
-  });
-
-  it('should validate required fields', async () => {
-    renderWithRouter(<TripSetup />);
-    
-    const submitButton = screen.getByRole('button', { name: /create trip/i });
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/trip name is required/i)).toBeInTheDocument();
-    });
-  });
-});
-```
-
-### End-to-End Tests
-
-We use Playwright for E2E testing:
+To install the beta release channel:
 
 ```bash
-# Install Playwright
-npm install -D @playwright/test
-
-# Run E2E tests
-npx playwright test
-
-# Run E2E tests in headed mode
-npx playwright test --headed
+npm i supabase@beta --save-dev
 ```
 
-**E2E Test Example**:
-```typescript
-import { test, expect } from '@playwright/test';
+When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
 
-test.describe('Trip Creation Flow', () => {
-  test('should create a new trip successfully', async ({ page }) => {
-    // Navigate to trip setup
-    await page.goto('/trip-setup');
-    
-    // Fill out the form
-    await page.fill('[data-testid="trip-name"]', 'Mountain Adventure');
-    await page.selectOption('[data-testid="trip-type"]', 'hike camping');
-    await page.fill('[data-testid="start-date"]', '2024-07-01');
-    await page.fill('[data-testid="end-date"]', '2024-07-05');
-    
-    // Submit the form
-    await page.click('[data-testid="create-trip-button"]');
-    
-    // Verify redirect to trip detail
-    await expect(page).toHaveURL(/\/trip\/[a-f0-9-]+$/);
-    await expect(page.locator('h1')).toContainText('Mountain Adventure');
-  });
-});
+```
+NODE_OPTIONS=--no-experimental-fetch yarn add supabase
 ```
 
-### Manual Testing Checklist
+> **Note**
+For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
 
-- [ ] **Authentication Flow**:
-  - [ ] Sign up with email/password
-  - [ ] Sign in with Google
-  - [ ] Sign in with Facebook
-  - [ ] Password reset functionality
-  - [ ] Sign out functionality
+<details>
+  <summary><b>macOS</b></summary>
 
-- [ ] **Trip Management**:
-  - [ ] Create new trip with all required fields
-  - [ ] Edit existing trip details
-  - [ ] Delete trip with confirmation
-  - [ ] View trip list with proper filtering
-  - [ ] Trip search functionality
+  Available via [Homebrew](https://brew.sh). To install:
 
-- [ ] **Data Security**:
-  - [ ] Users can only see their own trips
-  - [ ] Unauthenticated users are redirected to login
-  - [ ] API calls include proper authentication headers
-  - [ ] Sensitive data is not exposed in client-side code
+  ```sh
+  brew install supabase/tap/supabase
+  ```
 
-- [ ] **Error Handling**:
-  - [ ] Network errors display user-friendly messages
-  - [ ] Form validation shows clear error messages
-  - [ ] Loading states are properly displayed
-  - [ ] Graceful degradation when services are unavailable
+  To install the beta release channel:
+  
+  ```sh
+  brew install supabase/tap/supabase-beta
+  brew link --overwrite supabase-beta
+  ```
+  
+  To upgrade:
 
-- [ ] **Responsive Design**:
-  - [ ] App works on mobile devices (320px+)
-  - [ ] App works on tablets (768px+)
-  - [ ] App works on desktop (1024px+)
-  - [ ] Touch interactions work properly on mobile
+  ```sh
+  brew upgrade supabase
+  ```
+</details>
 
----
+<details>
+  <summary><b>Windows</b></summary>
 
-## 🔒 Security Considerations
+  Available via [Scoop](https://scoop.sh). To install:
 
-### Row Level Security (RLS)
+  ```powershell
+  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+  scoop install supabase
+  ```
 
-All database tables use RLS policies to ensure users can only access their own data:
+  To upgrade:
 
-```sql
--- Example: Users can only access their own trips
-CREATE POLICY "Users can access their own trips" ON trips
-  FOR ALL USING (auth.uid() = user_id);
-```
+  ```powershell
+  scoop update supabase
+  ```
+</details>
 
-### Authentication Best Practices
+<details>
+  <summary><b>Linux</b></summary>
 
-1. **Never store sensitive data in localStorage**
-2. **Use Supabase Auth for all authentication**
-3. **Validate user permissions on both client and server**
-4. **Implement proper session management**
+  Available via [Homebrew](https://brew.sh) and Linux packages.
 
-### API Security
+  #### via Homebrew
 
-1. **All API calls include authentication headers**
-2. **Validate input data on both client and server**
-3. **Use parameterized queries to prevent SQL injection**
-4. **Implement rate limiting for API endpoints**
+  To install:
 
-### Environment Variables
+  ```sh
+  brew install supabase/tap/supabase
+  ```
 
-- **Never commit `.env` files to version control**
-- **Use different API keys for development and production**
-- **Rotate API keys regularly**
-- **Monitor API usage for suspicious activity**
+  To upgrade:
 
----
+  ```sh
+  brew upgrade supabase
+  ```
 
-## 🚨 Error Handling
+  #### via Linux packages
 
-### Client-Side Error Handling
+  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
 
-```typescript
-// Example: Trip operations with proper error handling
-export const saveTrip = async (trip: Trip): Promise<Trip> => {
-  try {
-    const { data, error } = await supabase
-      .from('trips')
-      .upsert(trip)
-      .select()
-      .single();
+  ```sh
+  sudo apk add --allow-untrusted <...>.apk
+  ```
 
-    if (error) {
-      throw new Error(`Failed to save trip: ${error.message}`);
-    }
+  ```sh
+  sudo dpkg -i <...>.deb
+  ```
 
-    return data;
-  } catch (error) {
-    console.error('Trip save error:', error);
-    throw new Error(
-      error instanceof Error 
-        ? error.message 
-        : 'An unexpected error occurred while saving the trip'
-    );
-  }
-};
-```
+  ```sh
+  sudo rpm -i <...>.rpm
+  ```
 
-### Common Error Scenarios
+  ```sh
+  sudo pacman -U <...>.pkg.tar.zst
+  ```
+</details>
 
-1. **Network Errors**: Display user-friendly retry messages
-2. **Authentication Errors**: Redirect to login page
-3. **Validation Errors**: Show specific field error messages
-4. **Permission Errors**: Display access denied messages
-5. **Server Errors**: Show generic error with support contact
+<details>
+  <summary><b>Other Platforms</b></summary>
 
-### Error Boundaries
+  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
 
-```typescript
-import React from 'react';
+  ```sh
+  go install github.com/supabase/cli@latest
+  ```
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+  Add a symlink to the binary in `$PATH` for easier access:
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
+  ```sh
+  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
+  ```
 
-  componentDidCatch(error, errorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
-    // Send to error reporting service
-  }
+  This works on other non-standard Linux distros.
+</details>
 
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="error-boundary">
-          <h2>Something went wrong</h2>
-          <p>Please refresh the page or contact support.</p>
-        </div>
-      );
-    }
+<details>
+  <summary><b>Community Maintained Packages</b></summary>
 
-    return this.props.children;
-  }
-}
-```
+  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
+  To install in your working directory:
 
----
+  ```bash
+  pkgx install supabase
+  ```
 
-## 🚀 Deployment
+  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+</details>
 
-### Vercel Deployment
-
-1. **Connect your GitHub repository to Vercel**
-2. **Set environment variables in Vercel dashboard**
-3. **Deploy automatically on push to main branch**
+### Run the CLI
 
 ```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Deploy to Vercel
-vercel --prod
+supabase bootstrap
 ```
 
-### Environment Variables for Production
+Or using npx:
 
-Set these in your Vercel dashboard:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-production-anon-key
-NEXT_PUBLIC_GA_TRACKING_ID=G-XXXXXXXXXX
+```bash
+npx supabase bootstrap
 ```
 
-### Performance Optimization
+The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
 
-1. **Code Splitting**: Routes are automatically code-split
-2. **Image Optimization**: Use Next.js Image component
-3. **Caching**: Implement proper cache headers
-4. **Bundle Analysis**: Monitor bundle size with `npm run build`
+## Docs
 
----
+Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
 
-## 🤝 Contributing
+## Breaking changes
 
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make your changes** with proper tests
-4. **Run the test suite**: `npm test`
-5. **Commit your changes**: `git commit -m 'Add amazing feature'`
-6. **Push to the branch**: `git push origin feature/amazing-feature`
-7. **Open a Pull Request** with a clear description
+We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
 
-### Development Guidelines
+However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
 
-- **Follow TypeScript best practices**
-- **Write tests for new features**
-- **Update documentation for API changes**
-- **Use conventional commit messages**
-- **Ensure all tests pass before submitting PR**
+## Developing
 
----
+To run from source:
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🆘 Support
-
-- **Documentation**: Check this README and inline code comments
-- **Issues**: Report bugs via GitHub Issues
-- **Discussions**: Use GitHub Discussions for questions
-- **Security**: Report security issues privately to maintainers
-
----
-
-## 📊 Project Status
-
-- ✅ **Core Features**: Trip management, authentication, basic CRUD
-- ✅ **Security**: RLS policies, proper authentication
-- ✅ **Testing**: Unit tests, integration tests, E2E tests
-- 🔄 **In Progress**: Advanced meal planning, group coordination
-- 📋 **Planned**: Offline support, mobile app, API documentation 
-
-## Database Security: Row Level Security (RLS)
-
-This project now ships with a Supabase migration that enables RLS on all user-specific tables, adds `user_id` columns, and configures policies so that each user can only access their own data.
-
-1. Install the Supabase CLI if you haven't:
-   ```bash
-   npm install -g supabase
-   ```
-
-2. Authenticate and link your project (one-time):
-   ```bash
-   supabase login           # opens browser for token
-   supabase link --project-ref <your-project-ref>
-   ```
-
-3. Push the migration:
-   ```bash
-   supabase db push
-   ```
-
-The migration file lives at `supabase/migrations/202507072030_rls_security.sql`. Review it if you need to adjust table names or policies.
-
-⚠️  After applying the migration, make sure any inserts from external clients include the `user_id` column (the app already handles this automatically when a user is signed in). 
-
-## Environment Variables & Security Headers
-
-1. Copy `env.sample` to `.env.local` and fill in the required credentials.
-   `.env.local` is already listed in `.gitignore` so it will never be committed.
-
-2. The app relies on:
-   * `REACT_APP_SUPABASE_URL`
-   * `REACT_APP_SUPABASE_ANON_KEY`
-
-   Optional (server-side deployments):
-   * `SUPABASE_SERVICE_ROLE_KEY`
-   * `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
-
-3. Security headers
-   Static deployments (e.g., Netlify) will automatically serve the headers defined in `public/_headers` which includes `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, and a basic `Content-Security-Policy`.
-
-   If you host elsewhere, make sure to replicate these headers in your server configuration. 
-
-## Security Monitoring
-
-- A new `security_logs` table records login, failed login, data access, and data export events. See migration `202507072041_security_logs_table.sql`.
-- Front-end logging:
-  * Successful logins (in `SupaSignIn`) and data exports now call `logSecurityEvent` util.
-- For server/API endpoints, import `logSecurityEvent` from `src/utils/securityLogger` to capture additional events (e.g., `data_access`).
-
-## Rate Limiting
-
-`src/middleware/rateLimiter.ts` exports an Express middleware `authRateLimit` (5 login attempts per 15 min). Use it in any backend you deploy:
-
-```ts
-import express from 'express';
-import { authRateLimit } from './src/middleware/rateLimiter';
-
-const app = express();
-app.post('/login', authRateLimit, loginHandler);
+```sh
+# Go >= 1.22
+go run . help
 ```
-
-> Note: The middleware file is marked `// @ts-nocheck` because it targets Node environments and is not bundled into the React app. 

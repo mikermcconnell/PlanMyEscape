@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useOutletContext } from 'react-router-dom';
 import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, Activity, Tent, UtensilsCrossed, Shirt, Wrench, Bed, Gamepad2, Backpack, Car, Zap, Camera, Flashlight, Compass, Flame, ChefHat, Coffee, Hammer, Key, Phone, Book, Music, Gift, Map, Heart, Droplets, Smile, StickyNote } from 'lucide-react';
 import { PackingItem, Trip, ShoppingItem, TripType } from '../types';
-import { getPackingList, savePackingList, addToShoppingList, getShoppingList, removeFromShoppingList, recoverPackingData } from '../utils/storage';
+import { hybridDataService } from '../services/hybridDataService';
+import { recoverPackingData } from '../utils/storage';
 import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
 import { separateAndItems, PackingSuggestion } from '../data/activityEquipment';
 import ShoppingList from '../components/ShoppingList';
@@ -116,7 +117,7 @@ const PackingList = () => {
         clearTimeout(saveTimeoutRef.current);
       }
       saveTimeoutRef.current = setTimeout(() => {
-        savePackingList(tripId, items).catch(error => {
+        hybridDataService.savePackingItems(tripId, items).catch(error => {
           console.error('Failed to save packing list:', error);
           setUpdateError('Failed to save packing list. Please try again.');
         });
@@ -273,7 +274,7 @@ const PackingList = () => {
       const templateItems = getPackingTemplate(trip.tripType, totalCampers, tripDays);
       
       // Save the template items and set them
-      await savePackingList(tripId, templateItems);
+      await hybridDataService.savePackingItems(tripId, templateItems);
       setItems(templateItems);
     } catch (error) {
       console.error('Failed to reset to template:', error);
@@ -287,7 +288,7 @@ const PackingList = () => {
   useEffect(() => {
     const loadPackingList = async () => {
       try {
-        const savedItems = await getPackingList(tripId);
+        const savedItems = await hybridDataService.getPackingItems(tripId);
         
         // If no saved items exist, try data recovery first
         if (savedItems.length === 0) {
@@ -296,7 +297,7 @@ const PackingList = () => {
           
           if (recovered) {
             // Reload after recovery
-            const recoveredItems = await getPackingList(tripId);
+            const recoveredItems = await hybridDataService.getPackingItems(tripId);
             setItems(recoveredItems);
             setConfirmation(`Recovered ${recoveredItems.length} packing items from template!`);
             setTimeout(() => setConfirmation(null), 3000);
@@ -306,7 +307,7 @@ const PackingList = () => {
             const tripDays = Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 60 * 60 * 24));
             const templateItems = getPackingTemplate(trip.tripType, totalCampers, tripDays);
             
-            await savePackingList(tripId, templateItems);
+            await hybridDataService.savePackingItems(tripId, templateItems);
             setItems(templateItems);
           }
         } else {
@@ -330,10 +331,11 @@ const PackingList = () => {
     // If marking as owned, remove from shopping list
     if (newIsOwned) {
       try {
-        const shoppingList = await getShoppingList(tripId);
+        const shoppingList = await hybridDataService.getShoppingItems(tripId);
         const shoppingItem = shoppingList.find(shopItem => shopItem.sourceItemId === itemId);
         if (shoppingItem) {
-          await removeFromShoppingList(tripId, shoppingItem.id);
+          const updatedShoppingList = shoppingList.filter(item => item.id !== shoppingItem.id);
+          await hybridDataService.saveShoppingItems(tripId, updatedShoppingList);
           // Show confirmation message
           setConfirmation(`${item.name} removed from shopping list!`);
           setTimeout(() => setConfirmation(null), 2000);
@@ -375,17 +377,19 @@ const PackingList = () => {
         needsToBuy: true,
         sourceItemId: item.id
       };
-      await addToShoppingList(tripId, [shoppingItem]);
+      const currentShoppingList = await hybridDataService.getShoppingItems(tripId);
+      await hybridDataService.saveShoppingItems(tripId, [...currentShoppingList, shoppingItem]);
       // Show confirmation message
       setConfirmation(`${item.name} added to shopping list!`);
       setTimeout(() => setConfirmation(null), 2000);
     } else {
       // Removing from shopping list
       try {
-        const shoppingList = await getShoppingList(tripId);
+        const shoppingList = await hybridDataService.getShoppingItems(tripId);
         const shoppingItem = shoppingList.find(shopItem => shopItem.sourceItemId === itemId);
         if (shoppingItem) {
-          await removeFromShoppingList(tripId, shoppingItem.id);
+          const updatedShoppingList = shoppingList.filter(item => item.id !== shoppingItem.id);
+          await hybridDataService.saveShoppingItems(tripId, updatedShoppingList);
           // Show confirmation message
           setConfirmation(`${item.name} removed from shopping list!`);
           setTimeout(() => setConfirmation(null), 2000);
@@ -476,10 +480,9 @@ const PackingList = () => {
     updateItems(clearedItems);
     
     // Also clear shopping items that were added from this packing list
-    const { getShoppingList, saveShoppingList } = await import('../utils/storage');
-    const shoppingItems = await getShoppingList(tripId);
+    const shoppingItems = await hybridDataService.getShoppingItems(tripId);
     const filteredShoppingItems = shoppingItems.filter(item => !item.sourceItemId);
-    await saveShoppingList(tripId, filteredShoppingItems);
+    await hybridDataService.saveShoppingItems(tripId, filteredShoppingItems);
     
     setShowClearConfirmation(false);
   };

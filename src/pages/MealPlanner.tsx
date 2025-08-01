@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Plus, Trash2, Edit3, X, ShoppingCart, Calendar, CheckCircle, RotateCcw } from 'lucide-react';
 import { Meal, Trip, TripType } from '../types';
-import { getMeals, saveMeals, getDeletedIngredients, saveDeletedIngredients } from '../utils/storage';
+import { hybridDataService } from '../services/hybridDataService';
 import { getMealTemplates } from '../data/mealTemplates';
 import ShoppingList from '../components/ShoppingList';
 import { ShoppingItem } from '../types';
-import { saveShoppingList, getShoppingList, getPackingList, savePackingList } from '../utils/storage';
+// Shopping and packing operations now handled through hybridDataService
 import { suggestIngredients } from '../data/recipeSuggestions';
 import { tripMealSuggestions } from '../data/tripMealSuggestions';
 
@@ -44,8 +44,8 @@ const MealPlanner = () => {
       if (!tripId || !trip) return;
       
       const [savedMeals, deletedIngredientsArray] = await Promise.all([
-        getMeals(tripId),
-        getDeletedIngredients(tripId)
+        hybridDataService.getMeals(tripId),
+        hybridDataService.getDeletedIngredients(tripId)
       ]);
       
       if (savedMeals) {
@@ -61,7 +61,7 @@ const MealPlanner = () => {
   useEffect(() => {
     const loadShoppingList = async () => {
       if (!tripId) return;
-      const savedShoppingList = await getShoppingList(tripId);
+      const savedShoppingList = await hybridDataService.getShoppingItems(tripId);
       // Filter to only show food items that are NOT from packing list
       const mealRelatedItems = savedShoppingList.filter(item => 
         !item.sourceItemId && item.category === 'food'
@@ -88,7 +88,7 @@ const MealPlanner = () => {
 
     // Update the global shopping list while preserving packing items
     (async () => {
-      const existingShoppingItems = await getShoppingList(tripId);
+      const existingShoppingItems = await hybridDataService.getShoppingItems(tripId);
       
       // Create a map of existing items for quick lookup
       const existingItems = new Map(existingShoppingItems.map(item => [item.name.toLowerCase(), item]));
@@ -127,7 +127,7 @@ const MealPlanner = () => {
 
       // Combine all items for the global shopping list
       const allShoppingItems = [...mealIngredients, ...nonMealItems];
-      await saveShoppingList(tripId, allShoppingItems);
+      await hybridDataService.saveShoppingItems(tripId, allShoppingItems);
       
       // Set local state to only meal-related items for the ingredients sidebar
       const manualFoodItems = existingShoppingItems.filter(item => 
@@ -149,9 +149,9 @@ const MealPlanner = () => {
     
     // Update global shopping list
     if (tripId) {
-      const allItems = await getShoppingList(tripId);
+      const allItems = await hybridDataService.getShoppingItems(tripId);
       const updatedAllItems = allItems.map(it => it.id === itemId ? { ...it, ...updates } : it);
-      await saveShoppingList(tripId, updatedAllItems);
+      await hybridDataService.saveShoppingItems(tripId, updatedAllItems);
     }
   };
 
@@ -163,7 +163,7 @@ const MealPlanner = () => {
       // Remove from shopping list if unchecked
       const updated = shoppingItems.filter(i => i.id !== itemId);
       setShoppingItems(updated);
-      await saveShoppingList(tripId, updated);
+      await hybridDataService.saveShoppingItems(tripId, updated);
       return;
     }
     updateShoppingItem(itemId, { needsToBuy: true, isOwned: false });
@@ -179,11 +179,11 @@ const MealPlanner = () => {
       // Remove from shopping list if marked as owned
       const updated = shoppingItems.filter(i => i.id !== itemId);
       setShoppingItems(updated);
-      if (tripId) saveShoppingList(tripId, updated);
+      if (tripId) hybridDataService.saveShoppingItems(tripId, updated);
       // Sync to packing list when marked owned
       if (tripId) {
         (async () => {
-          const packing = await getPackingList(tripId);
+          const packing = await hybridDataService.getPackingItems(tripId);
           const exists = packing.find(p => p.name.toLowerCase() === current.name.toLowerCase() && p.category === 'Food');
           if (!exists) {
             const newPackingItem = {
@@ -198,7 +198,7 @@ const MealPlanner = () => {
               required: false,
               isPersonal: false
             } as any;
-            await savePackingList(tripId, [...packing, newPackingItem]);
+            await hybridDataService.savePackingItems(tripId, [...packing, newPackingItem]);
             setConfirmation('Added to packing list!');
             setTimeout(() => setConfirmation(null), 2000);
           }
@@ -251,7 +251,7 @@ const MealPlanner = () => {
   const deleteMeal = (mealId: string) => {
     const updatedMeals = meals.filter(meal => meal.id !== mealId);
     setMeals(updatedMeals);
-    if (tripId) saveMeals(tripId, updatedMeals);
+    if (tripId) hybridDataService.saveMeals(tripId, updatedMeals);
   };
 
   const startEditingMeal = (meal: Meal) => {
@@ -281,7 +281,7 @@ const MealPlanner = () => {
     );
 
     setMeals(updatedMeals);
-    if (tripId) saveMeals(tripId, updatedMeals);
+    if (tripId) hybridDataService.saveMeals(tripId, updatedMeals);
 
     // Show success feedback
     setConfirmation(`${editMealName.trim()} updated successfully!`);
@@ -344,7 +344,7 @@ const MealPlanner = () => {
       };
       const updatedMeals = [...meals, newMeal];
       setMeals(updatedMeals);
-      if (tripId) saveMeals(tripId, updatedMeals);
+      if (tripId) hybridDataService.saveMeals(tripId, updatedMeals);
       
       // Show success feedback
       setConfirmation(`${customMealName.trim()} added to ingredients list!`);
@@ -394,14 +394,14 @@ const MealPlanner = () => {
       setDeletedIngredients(newDeletedIngredients);
       
       // PERSIST THE DELETED INGREDIENTS
-      await saveDeletedIngredients(tripId, Array.from(newDeletedIngredients));
+      await hybridDataService.saveDeletedIngredients(tripId, Array.from(newDeletedIngredients));
     }
     
     // Remove from global shopping list
     if (tripId) {
-      const allItems = await getShoppingList(tripId);
+      const allItems = await hybridDataService.getShoppingItems(tripId);
       const updated = allItems.filter(i => i.id !== itemId);
-      await saveShoppingList(tripId, updated);
+      await hybridDataService.saveShoppingItems(tripId, updated);
     }
   };
 
@@ -424,16 +424,16 @@ const MealPlanner = () => {
     setDeletedIngredients(newDeletedIngredients);
     
     // PERSIST THE UPDATED DELETED INGREDIENTS
-    await saveDeletedIngredients(tripId, Array.from(newDeletedIngredients));
+    await hybridDataService.saveDeletedIngredients(tripId, Array.from(newDeletedIngredients));
     
     // Add to local ingredients list
     setShoppingItems(prev => [...prev, newItem]);
     
     // Add to global shopping list
     if (tripId) {
-      const allItems = await getShoppingList(tripId);
+      const allItems = await hybridDataService.getShoppingItems(tripId);
       const updated = [...allItems, newItem];
-      await saveShoppingList(tripId, updated);
+      await hybridDataService.saveShoppingItems(tripId, updated);
     }
     
     setNewIngredientName('');
@@ -444,13 +444,13 @@ const MealPlanner = () => {
     // Clear all custom meals (meals with isCustom: true)
     const clearedMeals = meals.filter(meal => !meal.isCustom);
     setMeals(clearedMeals);
-    if (tripId) await saveMeals(tripId, clearedMeals);
+    if (tripId) await hybridDataService.saveMeals(tripId, clearedMeals);
     
     // Clear the deleted ingredients list since we're clearing everything
     setDeletedIngredients(new Set());
     
     // Update global shopping list: remove custom meal ingredients, keep packing items
-    const allShoppingItems = await getShoppingList(tripId);
+    const allShoppingItems = await hybridDataService.getShoppingItems(tripId);
     const remainingIngredients = clearedMeals.flatMap(m => m.ingredients);
     
     // Keep: 1) Packing items (with sourceItemId), 2) Template meal ingredients, 3) Manual food items
@@ -460,7 +460,7 @@ const MealPlanner = () => {
              (item.category === 'food' && !meals.flatMap(m => m.ingredients).includes(item.name)); // Manual food items
     });
     
-    await saveShoppingList(tripId, clearedGlobalShoppingItems);
+    await hybridDataService.saveShoppingItems(tripId, clearedGlobalShoppingItems);
     
     // Update local ingredients sidebar to show only meal-related items
     setShoppingItems(clearedGlobalShoppingItems.filter(item => !item.sourceItemId && item.category === 'food'));
@@ -474,9 +474,9 @@ const MealPlanner = () => {
     
     // Update global shopping list
     if (tripId) {
-      const allItems = await getShoppingList(tripId);
+      const allItems = await hybridDataService.getShoppingItems(tripId);
       const updated = allItems.map(i => i.id === itemId ? { ...i, name, quantity: qty } : i);
-      await saveShoppingList(tripId, updated);
+      await hybridDataService.saveShoppingItems(tripId, updated);
     }
     
     setEditingIngredientId(null);
@@ -634,7 +634,7 @@ const MealPlanner = () => {
                 <button
                   onClick={async () => {
                     setDeletedIngredients(new Set());
-                    await saveDeletedIngredients(tripId, []);
+                    await hybridDataService.saveDeletedIngredients(tripId, []);
                     setConfirmation('Deleted ingredients list cleared!');
                     setTimeout(() => setConfirmation(null), 3000);
                   }}
