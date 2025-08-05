@@ -6,6 +6,7 @@ import { hybridDataService } from '../services/hybridDataService';
 import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
 import { separateAndItems, PackingSuggestion } from '../data/activityEquipment';
 import ShoppingList from '../components/ShoppingList';
+import SEOHead from '../components/SEOHead';
 
 interface TripContextType {
   trip: Trip;
@@ -781,6 +782,12 @@ const PackingList = () => {
 
   return (
     <div className="mx-auto w-full md:max-w-5xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow p-4 sm:p-8">
+      <SEOHead 
+        title={`Packing List - ${trip.tripName} | PlanMyEscape`}
+        description={`Organize and track your packing list for ${trip.tripName}. Never forget essential camping gear with our smart packing checklist.`}
+        keywords="camping packing list, outdoor gear checklist, trip packing, camping essentials"
+        url={`https://plan-my-escape.vercel.app/trip/${trip.id}/packing`}
+      />
       {updateError && (
         <div className="mb-4 p-3 rounded-md bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300">
           {updateError}

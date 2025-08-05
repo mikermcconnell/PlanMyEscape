@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+
+# Disallow private/auth pages
+Disallow: /trip/*/
+Disallow: /dashboard
+Disallow: /gear-locker
+
+# Allow main pages
+Allow: /
+Allow: /trip-setup
+Allow: /privacy
+Allow: /terms
+
+# Sitemap location
+Sitemap: https://plan-my-escape.vercel.app/sitemap.xml
+
+# Crawl-delay for bots
+Crawl-delay: 1

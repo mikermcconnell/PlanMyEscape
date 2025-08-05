@@ -5,6 +5,7 @@ import { getTrips } from '../utils/supabaseTrips';
 import { Tent, Compass, Mountain, Home, Calendar, Users, Plus, MapPin, Activity, Trash2 } from 'lucide-react';
 import { tripService } from '../services/tripService';
 import { parseLocalDate, formatLocalDate } from '../utils/dateUtils';
+import SEOHead from '../components/SEOHead';
 
 const Dashboard = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -113,6 +114,12 @@ const Dashboard = () => {
 
   return (
     <div>
+      <SEOHead 
+        title="Dashboard - PlanMyEscape"
+        description="Manage your camping trips, view upcoming adventures, and plan new outdoor experiences with PlanMyEscape dashboard."
+        keywords="camping dashboard, trip management, outdoor planning, camping trips"
+        url="https://plan-my-escape.vercel.app/dashboard"
+      />
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Your Trips</h1>
         <Link

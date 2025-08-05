@@ -8,6 +8,7 @@ import ShoppingList from '../components/ShoppingList';
 import { ShoppingItem } from '../types';
 // Shopping and packing operations now handled through hybridDataService
 import { suggestIngredients } from '../data/recipeSuggestions';
+import SEOHead from '../components/SEOHead';
 import { tripMealSuggestions } from '../data/tripMealSuggestions';
 
 interface TripContextType {
@@ -558,6 +559,12 @@ const MealPlanner = () => {
 
   return (
     <div className="p-6">
+      <SEOHead 
+        title={`Meal Planner - ${trip.tripName} | PlanMyEscape`}
+        description={`Plan delicious camping meals for ${trip.tripName}. Get recipe suggestions, create shopping lists, and organize group meal planning.`}
+        keywords="camping meal planning, outdoor cooking, camping recipes, meal prep, group meal planning"
+        url={`https://plan-my-escape.vercel.app/trip/${trip.id}/meals`}
+      />
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
