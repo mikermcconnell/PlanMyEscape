@@ -786,7 +786,7 @@ const PackingList = () => {
         title={`Packing List - ${trip.tripName} | PlanMyEscape`}
         description={`Organize and track your packing list for ${trip.tripName}. Never forget essential camping gear with our smart packing checklist.`}
         keywords="camping packing list, outdoor gear checklist, trip packing, camping essentials"
-        url={`https://plan-my-escape.vercel.app/trip/${trip.id}/packing`}
+        url={`https://planmyescape.ca/trip/${trip.id}/packing`}
       />
       {updateError && (
         <div className="mb-4 p-3 rounded-md bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300">

@@ -343,7 +343,7 @@ const TripSetup = () => {
         title="Create New Trip - PlanMyEscape"
         description="Start planning your perfect camping adventure. Set up trip details, organize groups, and coordinate with friends for car camping, canoe camping, or hiking trips."
         keywords="create camping trip, trip setup, camping planner, outdoor adventure planning"
-        url="https://plan-my-escape.vercel.app/trip-setup"
+        url="https://planmyescape.ca/trip-setup"
       />
       <div className="max-w-4xl mx-auto p-4 sm:p-6">
       {/* Welcome Section */}

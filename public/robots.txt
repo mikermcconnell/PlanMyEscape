@@ -13,7 +13,7 @@ Allow: /privacy
 Allow: /terms
 
 # Sitemap location
-Sitemap: https://plan-my-escape.vercel.app/sitemap.xml
+Sitemap: https://planmyescape.ca/sitemap.xml
 
 # Crawl-delay for bots
 Crawl-delay: 1

@@ -563,7 +563,7 @@ const MealPlanner = () => {
         title={`Meal Planner - ${trip.tripName} | PlanMyEscape`}
         description={`Plan delicious camping meals for ${trip.tripName}. Get recipe suggestions, create shopping lists, and organize group meal planning.`}
         keywords="camping meal planning, outdoor cooking, camping recipes, meal prep, group meal planning"
-        url={`https://plan-my-escape.vercel.app/trip/${trip.id}/meals`}
+        url={`https://planmyescape.ca/trip/${trip.id}/meals`}
       />
       {/* Header */}
       <div className="mb-8">

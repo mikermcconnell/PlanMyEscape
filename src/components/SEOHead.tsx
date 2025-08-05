@@ -15,8 +15,8 @@ const SEOHead: React.FC<SEOHeadProps> = ({
   title = 'PlanMyEscape - Effortless Camping & Cottage Trip Planning',
   description = 'Effortless planning for cottaging, car camping, canoe camping, and hike camping. Plan meals and shopping in minutes; never forget essentials again.',
   keywords = 'camping, trip planning, meal planning, packing list, cottage planning, outdoor adventure, group camping',
-  image = 'https://plan-my-escape.vercel.app/icon-512.png',
-  url = 'https://plan-my-escape.vercel.app',
+  image = 'https://planmyescape.ca/icon-512.png',
+  url = 'https://planmyescape.ca',
   type = 'website',
   schemaMarkup
 }) => {

@@ -118,7 +118,7 @@ const Dashboard = () => {
         title="Dashboard - PlanMyEscape"
         description="Manage your camping trips, view upcoming adventures, and plan new outdoor experiences with PlanMyEscape dashboard."
         keywords="camping dashboard, trip management, outdoor planning, camping trips"
-        url="https://plan-my-escape.vercel.app/dashboard"
+        url="https://planmyescape.ca/dashboard"
       />
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Your Trips</h1>
