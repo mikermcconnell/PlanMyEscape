@@ -38,12 +38,12 @@ export const PackingItemSchema = z.object({
   category: z.string().min(1),
   quantity: z.number().int().positive(),
   isChecked: z.boolean(),
-  weight: z.number().optional(),
+  weight: z.number().nullable().optional(),
   isOwned: z.boolean(),
   needsToBuy: z.boolean(),
   isPacked: z.boolean(),
   required: z.boolean(),
-  assignedGroupId: z.string().optional()
+  assignedGroupId: z.string().nullable().optional()
 });
 
 export const MealSchema = z.object({

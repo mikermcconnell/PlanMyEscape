@@ -37,7 +37,9 @@
       "Bash(./supabase.exe login)",
       "Bash(./supabase.exe link:*)",
       "Bash(./supabase.exe db push --include-all --debug)",
-      "Bash(./supabase.exe db push:*)"
+      "Bash(./supabase.exe db push:*)",
+      "Bash(supabase login:*)",
+      "Bash(./supabase.exe --help)"
     ],
     "deny": []
   }

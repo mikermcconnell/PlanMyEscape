@@ -2,7 +2,7 @@ import { Meal, MealType } from '../types';
 import { suggestIngredients } from './recipeSuggestions';
 
 const createMeal = (name: string, type: MealType, ingredients: string[], isCustom: boolean = false): Meal => ({
-  id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+  id: crypto.randomUUID(),
   name,
   day: 1,
   type,

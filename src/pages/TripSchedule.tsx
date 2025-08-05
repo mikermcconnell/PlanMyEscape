@@ -5,6 +5,7 @@ import { getMeals } from '../utils/storage';
 import { saveTrip } from '../utils/supabaseTrips';
 import { Trip, Meal } from '../types';
 import ActivitiesPlanner from '../components/ActivitiesPlanner';
+import { getDaysBetweenDates, getTripDayDate } from '../utils/dateUtils';
 
 interface TripContextType {
   trip: Trip;
@@ -41,20 +42,13 @@ const TripSchedule: React.FC = () => {
     }
   };
 
-  const getDaysBetweenDates = (startDate: string, endDate: string): number => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  };
+  // getDaysBetweenDates function moved to dateUtils to ensure consistency
 
   const generateDays = () => {
     const days = getDaysBetweenDates(trip.startDate, trip.endDate);
-    const startDate = new Date(trip.startDate);
     
     return Array.from({ length: days }, (_, index) => {
-      const currentDate = new Date(startDate);
-      currentDate.setDate(startDate.getDate() + index);
+      const currentDate = getTripDayDate(trip.startDate, index + 1);
       return {
         dayNumber: index + 1,
         date: currentDate,

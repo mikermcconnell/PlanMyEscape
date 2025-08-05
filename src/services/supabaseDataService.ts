@@ -7,6 +7,27 @@ import { PackingItem, Meal, ShoppingItem, GearItem, TodoItem } from '../types';
  */
 export class SupabaseDataService {
   
+  // Helper function to validate UUID format
+  private isValidUUID(id: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+  }
+  
+  // Convert legacy short ID to proper UUID (deterministic conversion)
+  private legacyIdToUUID(legacyId: string): string {
+    // Create a deterministic UUID from the legacy ID to maintain consistency
+    // This ensures the same legacy ID always maps to the same UUID
+    const hash = legacyId.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    
+    // Create a deterministic UUID v4 format using the hash
+    const hex = Math.abs(hash).toString(16).padStart(8, '0');
+    const uuid = `${hex.slice(0, 8)}-${hex.slice(0, 4)}-4${hex.slice(1, 4)}-8${hex.slice(4, 7)}-${hex}${hex.slice(0, 4)}`;
+    return uuid;
+  }
+  
   // === PACKING ITEMS ===
   
   async getPackingItems(tripId: string): Promise<PackingItem[]> {
@@ -25,7 +46,11 @@ export class SupabaseDataService {
   
   async savePackingItems(tripId: string, items: PackingItem[]): Promise<void> {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) throw new Error('Not signed in');
+    if (userError || !user) {
+      console.error('❌ [SupabaseDataService] savePackingItems - User not authenticated:', userError?.message);
+      throw new Error('Not signed in');
+    }
+    console.log(`🎒 [SupabaseDataService] Saving ${items.length} packing items for user ${user.id}, trip ${tripId}`);
     
     if (items.length === 0) {
       // If no items, delete all existing items for this trip
@@ -40,6 +65,8 @@ export class SupabaseDataService {
     
     // Use upsert for atomic operation - this will insert new items and update existing ones
     const dbItems = items.map(item => this.mapPackingItemToDB(item, tripId, user.id));
+    console.log(`📝 [SupabaseDataService] Mapped ${dbItems.length} items for database:`, dbItems[0] ? dbItems[0] : 'No items');
+    
     const { error } = await supabase
       .from('packing_items')
       .upsert(dbItems, { 
@@ -47,7 +74,13 @@ export class SupabaseDataService {
         ignoreDuplicates: false 
       });
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ [SupabaseDataService] Failed to upsert packing items:', error);
+      console.error('❌ [SupabaseDataService] Error details:', error.message, error.details, error.hint);
+      console.error('❌ [SupabaseDataService] Attempted to save items:', dbItems);
+      throw error;
+    }
+    console.log('✅ [SupabaseDataService] Packing items upsert successful');
     
     // Remove items that are no longer in the current list
     const currentItemIds = items.map(item => item.id);
@@ -57,7 +90,7 @@ export class SupabaseDataService {
         .delete()
         .eq('trip_id', tripId)
         .eq('user_id', user.id)
-        .not('id', 'in', currentItemIds);
+        .not('id', 'in', `(${currentItemIds.join(',')})`);
       
       if (deleteError) throw deleteError;
     }
@@ -85,25 +118,37 @@ export class SupabaseDataService {
   }
   
   private mapPackingItemToDB(item: PackingItem, tripId: string, userId: string): any {
+    const now = new Date().toISOString();
+    
+    // Handle legacy short IDs by creating a UUID mapping
+    let validId = item.id;
+    if (!this.isValidUUID(item.id)) {
+      // Create a deterministic UUID from the legacy ID to maintain consistency
+      validId = this.legacyIdToUUID(item.id);
+      console.log(`🔄 Converting legacy ID "${item.id}" to UUID "${validId}"`);
+    }
+    
     return {
-      id: item.id,
+      id: validId,
       trip_id: tripId,
       user_id: userId,
-      name: item.name,
-      category: item.category,
-      quantity: item.quantity,
-      is_checked: item.isChecked,
-      weight: item.weight,
-      is_owned: item.isOwned,
-      needs_to_buy: item.needsToBuy,
-      is_packed: item.isPacked,
-      required: item.required,
-      assigned_group_id: item.assignedGroupId,
-      is_personal: item.isPersonal,
-      packed_by_user_id: item.packedByUserId,
-      last_modified_by: item.lastModifiedBy,
-      last_modified_at: item.lastModifiedAt,
-      notes: item.notes
+      name: item.name || '',
+      category: item.category || 'Other', // Ensure category is never null
+      quantity: item.quantity || 1,
+      is_checked: Boolean(item.isChecked),
+      weight: item.weight || null,
+      is_owned: Boolean(item.isOwned),
+      needs_to_buy: Boolean(item.needsToBuy),
+      is_packed: Boolean(item.isPacked),
+      required: Boolean(item.required),
+      assigned_group_id: item.assignedGroupId || null,
+      is_personal: Boolean(item.isPersonal),
+      packed_by_user_id: item.packedByUserId || null,
+      last_modified_by: userId, // Always set to current user
+      last_modified_at: now,
+      notes: item.notes || null,
+      created_at: now,
+      updated_at: now
     };
   }
   
@@ -113,33 +158,150 @@ export class SupabaseDataService {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) throw new Error('Not signed in');
     
+    console.log(`🍽️ [SupabaseDataService] Getting meals for trip ${tripId}, user ${user.id}`);
     const { data, error } = await supabase
       .from('meals')
       .select('*')
       .eq('trip_id', tripId)
       .eq('user_id', user.id);
     
-    if (error) throw error;
-    return (data || []).map(this.mapMealFromDB);
+    if (error) {
+      console.error(`❌ [SupabaseDataService] Get meals failed:`, error);
+      throw error;
+    }
+    
+    const meals = (data || []).map(this.mapMealFromDB);
+    console.log(`📊 [SupabaseDataService] Retrieved ${meals.length} meals from database`);
+    if (meals.length > 0 && meals[0]) {
+      console.log(`🔍 [SupabaseDataService] First meal details:`, {
+        id: meals[0].id,
+        name: meals[0].name,
+        day: meals[0].day,
+        type: meals[0].type
+      });
+    }
+    return meals;
   }
   
   async saveMeals(tripId: string, meals: Meal[]): Promise<void> {
+    console.log(`🔍 [SupabaseDataService] saveMeals called with tripId: ${tripId}, meals.length: ${meals.length}`);
+    
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) throw new Error('Not signed in');
+    if (userError || !user) {
+      console.error('❌ [SupabaseDataService] saveMeals - User not authenticated:', userError?.message);
+      throw new Error('Not signed in');
+    }
+    console.log(`🍽️ [SupabaseDataService] Saving ${meals.length} meals for user ${user.id}, trip ${tripId}`);
     
     if (meals.length === 0) {
       // If no meals, delete all existing meals for this trip
-      const { error } = await supabase
+      console.log(`🗑️ [SupabaseDataService] Deleting ALL meals for trip ${tripId}, user ${user.id}`);
+      
+      // First, let's check what meals exist before deleting
+      console.log(`🔍 [SupabaseDataService] Checking existing meals before delete...`);
+      console.log(`🔍 [SupabaseDataService] Query parameters: tripId=${tripId}, userId=${user.id}`);
+      
+      // Check current authentication status
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error(`❌ [SupabaseDataService] Session check failed:`, sessionError);
+      } else {
+        console.log(`🔐 [SupabaseDataService] Session valid: ${!!sessionData.session}, Session user: ${sessionData.session?.user?.id}`);
+      }
+      
+      const { data: existingMeals, error: checkError } = await supabase
+        .from('meals')
+        .select('*')
+        .eq('trip_id', tripId)
+        .eq('user_id', user.id);
+      
+      if (checkError) {
+        console.error(`❌ [SupabaseDataService] Failed to check existing meals:`, checkError);
+      } else {
+        console.log(`📊 [SupabaseDataService] Found ${existingMeals?.length || 0} existing meals to delete:`, existingMeals);
+        if (existingMeals && existingMeals.length > 0) {
+          console.log(`📊 [SupabaseDataService] Meal details:`, existingMeals.map(m => ({
+            id: m.id,
+            name: m.name,
+            trip_id: m.trip_id,
+            user_id: m.user_id,
+            tripMatch: m.trip_id === tripId,
+            userMatch: m.user_id === user.id
+          })));
+        }
+      }
+      
+      // Now perform the delete - try bulk delete first
+      console.log(`🗑️ [SupabaseDataService] Attempting bulk delete...`);
+      const { error, count } = await supabase
         .from('meals')
         .delete()
         .eq('trip_id', tripId)
         .eq('user_id', user.id);
-      if (error) throw error;
+        
+      if (error) {
+        console.error(`❌ [SupabaseDataService] Bulk delete failed:`, error);
+        console.error(`❌ [SupabaseDataService] Delete error details:`, {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        
+        // If bulk delete failed and we have meals to delete, try individual deletes
+        if (existingMeals && existingMeals.length > 0) {
+          console.log(`🔄 [SupabaseDataService] Trying individual deletes for ${existingMeals.length} meals...`);
+          let deleteCount = 0;
+          for (const meal of existingMeals) {
+            console.log(`🗑️ [SupabaseDataService] Deleting meal ${meal.id}: ${meal.name}`);
+            const { error: individualError } = await supabase
+              .from('meals')
+              .delete()
+              .eq('id', meal.id);
+              
+            if (individualError) {
+              console.error(`❌ [SupabaseDataService] Failed to delete meal ${meal.id}:`, individualError);
+            } else {
+              deleteCount++;
+              console.log(`✅ [SupabaseDataService] Successfully deleted meal ${meal.id}`);
+            }
+          }
+          console.log(`📊 [SupabaseDataService] Individual delete results: ${deleteCount}/${existingMeals.length} successful`);
+        } else {
+          throw error;
+        }
+      } else {
+        console.log(`✅ [SupabaseDataService] Bulk delete completed. Affected rows: ${count || 'unknown'}`);
+      }
+      
+      // Verify the delete worked
+      console.log(`🔍 [SupabaseDataService] Verifying delete was successful...`);
+      const { data: remainingMeals, error: verifyError } = await supabase
+        .from('meals')
+        .select('*')
+        .eq('trip_id', tripId)
+        .eq('user_id', user.id);
+        
+      if (verifyError) {
+        console.error(`❌ [SupabaseDataService] Failed to verify delete:`, verifyError);
+      } else {
+        console.log(`📊 [SupabaseDataService] After delete verification: ${remainingMeals?.length || 0} meals remain:`, remainingMeals);
+        if (remainingMeals && remainingMeals.length > 0) {
+          console.error(`❌ [SupabaseDataService] DELETE FAILED - ${remainingMeals.length} meals still exist after delete operation!`);
+          // Log details of remaining meals
+          remainingMeals.forEach(meal => {
+            console.error(`❌ [SupabaseDataService] Remaining meal: ${meal.id} - ${meal.name} (trip: ${meal.trip_id}, user: ${meal.user_id})`);
+          });
+        }
+      }
+      
       return;
     }
     
     // Use upsert for atomic operation
     const dbMeals = meals.map(meal => this.mapMealToDB(meal, tripId, user.id));
+    console.log(`📝 [SupabaseDataService] Mapped ${dbMeals.length} meals for database:`, dbMeals[0] ? dbMeals[0] : 'No meals');
+    
     const { error } = await supabase
       .from('meals')
       .upsert(dbMeals, { 
@@ -147,17 +309,26 @@ export class SupabaseDataService {
         ignoreDuplicates: false 
       });
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ [SupabaseDataService] Failed to upsert meals:', error);
+      console.error('❌ [SupabaseDataService] Error details:', error.message, error.details, error.hint);
+      console.error('❌ [SupabaseDataService] Attempted to save meals:', dbMeals);
+      throw error;
+    }
+    console.log('✅ [SupabaseDataService] Meals upsert successful');
     
     // Remove meals that are no longer in the current list
     const currentMealIds = meals.map(meal => meal.id);
+    console.log(`🗑️ [SupabaseDataService] Current meal IDs to keep: [${currentMealIds.join(', ')}]`);
     if (currentMealIds.length > 0) {
+      const deleteFilter = `(${currentMealIds.join(',')})`;
+      console.log(`🗑️ [SupabaseDataService] DELETE filter: not.in.${deleteFilter}`);
       const { error: deleteError } = await supabase
         .from('meals')
         .delete()
         .eq('trip_id', tripId)
         .eq('user_id', user.id)
-        .not('id', 'in', currentMealIds);
+        .not('id', 'in', deleteFilter);
       
       if (deleteError) throw deleteError;
     }
@@ -180,20 +351,30 @@ export class SupabaseDataService {
   }
   
   private mapMealToDB(meal: Meal, tripId: string, userId: string): any {
+    // Handle legacy short IDs by creating a UUID mapping
+    let validId = meal.id;
+    if (!this.isValidUUID(meal.id)) {
+      validId = this.legacyIdToUUID(meal.id);
+      console.log(`🔄 Converting legacy meal ID "${meal.id}" to UUID "${validId}"`);
+    }
+    
+    const now = new Date().toISOString();
     return {
-      id: meal.id,
+      id: validId,
       trip_id: tripId,
       user_id: userId,
-      name: meal.name,
-      day: meal.day,
-      type: meal.type,
-      ingredients: meal.ingredients,
-      is_custom: meal.isCustom,
-      assigned_group_id: meal.assignedGroupId,
-      shared_servings: meal.sharedServings,
-      servings: meal.servings,
-      last_modified_by: meal.lastModifiedBy,
-      last_modified_at: meal.lastModifiedAt
+      name: meal.name || '',
+      day: meal.day || 1,
+      type: meal.type || 'dinner',
+      ingredients: meal.ingredients || [],
+      is_custom: Boolean(meal.isCustom),
+      assigned_group_id: meal.assignedGroupId || null,
+      shared_servings: meal.sharedServings !== undefined ? Boolean(meal.sharedServings) : true,
+      servings: meal.servings || 1,
+      last_modified_by: userId, // Always set to current user
+      last_modified_at: now,
+      created_at: now,
+      updated_at: now
     };
   }
   
@@ -247,7 +428,7 @@ export class SupabaseDataService {
         .delete()
         .eq('trip_id', tripId)
         .eq('user_id', user.id)
-        .not('id', 'in', currentItemIds);
+        .not('id', 'in', `(${currentItemIds.join(',')})`);
       
       if (deleteError) throw deleteError;
     }
@@ -338,7 +519,7 @@ export class SupabaseDataService {
         .from('gear_items')
         .delete()
         .eq('user_id', user.id)
-        .not('id', 'in', currentItemIds);
+        .not('id', 'in', `(${currentItemIds.join(',')})`);
       
       if (deleteError) throw deleteError;
     }
@@ -474,7 +655,7 @@ export class SupabaseDataService {
         .delete()
         .eq('trip_id', tripId)
         .eq('user_id', user.id)
-        .not('id', 'in', currentItemIds);
+        .not('id', 'in', `(${currentItemIds.join(',')})`);
       
       if (deleteError) throw deleteError;
     }

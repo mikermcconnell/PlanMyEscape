@@ -4,6 +4,7 @@ import { Calendar, MapPin, Users, Plus, Edit3, Trash2, X, Save } from 'lucide-re
 import { Trip, TripType, Group, GROUP_COLORS, GroupColor } from '../types';
 import { saveTrip } from '../utils/supabaseTrips';
 import ActivitiesPlanner from '../components/ActivitiesPlanner';
+import { formatLocalDate, getDaysBetweenDates } from '../utils/dateUtils';
 
 interface TripContextType {
   trip: Trip;
@@ -13,17 +14,6 @@ interface TripContextType {
 const TripOverview: React.FC = () => {
   const { trip, setTrip } = useOutletContext<TripContextType>();
   
-  console.log('🔍 [TripOverview] Component rendered with trip:', {
-    id: trip.id,
-    tripName: trip.tripName,
-    startDate: trip.startDate,
-    endDate: trip.endDate,
-    startDateType: typeof trip.startDate,
-    endDateType: typeof trip.endDate,
-    startDateValue: trip.startDate,
-    endDateValue: trip.endDate,
-    fullTrip: trip
-  });
   const [showLocationEdit, setShowLocationEdit] = useState(false);
   const [locationInput, setLocationInput] = useState(trip.location || '');
   const [showDateEdit, setShowDateEdit] = useState(false);
@@ -44,13 +34,6 @@ const TripOverview: React.FC = () => {
 
   // Sync date inputs with trip data when trip changes
   useEffect(() => {
-    console.log('🔍 [TripOverview] Syncing date inputs:', {
-      tripStartDate: trip.startDate,
-      tripEndDate: trip.endDate,
-      startDateType: typeof trip.startDate,
-      endDateType: typeof trip.endDate
-    });
-    
     setDateInputs({
       startDate: trip.startDate,
       endDate: trip.endDate
@@ -172,31 +155,7 @@ const TripOverview: React.FC = () => {
     }
   };
 
-  const getDaysBetweenDates = (startDate: string, endDate: string): number => {
-    console.log('🔍 [TripOverview.getDaysBetweenDates] Input:', {
-      startDate,
-      endDate,
-      startDateType: typeof startDate,
-      endDateType: typeof endDate
-    });
-    
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    console.log('🔍 [TripOverview.getDaysBetweenDates] Parsed dates:', {
-      start,
-      end,
-      startValid: !isNaN(start.getTime()),
-      endValid: !isNaN(end.getTime())
-    });
-    
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    
-    console.log('🔍 [TripOverview.getDaysBetweenDates] Result:', { diffTime, days });
-    
-    return days;
-  };
+  // getDaysBetweenDates function moved to dateUtils to ensure consistency
 
   const renderTripTypeText = (type: TripType): string => {
     switch (type) {
@@ -281,34 +240,7 @@ const TripOverview: React.FC = () => {
                 ) : (
                   <div className="flex items-center space-x-2">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {(() => {
-                        console.log('🔍 [TripOverview] Creating dates for display:', {
-                          startDate: trip.startDate,
-                          endDate: trip.endDate,
-                          startDateType: typeof trip.startDate,
-                          endDateType: typeof trip.endDate,
-                          startDateParsed: new Date(trip.startDate),
-                          endDateParsed: new Date(trip.endDate),
-                          startDateValid: !isNaN(new Date(trip.startDate).getTime()),
-                          endDateValid: !isNaN(new Date(trip.endDate).getTime())
-                        });
-                        
-                        const startDate = new Date(trip.startDate);
-                        const endDate = new Date(trip.endDate);
-                        
-                        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                          console.error('🔴 [TripOverview] Invalid dates detected:', {
-                            startDate: trip.startDate,
-                            endDate: trip.endDate,
-                            startDateValid: !isNaN(startDate.getTime()),
-                            endDateValid: !isNaN(endDate.getTime())
-                          });
-                          return 'Invalid Date - Invalid Date';
-                        }
-                        
-                        return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
-                      })()
-                      }
+                      {`${formatLocalDate(trip.startDate)} - ${formatLocalDate(trip.endDate)}`}
                     </p>
                     <button
                       onClick={() => setShowDateEdit(true)}

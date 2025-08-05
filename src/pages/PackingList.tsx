@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, Activity, Tent, UtensilsCrossed, Shirt, Wrench, Bed, Gamepad2, Backpack, Car, Zap, Camera, Flashlight, Compass, Flame, ChefHat, Coffee, Hammer, Key, Phone, Book, Music, Gift, Map, Heart, Droplets, Smile, StickyNote } from 'lucide-react';
-import { PackingItem, Trip, ShoppingItem, TripType } from '../types';
+import { PackingItem, Trip, TripType } from '../types';
 import { hybridDataService } from '../services/hybridDataService';
-import { recoverPackingData } from '../utils/storage';
 import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
 import { separateAndItems, PackingSuggestion } from '../data/activityEquipment';
 import ShoppingList from '../components/ShoppingList';
@@ -105,34 +104,129 @@ const PackingList = () => {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Ref to keep track of the current timeout across renders
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Debounced save function – clears any existing timeout before scheduling a new one
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Enhanced error message helper
+  const getErrorMessage = (error: any, operation: string): string => {
+    if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
+      return `Network error while ${operation}. Please check your connection and try again.`;
+    }
+    if (error?.message?.includes('permission') || error?.message?.includes('unauthorized')) {
+      return `Permission denied while ${operation}. Please sign in again.`;
+    }
+    if (error?.message?.includes('timeout')) {
+      return `Request timed out while ${operation}. Please try again.`;
+    }
+    return `Failed to ${operation}. Please try again.`;
+  };
+
+  // Auto-clear error messages after 5 seconds
+  useEffect(() => {
+    if (updateError) {
+      const timer = setTimeout(() => setUpdateError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [updateError]);
+
+  // Input validation and sanitization helper
+  const validateAndSanitizeInput = (input: string, fieldName: string, maxLength: number = 100): string | null => {
+    const trimmed = input.trim();
+    
+    if (!trimmed) {
+      return `${fieldName} cannot be empty`;
+    }
+    
+    if (trimmed.length > maxLength) {
+      return `${fieldName} is too long (max ${maxLength} characters)`;
+    }
+    
+    // Basic XSS prevention: remove script tags and suspicious patterns
+    if (trimmed.match(/<script.*?>.*?<\/script>/gi) || trimmed.match(/javascript:/gi) || trimmed.match(/on\w+=/gi)) {
+      return `${fieldName} contains invalid characters`;
+    }
+    
+    return null; // No errors
+  };
+
+  const sanitizeInput = (input: string): string => {
+    return input
+      .trim()
+      .replace(/<script.*?>.*?<\/script>/gi, '') // Remove script tags
+      .replace(/javascript:/gi, '') // Remove javascript: protocols
+      .replace(/on\w+=/gi, '') // Remove event handlers
+      .slice(0, 200); // Hard limit for safety
+  };
+
+  // Controlled logging for production
+  const DEBUG = process.env.NODE_ENV === 'development';
+  const log = (message: string, ...args: any[]) => {
+    if (DEBUG) {
+      console.log(message, ...args);
+    }
+  };
+
+  const logError = (message: string, error?: any) => {
+    // Always log errors, but format differently for production
+    if (DEBUG) {
+      console.error(message, error);
+    } else {
+      console.error(message); // Don't include sensitive error details in production
+    }
+  };
+
+  // Immediate save function to prevent data loss on navigation
+  const immediateSave = useCallback(
+    async (tripId: string, items: PackingItem[]) => {
+      try {
+        await hybridDataService.savePackingItems(tripId, items);
+        log('PackingList: Immediate save completed');
+      } catch (error) {
+        logError('Failed to save packing list:', error);
+        setUpdateError('Failed to save packing list. Please try again.');
+      }
+    },
+    []
+  );
+
+  // Debounced save function for typing - shorter timeout
   const debouncedSave = useCallback(
     (tripId: string, items: PackingItem[]) => {
+      // Always clear previous timeout to prevent memory leaks
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
       }
-      saveTimeoutRef.current = setTimeout(() => {
-        hybridDataService.savePackingItems(tripId, items).catch(error => {
-          console.error('Failed to save packing list:', error);
+      
+      saveTimeoutRef.current = setTimeout(async () => {
+        try {
+          await hybridDataService.savePackingItems(tripId, items);
+          saveTimeoutRef.current = null; // Clear reference after completion
+        } catch (error) {
+          logError('Failed to save packing list:', error);
           setUpdateError('Failed to save packing list. Please try again.');
-        });
-      }, 300);
+          saveTimeoutRef.current = null; // Clear reference even on error
+        }
+      }, 150); // Reduced from 300ms to 150ms
     },
-    [] // Empty dependency array is correct here
+    []
   );
 
   // Memoized function to update items state and trigger save
   const updateItems = useCallback(
-    (newItems: PackingItem[]) => {
+    (newItems: PackingItem[], immediate = false) => {
       setItems(newItems);
-      debouncedSave(tripId, newItems);
+      if (immediate) {
+        // For critical operations like status toggles, save immediately
+        immediateSave(tripId, newItems);
+      } else {
+        // For typing/editing, use debounced save
+        debouncedSave(tripId, newItems);
+      }
     },
-    [tripId, debouncedSave]
+    [tripId, debouncedSave, immediateSave]
   );
 
   // Clear any pending timeout on unmount
@@ -140,9 +234,24 @@ const PackingList = () => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
       }
     };
-  }, []);
+  }, []); // Run only once on mount
+
+  // Separate effect for unmount save to prevent race conditions
+  useEffect(() => {
+    const currentItems = items;
+    const currentTripId = tripId;
+    
+    return () => {
+      if (currentItems.length > 0) {
+        hybridDataService.savePackingItems(currentTripId, currentItems).catch(error => {
+          logError('Failed to save on unmount:', error);
+        });
+      }
+    };
+  }, []); // Only capture initial values
 
   // Add proper useMemo with typed parameters
   const displayedItems = useMemo(() =>
@@ -151,29 +260,47 @@ const PackingList = () => {
       : items.filter((i: PackingItem) => i.assignedGroupId === selectedGroupId),
     [items, selectedGroupId]);
 
-  const personalItems = useMemo(() => displayedItems.filter((item: PackingItem) => item.isPersonal), [displayedItems]);
-  const groupItems = useMemo(() => displayedItems.filter((item: PackingItem) => !item.isPersonal), [displayedItems]);
+  // Separate items by packed status first, then by personal/group
+  const unpackedItems = useMemo(() => displayedItems.filter((item: PackingItem) => !item.isPacked), [displayedItems]);
+  const packedItems = useMemo(() => displayedItems.filter((item: PackingItem) => item.isPacked), [displayedItems]);
   
-  const groupedPersonalItems = useMemo(() =>
+  const unpackedPersonalItems = useMemo(() => unpackedItems.filter((item: PackingItem) => item.isPersonal), [unpackedItems]);
+  const unpackedGroupItems = useMemo(() => unpackedItems.filter((item: PackingItem) => !item.isPersonal), [unpackedItems]);
+  const packedPersonalItems = useMemo(() => packedItems.filter((item: PackingItem) => item.isPersonal), [packedItems]);
+  const packedGroupItems = useMemo(() => packedItems.filter((item: PackingItem) => !item.isPersonal), [packedItems]);
+  
+  const groupedUnpackedPersonalItems = useMemo(() =>
     categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
-      acc[category] = personalItems.filter((item: PackingItem) => item.category === category);
+      acc[category] = unpackedPersonalItems.filter((item: PackingItem) => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
-  , [personalItems, categories]);
+  , [unpackedPersonalItems, categories]);
   
-  const groupedGroupItems = useMemo(() =>
+  const groupedUnpackedGroupItems = useMemo(() =>
     categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
-      acc[category] = groupItems.filter((item: PackingItem) => item.category === category);
+      acc[category] = unpackedGroupItems.filter((item: PackingItem) => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
-  , [groupItems, categories]);
+  , [unpackedGroupItems, categories]);
+
+  const groupedPackedPersonalItems = useMemo(() =>
+    categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
+      acc[category] = packedPersonalItems.filter((item: PackingItem) => item.category === category);
+      return acc;
+    }, {} as Record<string, PackingItem[]>)
+  , [packedPersonalItems, categories]);
+  
+  const groupedPackedGroupItems = useMemo(() =>
+    categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
+      acc[category] = packedGroupItems.filter((item: PackingItem) => item.category === category);
+      return acc;
+    }, {} as Record<string, PackingItem[]>)
+  , [packedGroupItems, categories]);
 
   const totalItems = displayedItems.length;
   const ownedItems = displayedItems.filter((item: PackingItem) => item.isOwned).length;
   const needToBuyItems = displayedItems.filter((item: PackingItem) => item.needsToBuy).length;
-  const packedItems = displayedItems.filter((item: PackingItem) => item.isPacked).length;
-  const totalWeight = displayedItems.reduce((sum: number, item: PackingItem) => sum + (item.weight || 0), 0);
-
+  const packedItemsCount = packedItems.length;
   const renderTripTypeText = (type: TripType): string => {
     switch (type) {
       case 'car camping':
@@ -187,10 +314,6 @@ const PackingList = () => {
       default:
         return 'Trip';
     }
-  };
-
-  const shouldShowWeightTracking = (type: TripType): boolean => {
-    return type === 'hike camping' || type === 'canoe camping';
   };
 
   const assignItemToGroup = (itemId: string, groupId: string | undefined) => {
@@ -222,38 +345,60 @@ const PackingList = () => {
   };
 
   const addItemFromModal = async () => {
-    if (!addItemModal.name.trim()) return;
-    
-    // Create a suggestion object to use the separateAndItems function
-    const suggestions = separateAndItems([{
-      name: addItemModal.name.trim(),
-      category: addItemModal.category,
-      required: false,
-      quantity: addItemModal.quantity
-    }]);
-    
-    // Create packing items from the separated suggestions
-    const newItems: PackingItem[] = suggestions.map((suggestion: PackingSuggestion) => ({
-      id: crypto.randomUUID(),
-      name: suggestion.name,
-      category: suggestion.category,
-      quantity: suggestion.quantity || 1,
-      isChecked: false,
-      weight: undefined,
-      isOwned: false,
-      needsToBuy: false,
-      isPacked: false,
-      required: suggestion.required,
-      assignedGroupId: addItemModal.assignedGroupId,
-      isPersonal: addItemModal.isPersonal
-    }));
-    
-    // Add to the current items list
-    const updatedItems = [...items, ...newItems];
-    updateItems(updatedItems);
-    
-    // Reset the form
-    closeAddItemModal();
+    try {
+      // Validate input
+      const validationError = validateAndSanitizeInput(addItemModal.name, 'Item name');
+      if (validationError) {
+        setUpdateError(validationError);
+        return;
+      }
+
+      // Validate quantity
+      if (addItemModal.quantity < 1 || addItemModal.quantity > 999) {
+        setUpdateError('Quantity must be between 1 and 999');
+        return;
+      }
+
+      setHasUserInteracted(true); // Mark that user has interacted
+      
+      // Sanitize the input
+      const sanitizedName = sanitizeInput(addItemModal.name);
+      
+      // Create a suggestion object to use the separateAndItems function
+      const suggestions = separateAndItems([{
+        name: sanitizedName,
+        category: addItemModal.category,
+        required: false,
+        quantity: addItemModal.quantity
+      }]);
+      
+      // Create packing items from the separated suggestions
+      const newItems: PackingItem[] = suggestions.map((suggestion: PackingSuggestion) => ({
+        id: crypto.randomUUID(),
+        name: suggestion.name,
+        category: suggestion.category,
+        quantity: suggestion.quantity || 1,
+        isChecked: false,
+        weight: undefined,
+        isOwned: false,
+        needsToBuy: false,
+        isPacked: false,
+        required: suggestion.required,
+        assignedGroupId: addItemModal.assignedGroupId,
+        isPersonal: addItemModal.isPersonal
+      }));
+      
+      // Add to the current items list
+      const updatedItems = [...items, ...newItems];
+      updateItems(updatedItems);
+      
+      // Reset the form
+      closeAddItemModal();
+      
+    } catch (error) {
+      logError('Failed to add item:', error);
+      setUpdateError(getErrorMessage(error, 'add item'));
+    }
   };
 
   const updateAddFormField = (field: 'name' | 'quantity', value: string | number) => {
@@ -268,136 +413,191 @@ const PackingList = () => {
   };
 
   const resetToTemplate = async () => {
+    setIsLoading(true);
     try {
       const totalCampers = trip.groups.reduce((sum, group) => sum + group.size, 0);
       const tripDays = Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 60 * 60 * 24));
       const templateItems = getPackingTemplate(trip.tripType, totalCampers, tripDays);
       
-      // Save the template items and set them
-      await hybridDataService.savePackingItems(tripId, templateItems);
-      setItems(templateItems);
+      // Preserve user status changes when resetting to template
+      const existingItemsMap: { [key: string]: PackingItem } = {};
+      items.forEach(item => {
+        existingItemsMap[item.name.toLowerCase()] = item;
+      });
+      
+      const mergedItems = templateItems.map(templateItem => {
+        const existingItem = existingItemsMap[templateItem.name.toLowerCase()];
+        
+        if (existingItem) {
+          // Preserve user status changes but update template properties
+          return {
+            ...templateItem, // Use template structure
+            id: existingItem.id, // Keep existing ID
+            isOwned: existingItem.isOwned, // Preserve owned status
+            needsToBuy: existingItem.needsToBuy, // Preserve shopping status
+            isPacked: existingItem.isPacked, // Preserve packed status
+            isChecked: existingItem.isChecked, // Preserve checked status
+            notes: existingItem.notes, // Preserve user notes
+            assignedGroupId: existingItem.assignedGroupId // Preserve group assignments
+          };
+        }
+        
+        return templateItem; // New template item
+      });
+      
+      // Save the merged items and set them through updateItems for consistency
+      updateItems(mergedItems);
+      
+      setConfirmation('Template updated while preserving your status changes!');
+      setTimeout(() => setConfirmation(null), 3000);
     } catch (error) {
-      console.error('Failed to reset to template:', error);
-      setUpdateError('Failed to reset to template. Please try again.');
+      logError('Failed to reset to template:', error);
+      setUpdateError(getErrorMessage(error, 'reset to template'));
+    } finally {
+      setIsLoading(false);
     }
   };
 
 
 
-  // Load the packing list from storage
+  // Track if data has been loaded to prevent re-initialization
+  const [hasLoaded, setHasLoaded] = useState(false);
+  // Track if user has interacted with the list (to prevent template overrides)
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  // Track if template is currently being created to prevent race conditions
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  
+  // Reset state when trip changes
+  useEffect(() => {
+    setHasLoaded(false);
+    setHasUserInteracted(false);
+    setIsCreatingTemplate(false);
+    log('🔄 Trip changed, resetting packing list state');
+  }, [tripId]);
+
+  // Load the packing list from storage (only when tripId changes, not trip object)
   useEffect(() => {
     const loadPackingList = async () => {
+      if (!tripId || hasLoaded || isCreatingTemplate) {
+        log(`⏭️ Skipping load: tripId=${tripId}, hasLoaded=${hasLoaded}, isCreatingTemplate=${isCreatingTemplate}`);
+        return; // Prevent reload if already loaded or template creation in progress
+      }
+      
+      log('📥 Loading packing list for trip:', tripId);
+      
       try {
         const savedItems = await hybridDataService.getPackingItems(tripId);
+        log(`📦 Found ${savedItems.length} existing packing items`);
         
-        // If no saved items exist, try data recovery first
-        if (savedItems.length === 0) {
-          console.log('No packing items found, attempting data recovery...');
-          const recovered = await recoverPackingData(tripId, trip);
+        // CRITICAL: Only create template if NO items exist AND no template creation is in progress
+        if (savedItems.length === 0 && trip && !hasUserInteracted && !isCreatingTemplate) {
+          log('🔨 No packing items found, creating template...');
+          setIsCreatingTemplate(true); // Prevent concurrent template creation
           
-          if (recovered) {
-            // Reload after recovery
-            const recoveredItems = await hybridDataService.getPackingItems(tripId);
-            setItems(recoveredItems);
-            setConfirmation(`Recovered ${recoveredItems.length} packing items from template!`);
-            setTimeout(() => setConfirmation(null), 3000);
-          } else {
-            // If recovery didn't help, create new template
+          try {
             const totalCampers = trip.groups.reduce((sum, group) => sum + group.size, 0);
             const tripDays = Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 60 * 60 * 24));
             const templateItems = getPackingTemplate(trip.tripType, totalCampers, tripDays);
             
-            await hybridDataService.savePackingItems(tripId, templateItems);
+            log(`🎯 Creating ${templateItems.length} template items for ${trip.tripType} trip`);
+            
+            // Set items directly and save them
             setItems(templateItems);
+            await hybridDataService.savePackingItems(tripId, templateItems);
+            log(`✅ Created and saved ${templateItems.length} template items`);
+          } catch (templateError) {
+            logError('❌ Failed to create template:', templateError);
+            setUpdateError('Failed to create packing template. Please try again.');
+          } finally {
+            setIsCreatingTemplate(false);
           }
-        } else {
+        } else if (savedItems.length > 0) {
+          log(`📦 Loading ${savedItems.length} existing packing items from database`);
           setItems(savedItems);
+        } else {
+          log('⏭️ Skipping template creation - conditions not met');
         }
+        
+        setHasLoaded(true); // Mark as loaded
       } catch (error) {
-        console.error('Failed to load packing list:', error);
+        logError('❌ Failed to load packing list:', error);
         setUpdateError('Failed to load packing list. Please refresh the page.');
+        setIsCreatingTemplate(false);
       }
     };
     
     loadPackingList();
-  }, [tripId, trip]);
+  }, [tripId, hasLoaded, isCreatingTemplate]); // Limited dependencies to prevent excessive re-runs
 
   const toggleOwned = async (itemId: string) => {
-    const item = items.find(item => item.id === itemId);
-    if (!item) return;
-
-    const newIsOwned = !item.isOwned;
+    const originalItems = [...items]; // Backup for error recovery
     
-    // If marking as owned, remove from shopping list
-    if (newIsOwned) {
-      try {
-        const shoppingList = await hybridDataService.getShoppingItems(tripId);
-        const shoppingItem = shoppingList.find(shopItem => shopItem.sourceItemId === itemId);
-        if (shoppingItem) {
-          const updatedShoppingList = shoppingList.filter(item => item.id !== shoppingItem.id);
-          await hybridDataService.saveShoppingItems(tripId, updatedShoppingList);
-          // Show confirmation message
-          setConfirmation(`${item.name} removed from shopping list!`);
-          setTimeout(() => setConfirmation(null), 2000);
-        }
-      } catch (error) {
-        console.error('Failed to remove from shopping list:', error);
+    try {
+      setHasUserInteracted(true); // Mark that user has interacted
+      const item = items.find(item => item.id === itemId);
+      if (!item) {
+        setUpdateError('Item not found. Please refresh the page.');
+        return;
       }
-    }
 
-    const updatedItems = items.map(itemToUpdate => {
-      if (itemToUpdate.id === itemId) {
-        return {
-          ...itemToUpdate,
-          isOwned: newIsOwned,
-          // When marking as owned, also set needsToBuy to false
-          needsToBuy: newIsOwned ? false : itemToUpdate.needsToBuy
-        };
+      const newIsOwned = !item.isOwned;
+      
+      log(`🎯 Toggling owned status for ${item.name}: ${item.isOwned} → ${newIsOwned}`);
+      
+      // Optimistically update UI first
+      const updatedItems = items.map(itemToUpdate => {
+        if (itemToUpdate.id === itemId) {
+          return {
+            ...itemToUpdate,
+            isOwned: newIsOwned,
+            // When marking as owned, also set needsToBuy to false
+            needsToBuy: newIsOwned ? false : itemToUpdate.needsToBuy
+          };
+        }
+        return itemToUpdate;
+      });
+      
+      // Optimistically update local state
+      setItems(updatedItems);
+      
+      // If marking as owned, remove from shopping list
+      if (newIsOwned) {
+        try {
+          const shoppingList = await hybridDataService.getShoppingItems(tripId);
+          const shoppingItem = shoppingList.find(shopItem => shopItem.sourceItemId === itemId);
+          if (shoppingItem) {
+            const updatedShoppingList = shoppingList.filter(item => item.id !== shoppingItem.id);
+            await hybridDataService.saveShoppingItems(tripId, updatedShoppingList);
+            // Show confirmation message
+            setConfirmation(`${item.name} removed from shopping list!`);
+            setTimeout(() => setConfirmation(null), 2000);
+          }
+        } catch (shoppingError) {
+          logError('Failed to remove from shopping list:', shoppingError);
+          // Don't fail the main operation for shopping list errors
+        }
       }
-      return itemToUpdate;
-    });
-    updateItems(updatedItems);
+      
+      // Save the main item changes
+      log(`💾 Saving owned status change immediately...`);
+      await hybridDataService.savePackingItems(tripId, updatedItems);
+      log(`✅ Owned status saved successfully for ${item.name}`);
+      
+    } catch (error) {
+      logError(`❌ Failed to save owned status for item:`, error);
+      setUpdateError(getErrorMessage(error, 'update item status'));
+      // Revert the UI change on error
+      setItems(originalItems);
+    }
   };
 
   const toggleNeedsToBuy = async (itemId: string) => {
+    setHasUserInteracted(true); // Mark that user has interacted
     const item = items.find(item => item.id === itemId);
     if (!item) return;
 
     const newNeedsToBuy = !item.needsToBuy;
-    
-    if (newNeedsToBuy) {
-      // Adding to shopping list
-      const shoppingItem: ShoppingItem = {
-        id: crypto.randomUUID(),
-        name: item.name,
-        category: item.category === 'Kitchen' || item.category === 'Food' ? 'food' : 'camping',
-        quantity: item.quantity,
-        isChecked: false,
-        isOwned: false,
-        needsToBuy: true,
-        sourceItemId: item.id
-      };
-      const currentShoppingList = await hybridDataService.getShoppingItems(tripId);
-      await hybridDataService.saveShoppingItems(tripId, [...currentShoppingList, shoppingItem]);
-      // Show confirmation message
-      setConfirmation(`${item.name} added to shopping list!`);
-      setTimeout(() => setConfirmation(null), 2000);
-    } else {
-      // Removing from shopping list
-      try {
-        const shoppingList = await hybridDataService.getShoppingItems(tripId);
-        const shoppingItem = shoppingList.find(shopItem => shopItem.sourceItemId === itemId);
-        if (shoppingItem) {
-          const updatedShoppingList = shoppingList.filter(item => item.id !== shoppingItem.id);
-          await hybridDataService.saveShoppingItems(tripId, updatedShoppingList);
-          // Show confirmation message
-          setConfirmation(`${item.name} removed from shopping list!`);
-          setTimeout(() => setConfirmation(null), 2000);
-        }
-      } catch (error) {
-        console.error('Failed to remove from shopping list:', error);
-      }
-    }
+    log(`🛒 [PackingList] Toggling needsToBuy for ${item.name}: ${item.needsToBuy} → ${newNeedsToBuy}`);
 
     const updatedItems = items.map(itemToUpdate => {
       if (itemToUpdate.id === itemId) {
@@ -410,20 +610,53 @@ const PackingList = () => {
       }
       return itemToUpdate;
     });
-    updateItems(updatedItems);
+    
+    // Show confirmation message - the shopping list will be automatically updated by the HybridDataService
+    setConfirmation(newNeedsToBuy ? `${item.name} added to shopping list!` : `${item.name} removed from shopping list!`);
+    setTimeout(() => setConfirmation(null), 2000);
+    
+    updateItems(updatedItems, true); // Save immediately for status changes
   };
 
   const togglePacked = async (itemId: string) => {
-    const updatedItems = items.map(item => {
-      if (item.id === itemId) {
-        return {
-          ...item,
-          isPacked: !item.isPacked
-        };
+    const originalItems = [...items]; // Backup for error recovery
+    
+    try {
+      setHasUserInteracted(true); // Mark that user has interacted
+      const item = items.find(item => item.id === itemId);
+      if (!item) {
+        setUpdateError('Item not found. Please refresh the page.');
+        return;
       }
-      return item;
-    });
-    updateItems(updatedItems);
+      
+      const newIsPacked = !item.isPacked;
+      log(`🎯 Toggling packed status for ${item.name}: ${item.isPacked} → ${newIsPacked}`);
+      
+      // Optimistically update UI first
+      const updatedItems = items.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            isPacked: newIsPacked
+          };
+        }
+        return item;
+      });
+      
+      // Optimistically update local state
+      setItems(updatedItems);
+      
+      // Save changes
+      log(`💾 Saving packed status change immediately...`);
+      await hybridDataService.savePackingItems(tripId, updatedItems);
+      log(`✅ Packed status saved successfully for ${item.name}`);
+      
+    } catch (error) {
+      logError(`❌ Failed to save packed status for item:`, error);
+      setUpdateError(getErrorMessage(error, 'update item status'));
+      // Revert the UI change on error
+      setItems(originalItems);
+    }
   };
 
   const updateItemQuantity = async (itemId: string, quantity: number) => {
@@ -437,16 +670,46 @@ const PackingList = () => {
   };
 
   const updateItem = async (itemId: string, updates: Partial<PackingItem>) => {
-    const updatedItems = items.map(item => {
-      if (item.id === itemId) {
-        return { ...item, ...updates };
+    try {
+      // Validate name updates if provided
+      if (updates.name !== undefined) {
+        const validationError = validateAndSanitizeInput(updates.name, 'Item name');
+        if (validationError) {
+          setUpdateError(validationError);
+          return;
+        }
+        // Sanitize the name
+        updates.name = sanitizeInput(updates.name);
       }
-      return item;
-    });
-    updateItems(updatedItems);
+
+      // Validate quantity updates if provided
+      if (updates.quantity !== undefined && (updates.quantity < 1 || updates.quantity > 999)) {
+        setUpdateError('Quantity must be between 1 and 999');
+        return;
+      }
+
+      // Validate notes if provided
+      if (updates.notes !== undefined && updates.notes.length > 500) {
+        setUpdateError('Notes are too long (max 500 characters)');
+        return;
+      }
+
+      const updatedItems = items.map(item => {
+        if (item.id === itemId) {
+          return { ...item, ...updates };
+        }
+        return item;
+      });
+      updateItems(updatedItems);
+      
+    } catch (error) {
+      logError('Failed to update item:', error);
+      setUpdateError(getErrorMessage(error, 'update item'));
+    }
   };
 
   const deleteItem = async (itemId: string) => {
+    setHasUserInteracted(true); // Mark that user has interacted
     const updatedItems = items.filter(item => item.id !== itemId);
     updateItems(updatedItems);
   };
@@ -560,11 +823,22 @@ const PackingList = () => {
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 items-center sm:items-start">
             <button
               onClick={resetToTemplate}
-              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+              disabled={isLoading}
+              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              <Package className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Reset {renderTripTypeText(trip.tripType)} Packing List</span>
-              <span className="sm:hidden">Reset Template</span>
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1 sm:mr-2"></div>
+                  <span className="hidden sm:inline">Updating Template...</span>
+                  <span className="sm:hidden">Updating...</span>
+                </>
+              ) : (
+                <>
+                  <Package className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Reset to Template Packing List</span>
+                  <span className="sm:hidden">Reset Template</span>
+                </>
+              )}
             </button>
             <button
               onClick={() => setShowClearConfirmation(true)}
@@ -577,9 +851,9 @@ const PackingList = () => {
         </div>
 
         {/* Stats */}
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="mt-6 grid grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-green-600">{packedItems}/{totalItems}</div>
+            <div className="text-2xl font-bold text-green-600">{packedItemsCount}/{totalItems}</div>
             <div className="text-sm text-gray-500">Packed</div>
           </div>
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
@@ -590,12 +864,6 @@ const PackingList = () => {
             <div className="text-2xl font-bold text-orange-600">{needToBuyItems}</div>
             <div className="text-sm text-gray-500">Need to Buy</div>
           </div>
-          {shouldShowWeightTracking(trip.tripType) && (
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-purple-600">{Math.round(totalWeight / 1000 * 10) / 10}kg</div>
-              <div className="text-sm text-gray-500">Total Weight</div>
-            </div>
-          )}
         </div>
         
         {/* Legend */}
@@ -729,8 +997,8 @@ const PackingList = () => {
 
       {/* Packing List */}
       <div className="space-y-8">
-        {/* Personal Items Section */}
-        {personalItems.length > 0 && (
+        {/* Unpacked Personal Items Section */}
+        {unpackedPersonalItems.length > 0 && (
           <div className="space-y-6">
             <div className="border-b border-gray-300 dark:border-gray-600 pb-2">
               <h2 className="text-xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
@@ -742,7 +1010,7 @@ const PackingList = () => {
               </p>
             </div>
             {categories.map(category => {
-              const categoryItems: PackingItem[] = groupedPersonalItems[category] ?? [];
+              const categoryItems: PackingItem[] = groupedUnpackedPersonalItems[category] ?? [];
               if (categoryItems.length === 0) return null;
 
               return (
@@ -1169,8 +1437,8 @@ const PackingList = () => {
           </div>
         )}
 
-        {/* Group Items Section */}
-        {groupItems.length > 0 && (
+        {/* Unpacked Group Items Section */}
+        {unpackedGroupItems.length > 0 && (
           <div className="space-y-6">
             <div className="border-b border-gray-300 dark:border-gray-600 pb-2">
               <h2 className="text-xl font-bold text-green-600 dark:text-green-400 flex items-center">
@@ -1182,7 +1450,7 @@ const PackingList = () => {
               </p>
             </div>
             {categories.map(category => {
-              const categoryItems: PackingItem[] = groupedGroupItems[category] ?? [];
+              const categoryItems: PackingItem[] = groupedUnpackedGroupItems[category] ?? [];
               if (categoryItems.length === 0) return null;
 
               return (
@@ -1606,6 +1874,123 @@ const PackingList = () => {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Packed Items Section */}
+        {packedItems.length > 0 && (
+          <div className="space-y-6 mt-12">
+            <div className="border-b border-gray-300 dark:border-gray-600 pb-2">
+              <h2 className="text-xl font-bold text-gray-600 dark:text-gray-400 flex items-center">
+                <Check className="h-5 w-5 mr-2" />
+                Packed Items
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Items that have been packed for the trip
+              </p>
+            </div>
+
+            {/* Packed Personal Items */}
+            {packedPersonalItems.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 flex items-center">
+                  <Users className="h-4 w-4 mr-2" />
+                  Personal Items
+                </h3>
+                {categories.map(category => {
+                  const categoryItems: PackingItem[] = groupedPackedPersonalItems[category] ?? [];
+                  if (categoryItems.length === 0) return null;
+
+                  return (
+                    <div key={`packed-personal-${category}`} className="bg-gray-50 dark:bg-gray-700 shadow rounded-lg">
+                      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                            {getCategoryIcon(category)}
+                            <span className="ml-2">{category}</span>
+                          </h4>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-gray-200 dark:divide-gray-600">
+                        {categoryItems.map((item: PackingItem) => (
+                          <div key={item.id} className="px-3 sm:px-6 py-3 opacity-75">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <Check className="h-4 w-4 text-green-600" />
+                                <span className="text-gray-600 dark:text-gray-400 line-through">
+                                  {item.name}
+                                </span>
+                                {item.quantity > 1 && (
+                                  <span className="text-xs text-gray-500">×{item.quantity}</span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => togglePacked(item.id)}
+                                className="text-gray-400 hover:text-blue-600 p-1"
+                                title="Unpack this item"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Packed Group Items */}
+            {packedGroupItems.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-green-600 dark:text-green-400 flex items-center">
+                  <Package className="h-4 w-4 mr-2" />
+                  Group Items
+                </h3>
+                {categories.map(category => {
+                  const categoryItems: PackingItem[] = groupedPackedGroupItems[category] ?? [];
+                  if (categoryItems.length === 0) return null;
+
+                  return (
+                    <div key={`packed-group-${category}`} className="bg-gray-50 dark:bg-gray-700 shadow rounded-lg">
+                      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                            {getCategoryIcon(category)}
+                            <span className="ml-2">{category}</span>
+                          </h4>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-gray-200 dark:divide-gray-600">
+                        {categoryItems.map((item: PackingItem) => (
+                          <div key={item.id} className="px-3 sm:px-6 py-3 opacity-75">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <Check className="h-4 w-4 text-green-600" />
+                                <span className="text-gray-600 dark:text-gray-400 line-through">
+                                  {item.name}
+                                </span>
+                                {item.quantity > 1 && (
+                                  <span className="text-xs text-gray-500">×{item.quantity}</span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => togglePacked(item.id)}
+                                className="text-gray-400 hover:text-blue-600 p-1"
+                                title="Unpack this item"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

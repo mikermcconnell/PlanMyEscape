@@ -9,7 +9,7 @@ const createItem = (
   required: boolean = true,
   isPersonal: boolean = false
 ): PackingItem => ({
-  id: Math.random().toString(36).substr(2, 9),
+  id: crypto.randomUUID(),
   name,
   category,
   quantity: isPersonal ? 1 : quantity,
@@ -66,10 +66,10 @@ export const getCarCampingTemplate = (groupSize: number, tripDays: number = 2): 
   createItem('Trash bags', 'Kitchen', undefined, 1, true, false),
   
   // Kitchen - Optional
-  createItem('Plates', 'Kitchen', undefined, groupSize, false, true),
-  createItem('Bowls', 'Kitchen', undefined, groupSize, false, true),
-  createItem('Cups', 'Kitchen', undefined, groupSize, false, true),
-  createItem('Mugs', 'Kitchen', undefined, groupSize, false, true),
+  createItem('Plates', 'Kitchen', undefined, groupSize, false, false),
+  createItem('Bowls', 'Kitchen', undefined, groupSize, false, false),
+  createItem('Cups', 'Kitchen', undefined, groupSize, false, false),
+  createItem('Mugs', 'Kitchen', undefined, groupSize, false, false),
   createItem('Cooler', 'Kitchen', undefined, 1, false, false),
   createItem('Ice', 'Kitchen', undefined, 1, false, false),
   createItem('Coffee maker', 'Kitchen', undefined, 1, false, false),
@@ -134,7 +134,6 @@ export const getCarCampingTemplate = (groupSize: number, tripDays: number = 2): 
   createItem('Map', 'Tools', 50, 1, true, false),
   createItem('Compass', 'Tools', 50, 1, true, false),
   createItem('Fire starter', 'Tools', 50, 1, true, false),
-  createItem('Whistle', 'Tools', 20, groupSize, true, true),
   
   // Tools & Safety - Optional (Mix of Personal and Group Items)
   createItem('GPS device', 'Tools', 200, 1, false, false),
@@ -156,7 +155,6 @@ export const getCarCampingTemplate = (groupSize: number, tripDays: number = 2): 
   createItem('Portable speaker', 'Fun and games', undefined, 1, false, false),
   createItem('Camera', 'Comfort', undefined, groupSize, false, true),
   createItem('Binoculars', 'Fun and games', undefined, 1, false, false),
-  createItem('Fishing gear', 'Fun and games', undefined, 1, false, false),
 ];
   return processPackingItems(items);
 };
@@ -185,7 +183,7 @@ export const getBackcountryTemplate = (groupSize: number, tripDays: number = 3):
   createItem('Pot', 'Kitchen', 400, 1, true, false),
   createItem('Spork', 'Kitchen', 20, groupSize, true, true),
   createItem('Water filter', 'Kitchen', 300, 1, true, false),
-  createItem('Water bottles', 'Kitchen', 500, groupSize * 2, true, true),
+  createItem('Water bottle', 'Personal', 500, groupSize, true, true),
   createItem('Food bag', 'Kitchen', 100, 1, true, false),
   
   // Kitchen - Optional
@@ -193,8 +191,8 @@ export const getBackcountryTemplate = (groupSize: number, tripDays: number = 3):
   createItem('Coffee filter', 'Kitchen', 10, 1, false, false),
   createItem('Salt/pepper', 'Kitchen', 20, 1, false, false),
   createItem('Hot sauce', 'Kitchen', 30, 1, false, false),
-  createItem('Cup', 'Kitchen', 100, groupSize, false, true),
-  createItem('Bowl', 'Kitchen', 150, groupSize, false, true),
+  createItem('Cup', 'Kitchen', 100, groupSize, false, false),
+  createItem('Bowl', 'Kitchen', 150, groupSize, false, false),
   createItem('Food storage bag', 'Kitchen', 50, 1, false, false),
   
   // Clothing - Required (Personal Items - Minimalist for hiking)
@@ -251,7 +249,6 @@ export const getBackcountryTemplate = (groupSize: number, tripDays: number = 3):
   createItem('Map', 'Tools', 50, 1, true, false),
   createItem('Compass', 'Tools', 50, 1, true, false),
   createItem('Fire starter', 'Tools', 50, 1, true, false),
-  createItem('Whistle', 'Tools', 20, groupSize, true, true),
   
   // Tools & Safety - Optional
   createItem('GPS device', 'Tools', 200, 1, false, false),
@@ -279,7 +276,6 @@ export const getBackcountryTemplate = (groupSize: number, tripDays: number = 3):
   createItem('Books/games', 'Fun and games', 200, 1, false, false),
   createItem('Camera', 'Comfort', 300, groupSize, false, true),
   createItem('Binoculars', 'Fun and games', 400, 1, false, false),
-  createItem('Fishing gear', 'Fun and games', 600, 1, false, false),
   createItem('Portable speaker', 'Fun and games', 200, 1, false, false),
   createItem('Hammock', 'Fun and games', 400, 1, false, false),
   createItem('Trekking poles', 'Comfort', 300, groupSize, false, true),
@@ -369,17 +365,11 @@ export const getCottageTemplate = (groupSize: number, tripDays: number = 3): Pac
 export const getCanoeCampingTemplate = (groupSize: number, tripDays: number = 3): PackingItem[] => {
   const items = [
   // Transportation & Safety - Required (Group Items)
-  createItem('Canoe', 'Transportation', undefined, Math.ceil(groupSize / 2), true, false),
+  createItem('Canoe', 'Transportation', undefined, 1, true, false),
   createItem('Canoe straps on vehicle', 'Transportation', undefined, 1, true, false),
-  createItem('Paddles', 'Transportation', undefined, Math.ceil(groupSize / 2) + 1, true, false),
+  createItem('Paddles', 'Transportation', undefined, 1, true, false),
   createItem('Bailer', 'Transportation', undefined, 1, true, false),
-  createItem('Life jackets', 'Safety', undefined, groupSize, true, true),
-  createItem('Dry bags (waterproof)', 'Pack', undefined, Math.max(2, groupSize), true, false),
-  createItem('Backpack', 'Pack', undefined, groupSize, true, false),
-  createItem('Cooler', 'Pack', undefined, 1, true, false),
-  createItem('Cooler bag', 'Pack', undefined, 1, true, false),
-  createItem('Knapsacks', 'Pack', undefined, groupSize, true, false),
-  createItem('Net', 'Pack', undefined, 1, true, false),
+  createItem('Life jackets', 'Transportation', undefined, 1, true, false),
   createItem('Rope', 'Tools', undefined, 1, true, false),
   
   // Shelter - Required (Group Items)
@@ -390,21 +380,21 @@ export const getCanoeCampingTemplate = (groupSize: number, tripDays: number = 3)
   createItem('Sleeping pad', 'Sleep', 500, groupSize, true, true),
   createItem('Camping pillow', 'Sleep', 200, groupSize, true, true),
   createItem('Tarps', 'Shelter', 400, 1, true, false),
-  createItem('Fire starters', 'Shelter', 50, 1, true, false),
+  createItem('Fire starters', 'Tools', 50, 1, true, false),
   
   // Kitchen - Required (Group Items)
   createItem('Portable camp stove', 'Kitchen', 400, 1, true, false),
   createItem('Fuel', 'Kitchen', 400, 1, true, false),
   createItem('Lighter', 'Kitchen', 20, 1, true, false),
   createItem('Pot and pan', 'Kitchen', 500, 1, true, false),
-  createItem('Utensils', 'Kitchen', 50, groupSize, true, true),
-  createItem('Bowl', 'Kitchen', 100, groupSize, true, true),
-  createItem('Plates', 'Kitchen', 80, groupSize, true, true),
-  createItem('Cup', 'Kitchen', 60, groupSize, true, true),
+  createItem('Utensils', 'Kitchen', 50, groupSize, true, false),
+  createItem('Bowl', 'Kitchen', 100, groupSize, true, false),
+  createItem('Plates', 'Kitchen', 80, groupSize, true, false),
+  createItem('Cup', 'Kitchen', 60, groupSize, true, false),
   createItem('Coffee cone + filter', 'Kitchen', 100, 1, true, false),
   createItem('Water purification system', 'Kitchen', 200, 1, true, false),
   createItem('Water container', 'Kitchen', 300, 1, true, false),
-  createItem('Water bottles', 'Kitchen', 150, groupSize, true, true),
+  createItem('Water bottle', 'Personal', 150, groupSize, true, true),
   createItem('Food storage (bear-proof)', 'Kitchen', 200, 1, true, false),
   createItem('Large ziplock bags', 'Kitchen', 50, 1, true, false),
   createItem('Garbage bags', 'Kitchen', 100, 1, true, false),
@@ -414,6 +404,7 @@ export const getCanoeCampingTemplate = (groupSize: number, tripDays: number = 3)
   createItem('Dishes container', 'Kitchen', 200, 1, true, false),
   createItem('Hand towel', 'Kitchen', 80, 1, true, false),
   createItem('Paper towel', 'Kitchen', 100, 1, true, false),
+  createItem('Cooler', 'Kitchen', undefined, 1, true, false),
   
   // Clothing - Required (Personal Items - Water-appropriate)
   createItem('Quick-dry hiking pants', 'Clothing', 250, groupSize * calculateClothingQuantity(1, tripDays, 'basic'), true, true),
@@ -460,26 +451,19 @@ export const getCanoeCampingTemplate = (groupSize: number, tripDays: number = 3)
   createItem('Multi-tool', 'Tools', 120, 1, true, false),
   createItem('Duct tape', 'Tools', 80, 1, true, false),
   createItem('Map (in waterproof case)', 'Tools', 50, 1, true, false),
-  createItem('Compass', 'Tools', 60, 1, true, false),
-  createItem('Whistle', 'Tools', 20, groupSize, true, true),
   createItem('Saw and/or hatchet', 'Tools', 300, 1, true, false),
   
   // Tools & Safety - Optional (Group Items)
-  createItem('Portage yoke', 'Transportation', 800, 1, false, false),
-  createItem('Spare paddle', 'Transportation', 600, 1, false, false),
-  createItem('Throw bag (rescue)', 'Safety', 300, 1, false, false),
-  createItem('GPS device (waterproof)', 'Tools', 250, 1, false, false),
   
   // Comfort - Optional (Mix of Personal and Group Items)
   createItem('Waterproof camera', 'Comfort', 300, groupSize, false, true),
-  createItem('Fishing gear', 'Fun and games', 500, 1, false, false),
   createItem('Binoculars (waterproof)', 'Fun and games', 400, 1, false, false),
   createItem('Waterproof playing cards', 'Fun and games', 50, 1, false, false),
   createItem('Camp chair (lightweight)', 'Comfort', 600, groupSize, false, true),
   createItem('Garden gloves', 'Comfort', 100, groupSize, false, true),
   createItem('Floaty', 'Comfort', 200, groupSize, false, true),
   createItem('Hammocks', 'Comfort', 400, groupSize, false, true),
-  createItem('Fun games (balls, things to hide, monopoly deal)', 'Fun and games', 500, 1, false, false),
+  createItem('Fun games', 'Fun and games', 500, 1, false, false),
   ];
   return processPackingItems(items);
 };
@@ -523,7 +507,7 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
       { name: 'Utensils', category: 'Kitchen' },
       { name: 'Plates', category: 'Kitchen' },
       { name: 'Bowls', category: 'Kitchen' },
-      { name: 'Water bottles', category: 'Kitchen' },
+      { name: 'Water bottles', category: 'Personal' },
       { name: 'Headlamp', category: 'Tools' },
       { name: 'First aid kit', category: 'Personal' },
       { name: 'Toiletries', category: 'Personal' },
@@ -552,7 +536,7 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
     essentials: [
       { name: 'Canoe', category: 'Transportation' },
       { name: 'Paddles', category: 'Transportation' },
-      { name: 'Life jackets', category: 'Safety' },
+      { name: 'Life jackets', category: 'Transportation' },
       { name: 'Dry bags', category: 'Storage' },
       { name: 'Waterproof tent', category: 'Shelter' },
       { name: 'Sleeping bag', category: 'Sleep' },
@@ -568,10 +552,7 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
       { name: 'Repair kit', category: 'Tools' }
     ],
     recommended: [
-      { name: 'Portage yoke', category: 'Transportation' },
-      { name: 'Spare paddle', category: 'Transportation' },
       { name: 'Waterproof camera', category: 'Fun and games' },
-      { name: 'Fishing gear', category: 'Fun and games' },
       { name: 'Binoculars', category: 'Fun and games' },
       { name: 'Quick-dry towel', category: 'Personal' },
       { name: 'Water shoes', category: 'Clothing' },
@@ -579,8 +560,6 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
       { name: 'Extra dry bags', category: 'Storage' },
       { name: 'Duct tape', category: 'Tools' },
       { name: 'Multi-tool', category: 'Tools' },
-      { name: 'Whistle', category: 'Safety' },
-      { name: 'Throw bag', category: 'Safety' },
       { name: 'Emergency shelter', category: 'Safety' },
       { name: 'Signal mirror', category: 'Safety' }
     ]
@@ -596,7 +575,7 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
       { name: 'Map', category: 'Tools' },
       { name: 'Compass', category: 'Tools' },
       { name: 'First aid kit', category: 'Personal' },
-      { name: 'Water bottles', category: 'Kitchen' },
+      { name: 'Water bottles', category: 'Personal' },
       { name: 'Water filter', category: 'Kitchen' },
       { name: 'Lightweight stove', category: 'Kitchen' },
       { name: 'Trail snacks', category: 'Kitchen' },
@@ -606,7 +585,6 @@ export const packingTemplates: Record<TripTypeOption, PackingTemplate> = {
     ],
     recommended: [
       { name: 'GPS device', category: 'Tools' },
-      { name: 'Emergency whistle', category: 'Safety' },
       { name: 'Duct tape', category: 'Tools' },
       { name: 'Extra batteries', category: 'Tools' },
       { name: 'Portable charger', category: 'Tools' },
@@ -700,8 +678,6 @@ export const specializedGear: Record<TripTypeOption, string[]> = {
     'Canoe',
     'Paddles',
     'Life jackets',
-    'Dry bags',
-    'Portage packs',
     'Rope',
     'Repair kit'
   ],
@@ -717,7 +693,6 @@ export const specializedGear: Record<TripTypeOption, string[]> = {
   'cottage': [
     'Board games',
     'Beach toys',
-    'Fishing gear',
     'Water toys',
     'Outdoor games',
     'Entertainment items'
@@ -751,7 +726,7 @@ export const processPackingItems = (items: PackingItem[]): PackingItem[] => {
     const originalItem = items.find(item => item.name.toLowerCase().includes(suggestion.name.toLowerCase()));
     
     return {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       name: suggestion.name,
       category: suggestion.category,
       quantity: suggestion.quantity || 1,

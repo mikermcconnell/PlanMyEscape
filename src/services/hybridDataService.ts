@@ -23,8 +23,11 @@ export class HybridDataService {
   private async isSignedIn(): Promise<boolean> {
     try {
       const { data, error } = await supabase.auth.getUser();
-      return !error && !!data.user;
-    } catch {
+      const signedIn = !error && !!data.user;
+      console.log(`🔐 [HybridDataService] Auth check - Signed in: ${signedIn}, User ID: ${data.user?.id || 'none'}`);
+      return signedIn;
+    } catch (authError) {
+      console.error('❌ [HybridDataService] Auth check failed:', authError);
       return false;
     }
   }
@@ -32,57 +35,141 @@ export class HybridDataService {
   // === PACKING ITEMS ===
   
   async getPackingItems(tripId: string): Promise<PackingItem[]> {
+    console.log(`🎒 [HybridDataService] Getting packing items for trip ${tripId}`);
+    
     if (await this.isSignedIn()) {
       try {
-        return await supabaseDataService.getPackingItems(tripId);
+        const items = await supabaseDataService.getPackingItems(tripId);
+        console.log(`📦 [HybridDataService] Loaded ${items.length} packing items from Supabase`);
+        
+        // Safety check: Remove any duplicates that might exist in storage
+        const uniqueItems = this.removeDuplicatePackingItems(items);
+        if (uniqueItems.length !== items.length) {
+          console.warn(`⚠️ [HybridDataService] Found ${items.length - uniqueItems.length} duplicate items in storage, cleaning up...`);
+          // Save the cleaned version back to storage (bypass duplicate check to prevent loop)
+          await this.savePackingItemsInternal(tripId, uniqueItems);
+          return uniqueItems;
+        }
+        
+        return items;
       } catch (error) {
         console.error('Failed to get packing items from Supabase, falling back to local:', error);
-        return await getPackingListLocal(tripId);
+        const localItems = await getPackingListLocal(tripId);
+        return this.removeDuplicatePackingItems(localItems);
       }
     }
-    return await getPackingListLocal(tripId);
+    
+    const localItems = await getPackingListLocal(tripId);
+    console.log(`📱 [HybridDataService] Loaded ${localItems.length} packing items from local storage`);
+    return this.removeDuplicatePackingItems(localItems);
   }
   
   async savePackingItems(tripId: string, items: PackingItem[]): Promise<void> {
+    console.log(`🎒 [HybridDataService] Saving ${items.length} packing items for trip ${tripId}`);
+    
+    // DUPLICATE PREVENTION: Check for obvious duplicates before saving
+    const uniqueItems = this.removeDuplicatePackingItems(items);
+    if (uniqueItems.length !== items.length) {
+      console.warn(`⚠️ [HybridDataService] Removed ${items.length - uniqueItems.length} duplicate packing items before saving`);
+    }
+    
+    return await this.savePackingItemsInternal(tripId, uniqueItems);
+  }
+  
+  /**
+   * Internal save method that bypasses duplicate checking (used for cleanup operations)
+   */
+  private async savePackingItemsInternal(tripId: string, items: PackingItem[]): Promise<void> {
     if (await this.isSignedIn()) {
       try {
+        console.log('📤 [HybridDataService] User signed in, saving to Supabase...');
         await supabaseDataService.savePackingItems(tripId, items);
         // Also save locally as backup
         await savePackingListLocal(tripId, items);
+        console.log('✅ [HybridDataService] Packing items saved successfully to Supabase');
       } catch (error) {
-        console.error('Failed to save packing items to Supabase, saving locally:', error);
+        console.error('❌ [HybridDataService] Failed to save packing items to Supabase, saving locally:', error);
         await savePackingListLocal(tripId, items);
       }
     } else {
+      console.log('📱 [HybridDataService] User not signed in, saving locally only');
       await savePackingListLocal(tripId, items);
     }
+  }
+  
+  /**
+   * Remove duplicate packing items based on name and category
+   */
+  private removeDuplicatePackingItems(items: PackingItem[]): PackingItem[] {
+    const seen = new Map<string, PackingItem>();
+    
+    for (const item of items) {
+      const key = `${item.name.toLowerCase().trim()}-${item.category.toLowerCase().trim()}-${item.isPersonal}`;
+      
+      if (!seen.has(key)) {
+        seen.set(key, item);
+      } else {
+        // Keep the item with more user data (owned, packed, notes, etc.)
+        const existing = seen.get(key)!;
+        const hasMoreData = item.isOwned || item.isPacked || item.needsToBuy || item.notes || item.assignedGroupId;
+        const existingHasMoreData = existing.isOwned || existing.isPacked || existing.needsToBuy || existing.notes || existing.assignedGroupId;
+        
+        if (hasMoreData && !existingHasMoreData) {
+          seen.set(key, item);
+        }
+      }
+    }
+    
+    return Array.from(seen.values());
   }
   
   // === MEALS ===
   
   async getMeals(tripId: string): Promise<Meal[]> {
+    console.log(`🍽️ [HybridDataService] Getting meals for trip ${tripId}`);
     if (await this.isSignedIn()) {
       try {
-        return await supabaseDataService.getMeals(tripId);
+        console.log('📤 [HybridDataService] User signed in, loading from Supabase...');
+        const supabaseMeals = await supabaseDataService.getMeals(tripId);
+        console.log(`✅ [HybridDataService] Loaded ${supabaseMeals.length} meals from Supabase`);
+        return supabaseMeals;
       } catch (error) {
-        console.error('Failed to get meals from Supabase, falling back to local:', error);
-        return await getMealsLocal(tripId);
+        console.error('❌ [HybridDataService] Failed to get meals from Supabase, falling back to local:', error);
+        const localMeals = await getMealsLocal(tripId);
+        console.log(`📱 [HybridDataService] Loaded ${localMeals.length} meals from local storage as fallback`);
+        return localMeals;
       }
     }
-    return await getMealsLocal(tripId);
+    console.log('📱 [HybridDataService] User not signed in, loading from local storage only');
+    const localMeals = await getMealsLocal(tripId);
+    console.log(`📱 [HybridDataService] Loaded ${localMeals.length} meals from local storage`);
+    return localMeals;
   }
   
   async saveMeals(tripId: string, meals: Meal[]): Promise<void> {
-    if (await this.isSignedIn()) {
+    console.log(`🔍 [HybridDataService] saveMeals called with tripId: ${tripId}, meals.length: ${meals.length}`);
+    console.log(`🍽️ [HybridDataService] Saving ${meals.length} meals for trip ${tripId}`);
+    
+    const isSignedIn = await this.isSignedIn();
+    console.log(`🔐 [HybridDataService] User signed in status: ${isSignedIn}`);
+    
+    if (isSignedIn) {
       try {
+        console.log('📤 [HybridDataService] User signed in, calling supabaseDataService.saveMeals...');
         await supabaseDataService.saveMeals(tripId, meals);
+        console.log('✅ [HybridDataService] supabaseDataService.saveMeals completed successfully');
+        
         // Also save locally as backup
+        console.log('💾 [HybridDataService] Saving locally as backup...');
         await saveMealsLocal(tripId, meals);
+        console.log('✅ [HybridDataService] Meals saved successfully to Supabase and local backup');
       } catch (error) {
-        console.error('Failed to save meals to Supabase, saving locally:', error);
+        console.error('❌ [HybridDataService] Failed to save meals to Supabase, saving locally:', error);
         await saveMealsLocal(tripId, meals);
+        throw error; // Re-throw the error so the MealPlanner can handle it
       }
     } else {
+      console.log('📱 [HybridDataService] User not signed in, saving locally only');
       await saveMealsLocal(tripId, meals);
     }
   }
@@ -92,26 +179,264 @@ export class HybridDataService {
   async getShoppingItems(tripId: string): Promise<ShoppingItem[]> {
     if (await this.isSignedIn()) {
       try {
-        return await supabaseDataService.getShoppingItems(tripId);
+        const items = await supabaseDataService.getShoppingItems(tripId);
+        // Ensure shopping list is automatically populated with packing and meal items
+        return await this.ensureShoppingListPopulated(tripId, items);
       } catch (error) {
         console.error('Failed to get shopping items from Supabase, falling back to local:', error);
-        return await getShoppingListLocal(tripId);
+        const localItems = await getShoppingListLocal(tripId);
+        return await this.ensureShoppingListPopulated(tripId, localItems);
       }
     }
-    return await getShoppingListLocal(tripId);
+    const localItems = await getShoppingListLocal(tripId);
+    return await this.ensureShoppingListPopulated(tripId, localItems);
+  }
+  
+  // New method that accepts meals to avoid database reload race conditions
+  async getShoppingItemsWithMeals(tripId: string, currentMeals: Meal[]): Promise<ShoppingItem[]> {
+    if (await this.isSignedIn()) {
+      try {
+        const items = await supabaseDataService.getShoppingItems(tripId);
+        // Use provided meals instead of loading from database
+        return await this.ensureShoppingListPopulatedWithMeals(tripId, items, currentMeals);
+      } catch (error) {
+        console.error('Failed to get shopping items from Supabase, falling back to local:', error);
+        const localItems = await getShoppingListLocal(tripId);
+        return await this.ensureShoppingListPopulatedWithMeals(tripId, localItems, currentMeals);
+      }
+    }
+    const localItems = await getShoppingListLocal(tripId);
+    return await this.ensureShoppingListPopulatedWithMeals(tripId, localItems, currentMeals);
+  }
+  
+  private async ensureShoppingListPopulated(tripId: string, existingItems: ShoppingItem[]): Promise<ShoppingItem[]> {
+    console.log(`🛒 [HybridDataService] Ensuring shopping list is populated for trip ${tripId}`);
+    
+    // Get packing items and meals to auto-populate shopping list
+    const [packingItems, meals, deletedIngredients] = await Promise.all([
+      this.getPackingItems(tripId),
+      this.getMeals(tripId),
+      this.getDeletedIngredients(tripId)
+    ]);
+    
+    const existingItemsMap = new Map(existingItems.map(item => [item.name.toLowerCase(), item]));
+    const deletedIngredientsSet = new Set(deletedIngredients.map(name => name.toLowerCase()));
+    
+    // 1. Add packing items marked as needsToBuy
+    const packingShoppingItems: ShoppingItem[] = packingItems
+      .filter(item => item.needsToBuy && !item.isOwned)
+      .map(item => {
+        const existing = existingItemsMap.get(item.name.toLowerCase());
+        return existing || {
+          id: crypto.randomUUID(),
+          name: item.name,
+          quantity: item.quantity,
+          category: 'camping' as const,
+          isChecked: false,
+          needsToBuy: true,
+          isOwned: false,
+          sourceItemId: item.id // Link back to packing item
+        };
+      });
+    
+    // 2. Add meal ingredients (excluding deleted ones)
+    const ingredientCounts = meals.length > 0 
+      ? meals.flatMap(m => m.ingredients).reduce<Record<string, number>>((acc, ing) => {
+          const normalizedName = ing.toLowerCase().trim();
+          if (!deletedIngredientsSet.has(normalizedName)) {
+            acc[ing] = (acc[ing] || 0) + 1;
+          }
+          return acc;
+        }, {})
+      : {};
+    
+    console.log(`🍽️ [HybridDataService] Current meal ingredients:`, Object.keys(ingredientCounts));
+    
+    const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientCounts)
+      .map(([name, count]) => {
+        const existing = existingItemsMap.get(name.toLowerCase());
+        return existing || {
+          id: crypto.randomUUID(),
+          name,
+          quantity: count,
+          category: 'food' as const,
+          isChecked: false,
+          needsToBuy: true,
+          isOwned: false,
+          sourceItemId: undefined // No sourceItemId means it's from meals
+        };
+      });
+    
+    // 3. Get manually added items (items not from packing or current meals)
+    // FIXED: Properly filter out orphaned meal ingredients
+    const manualItems = existingItems.filter(item => {
+      // Keep items that are not auto-generated from packing or meals
+      const isFromPacking = item.sourceItemId && packingItems.some(p => p.id === item.sourceItemId);
+      
+      // For food items without sourceItemId, only keep them if they're currently in meals
+      // This will remove orphaned ingredients from deleted meals
+      const isFoodItemWithoutSource = !item.sourceItemId && item.category === 'food';
+      const isCurrentlyInMeals = ingredientCounts[item.name];
+      
+      if (isFromPacking) {
+        return false; // Will be handled by packing section
+      }
+      
+      if (isFoodItemWithoutSource) {
+        if (isCurrentlyInMeals) {
+          return false; // Will be handled by meals section
+        } else {
+          // This is an orphaned ingredient from a deleted meal
+          console.log(`🗑️ [HybridDataService] Removing orphaned meal ingredient: ${item.name}`);
+          return false;
+        }
+      }
+      
+      // Keep camping items and other manually added items
+      return true;
+    });
+    
+    // 4. Combine all items
+    const allItems = [...packingShoppingItems, ...mealShoppingItems, ...manualItems];
+    
+    console.log(`🛒 [HybridDataService] Shopping list populated: ${packingShoppingItems.length} packing + ${mealShoppingItems.length} meal + ${manualItems.length} manual = ${allItems.length} total`);
+    
+    // 5. Save the updated shopping list if it changed
+    if (allItems.length !== existingItems.length || 
+        !allItems.every(item => existingItems.some(existing => 
+          existing.id === item.id && 
+          existing.name === item.name && 
+          existing.quantity === item.quantity
+        ))) {
+      console.log(`🛒 [HybridDataService] Shopping list changed, saving...`);
+      await this.saveShoppingItems(tripId, allItems);
+      return allItems;
+    }
+    
+    return existingItems;
+  }
+  
+  private async ensureShoppingListPopulatedWithMeals(tripId: string, existingItems: ShoppingItem[], currentMeals: Meal[]): Promise<ShoppingItem[]> {
+    console.log(`🛒 [HybridDataService] Ensuring shopping list is populated for trip ${tripId} with provided meals`);
+    
+    // Get packing items and deleted ingredients (but use provided meals)
+    const [packingItems, deletedIngredients] = await Promise.all([
+      this.getPackingItems(tripId),
+      this.getDeletedIngredients(tripId)
+    ]);
+    
+    const existingItemsMap = new Map(existingItems.map(item => [item.name.toLowerCase(), item]));
+    const deletedIngredientsSet = new Set(deletedIngredients.map(name => name.toLowerCase()));
+    
+    // 1. Add packing items marked as needsToBuy
+    const packingShoppingItems: ShoppingItem[] = packingItems
+      .filter(item => item.needsToBuy && !item.isOwned)
+      .map(item => {
+        const existing = existingItemsMap.get(item.name.toLowerCase());
+        return existing || {
+          id: crypto.randomUUID(),
+          name: item.name,
+          quantity: item.quantity,
+          category: 'camping' as const,
+          isChecked: false,
+          needsToBuy: true,
+          isOwned: false,
+          sourceItemId: item.id // Link back to packing item
+        };
+      });
+    
+    // 2. Add meal ingredients from provided meals (excluding deleted ones)
+    const ingredientCounts = currentMeals.length > 0 
+      ? currentMeals.flatMap(m => m.ingredients).reduce<Record<string, number>>((acc, ing) => {
+          const normalizedName = ing.toLowerCase().trim();
+          if (!deletedIngredientsSet.has(normalizedName)) {
+            acc[ing] = (acc[ing] || 0) + 1;
+          }
+          return acc;
+        }, {})
+      : {};
+    
+    console.log(`🍽️ [HybridDataService] Using provided meal ingredients:`, Object.keys(ingredientCounts));
+    
+    const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientCounts)
+      .map(([name, count]) => {
+        const existing = existingItemsMap.get(name.toLowerCase());
+        return existing || {
+          id: crypto.randomUUID(),
+          name,
+          quantity: count,
+          category: 'food' as const,
+          isChecked: false,
+          needsToBuy: true,
+          isOwned: false,
+          sourceItemId: undefined // No sourceItemId means it's from meals
+        };
+      });
+    
+    // 3. Get manually added items (items not from packing or current meals)
+    // FIXED: Properly filter out orphaned meal ingredients
+    const manualItems = existingItems.filter(item => {
+      // Keep items that are not auto-generated from packing or meals
+      const isFromPacking = item.sourceItemId && packingItems.some(p => p.id === item.sourceItemId);
+      
+      // For food items without sourceItemId, only keep them if they're currently in meals
+      // This will remove orphaned ingredients from deleted meals
+      const isFoodItemWithoutSource = !item.sourceItemId && item.category === 'food';
+      const isCurrentlyInMeals = ingredientCounts[item.name];
+      
+      if (isFromPacking) {
+        return false; // Will be handled by packing section
+      }
+      
+      if (isFoodItemWithoutSource) {
+        if (isCurrentlyInMeals) {
+          return false; // Will be handled by meals section
+        } else {
+          // This is an orphaned ingredient from a deleted meal
+          console.log(`🗑️ [HybridDataService] Removing orphaned meal ingredient: ${item.name}`);
+          return false;
+        }
+      }
+      
+      // Keep camping items and other manually added items
+      return true;
+    });
+    
+    // 4. Combine all items
+    const allItems = [...packingShoppingItems, ...mealShoppingItems, ...manualItems];
+    
+    console.log(`🛒 [HybridDataService] Shopping list populated with provided meals: ${packingShoppingItems.length} packing + ${mealShoppingItems.length} meal + ${manualItems.length} manual = ${allItems.length} total`);
+    
+    // 5. Save the updated shopping list if it changed
+    if (allItems.length !== existingItems.length || 
+        !allItems.every(item => existingItems.some(existing => 
+          existing.id === item.id && 
+          existing.name === item.name && 
+          existing.quantity === item.quantity
+        ))) {
+      console.log(`🛒 [HybridDataService] Shopping list changed, saving...`);
+      await this.saveShoppingItems(tripId, allItems);
+      return allItems;
+    }
+    
+    return existingItems;
   }
   
   async saveShoppingItems(tripId: string, items: ShoppingItem[]): Promise<void> {
+    console.log(`🛒 [HybridDataService] Saving ${items.length} shopping items for trip ${tripId}`);
     if (await this.isSignedIn()) {
       try {
+        console.log('📤 [HybridDataService] User signed in, saving to Supabase...');
         await supabaseDataService.saveShoppingItems(tripId, items);
         // Also save locally as backup
         await saveShoppingListLocal(tripId, items);
+        console.log('✅ [HybridDataService] Shopping items saved successfully to Supabase');
       } catch (error) {
-        console.error('Failed to save shopping items to Supabase, saving locally:', error);
+        console.error('❌ [HybridDataService] Failed to save shopping items to Supabase, saving locally:', error);
         await saveShoppingListLocal(tripId, items);
       }
     } else {
+      console.log('📱 [HybridDataService] User not signed in, saving locally only');
       await saveShoppingListLocal(tripId, items);
     }
   }
@@ -187,16 +512,20 @@ export class HybridDataService {
   }
   
   async saveTodoItems(tripId: string, items: TodoItem[]): Promise<void> {
+    console.log(`✅ [HybridDataService] Saving ${items.length} todo items for trip ${tripId}`);
     if (await this.isSignedIn()) {
       try {
+        console.log('📤 [HybridDataService] User signed in, saving to Supabase...');
         await supabaseDataService.saveTodoItems(tripId, items);
         // Also save locally as backup
         await saveTodoItemsLocal(tripId, items);
+        console.log('✅ [HybridDataService] Todo items saved successfully to Supabase');
       } catch (error) {
-        console.error('Failed to save todo items to Supabase, saving locally:', error);
+        console.error('❌ [HybridDataService] Failed to save todo items to Supabase, saving locally:', error);
         await saveTodoItemsLocal(tripId, items);
       }
     } else {
+      console.log('📱 [HybridDataService] User not signed in, saving locally only');
       await saveTodoItemsLocal(tripId, items);
     }
   }

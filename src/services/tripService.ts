@@ -1,6 +1,20 @@
 import { Trip } from '../types';
 import { StorageAdapter, HybridStorageAdapter } from './storageAdapter';
 import { toast } from 'react-toastify';
+import { supabase } from '../supabaseClient';
+
+export interface TripPerformanceStats {
+  id: string;
+  trip_name: string;
+  user_id: string;
+  packing_items_count: number;
+  meals_count: number;
+  shopping_items_count: number;
+  todo_items_count: number;
+  complexity_level: 'LOW' | 'MEDIUM' | 'HIGH';
+  created_at: string;
+  updated_at: string;
+}
 
 export class TripService {
   constructor(private adapter: StorageAdapter) {}
@@ -83,6 +97,31 @@ export class TripService {
       }
       
       throw error; // Re-throw the original error for further handling
+    }
+  }
+
+  async getTripPerformanceStats(): Promise<TripPerformanceStats[]> {
+    try {
+      console.log('🔍 [TripService.getTripPerformanceStats] Starting...');
+      
+      // Call the security definer function that handles user isolation
+      const { data, error } = await supabase.rpc('get_user_trip_performance_stats');
+      
+      if (error) {
+        console.error('🔴 [TripService.getTripPerformanceStats] Supabase error:', error);
+        throw new Error(`Failed to fetch performance stats: ${error.message}`);
+      }
+      
+      console.log('🔍 [TripService.getTripPerformanceStats] Result:', {
+        statsCount: data?.length || 0,
+        stats: data?.slice(0, 3) // Log first 3 for debugging
+      });
+      
+      return data || [];
+    } catch (error) {
+      console.error('🔴 [TripService.getTripPerformanceStats] Error:', error);
+      toast.error('Unable to load trip performance stats');
+      throw new Error('Unable to load trip performance stats');
     }
   }
 }

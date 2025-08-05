@@ -3,11 +3,9 @@ import { useOutletContext } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { ShoppingCart, FileDown, Check, RotateCcw, X, DollarSign, Calculator, BarChart3 } from 'lucide-react';
-import { Trip, ShoppingItem, Settlement } from '../types';
-import { getShoppingList, saveShoppingList } from '../utils/storage';
-import CostSplitter from '../components/CostSplitter';
-import ExpenseSummary from '../components/ExpenseSummary';
+import { ShoppingCart, FileDown, Check, RotateCcw, X } from 'lucide-react';
+import { Trip, ShoppingItem } from '../types';
+import { hybridDataService } from '../services/hybridDataService';
 
 interface TripContextType {
   trip: Trip;
@@ -19,12 +17,12 @@ const ShoppingListPage: React.FC = () => {
   const tripId = trip.id;
   const [allItems, setAllItems] = useState<ShoppingItem[]>([]);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
-  const [editingCostItem, setEditingCostItem] = useState<ShoppingItem | null>(null);
-  const [showExpenseSummary, setShowExpenseSummary] = useState(false);
 
   useEffect(() => {
     const load = async () => {
-      const list = await getShoppingList(tripId);
+      console.log(`📥 [ShoppingListPage] Loading shopping items for trip ${tripId}...`);
+      const list = await hybridDataService.getShoppingItems(tripId);
+      console.log(`📊 [ShoppingListPage] Loaded ${list.length} shopping items`);
       setAllItems(list);
     };
     load();
@@ -57,10 +55,10 @@ const ShoppingListPage: React.FC = () => {
   const toggleBought = async (itemId: string) => {
     const updated = allItems.map(it => it.id === itemId ? { ...it, isChecked: !it.isChecked } : it);
     setAllItems(updated);
-    await saveShoppingList(tripId, updated);
+    await hybridDataService.saveShoppingItems(tripId, updated);
 
     // Force refresh from storage to ensure UI is in sync
-    const refreshed = await getShoppingList(tripId);
+    const refreshed = await hybridDataService.getShoppingItems(tripId);
     setAllItems(refreshed);
 
     const toggled = updated.find(i => i.id === itemId);
@@ -69,38 +67,26 @@ const ShoppingListPage: React.FC = () => {
     }
   };
 
-  const handleSaveCostSplit = async (updatedItem: ShoppingItem) => {
-    const updatedItems = allItems.map(item => 
-      item.id === updatedItem.id ? updatedItem : item
-    );
-    setAllItems(updatedItems);
-    await saveShoppingList(tripId, updatedItems);
-    setEditingCostItem(null);
-    toast.success('Cost split saved successfully!');
-  };
-
-  const handleSettleExpense = async (settlement: Settlement) => {
-    // In a real app, this would update the settlement status in the database
-    toast.success(`Settlement of ${settlement.amount} marked as settled!`);
-  };
 
   const clearUserInput = async () => {
     // This should reset the needsToBuy flags in the source lists (packing and meals)
     // and clear all manually added items
+    console.log(`🧹 [ShoppingListPage] Clearing shopping list for trip ${tripId}...`);
     
     // Step 1: Get current packing list and reset needsToBuy flags
-    const { getPackingList, savePackingList } = await import('../utils/storage');
-    const packingItems = await getPackingList(tripId);
+    const packingItems = await hybridDataService.getPackingItems(tripId);
     const resetPackingItems = packingItems.map(item => ({
       ...item,
       needsToBuy: false // Reset all packing items
     }));
-    await savePackingList(tripId, resetPackingItems);
+    await hybridDataService.savePackingItems(tripId, resetPackingItems);
+    console.log(`🧹 [ShoppingListPage] Reset ${resetPackingItems.length} packing items needsToBuy flags`);
     
     // Step 2: Clear all shopping items (both manual and auto-generated)
     // The shopping list should regenerate from the reset sources
     setAllItems([]);
-    await saveShoppingList(tripId, []);
+    await hybridDataService.saveShoppingItems(tripId, []);
+    console.log(`🧹 [ShoppingListPage] Cleared all shopping items`);
     
     setShowClearConfirmation(false);
   };
@@ -118,13 +104,6 @@ const ShoppingListPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setShowExpenseSummary(!showExpenseSummary)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Expenses
-          </button>
           <button
             onClick={() => setShowClearConfirmation(true)}
             className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
@@ -166,33 +145,15 @@ const ShoppingListPage: React.FC = () => {
         );
       })()}
 
-      {/* Expense Summary */}
-      {showExpenseSummary && trip.groups.length > 0 && (
-        <div className="mb-6">
-          <ExpenseSummary 
-            shoppingItems={allItems}
-            groups={trip.groups}
-            onSettleExpense={handleSettleExpense}
-          />
-        </div>
-      )}
 
       {/* Legend */}
       <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg max-w-md">
         <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Status Icons</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center">
-            <div className="p-1 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 mr-2">
-              <Check className="h-4 w-4" />
-            </div>
-            <span className="text-gray-700 dark:text-gray-300 text-sm">Purchased</span>
+        <div className="flex items-center">
+          <div className="p-1 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400 mr-2">
+            <Check className="h-4 w-4" />
           </div>
-          <div className="flex items-center">
-            <div className="p-1 rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400 mr-2">
-              <DollarSign className="h-4 w-4" />
-            </div>
-            <span className="text-gray-700 dark:text-gray-300 text-sm">Has cost data</span>
-          </div>
+          <span className="text-gray-700 dark:text-gray-300 text-sm">Purchased</span>
         </div>
       </div>
 
@@ -200,54 +161,81 @@ const ShoppingListPage: React.FC = () => {
       {allItems.filter(i => i.needsToBuy).length === 0 ? (
         <div className="text-gray-500 dark:text-gray-400">No items marked as need to buy.</div>
       ) : (
-        <div className="space-y-2 max-w-2xl">
-          {allItems.filter(i => i.needsToBuy).map(item => {
-            const hasCost = item.cost && item.cost > 0;
-            const paidByGroup = trip.groups.find(g => g.id === item.paidByGroupId);
+        <div className="space-y-6 max-w-2xl">
+          {(() => {
+            const itemsToBuy = allItems.filter(i => i.needsToBuy);
             
-            return (
-              <div key={item.id} className="flex items-center p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                <button
-                  onClick={() => toggleBought(item.id)}
-                  className={`p-1 rounded-full transition-colors mr-3 ${
-                    item.isChecked ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                  }`}
-                  title={item.isChecked ? 'Purchased' : 'Mark as purchased'}
-                >
-                  <Check className="h-4 w-4" />
-                </button>
-                
-                <div className="flex-1">
-                  <div className={`${item.isChecked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                    {item.name}{item.quantity > 1 && <span className="ml-1 text-sm text-gray-500">×{item.quantity}</span>}
-                  </div>
-                  {hasCost && (
-                    <div className="text-sm text-gray-500 mt-1">
-                      ${item.cost?.toFixed(2)}
-                      {paidByGroup && <span className="ml-2">• Paid by {paidByGroup.name}</span>}
-                      {item.paidByUserName && <span className="ml-1">({item.paidByUserName})</span>}
-                      {item.splits && <span className="ml-2">• Split {item.splits.length} ways</span>}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  {hasCost && (
-                    <div className="p-1 rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400">
-                      <DollarSign className="h-4 w-4" />
-                    </div>
-                  )}
+            // Sort items: unpurchased first, then purchased (moved to bottom)
+            // Within each group, sort by category (packing items first, then ingredients)
+            const sortedItems = itemsToBuy.sort((a, b) => {
+              // First sort by purchase status (unpurchased first)
+              if (a.isChecked !== b.isChecked) {
+                return a.isChecked ? 1 : -1;
+              }
+              
+              // Then sort by category (camping/packing first, then food/ingredients)
+              if (a.category !== b.category) {
+                return a.category === 'camping' ? -1 : 1;
+              }
+              
+              // Finally sort by name
+              return a.name.localeCompare(b.name);
+            });
+            
+            // Group items by category for display
+            const packingItems = sortedItems.filter(item => item.category === 'camping');
+            const ingredientItems = sortedItems.filter(item => item.category === 'food');
+            
+            const renderItem = (item: ShoppingItem) => {
+              return (
+                <div key={item.id} className="flex items-center p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                   <button
-                    onClick={() => setEditingCostItem(item)}
-                    className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 transition-colors"
-                    title={hasCost ? 'Edit cost split' : 'Add cost split'}
+                    onClick={() => toggleBought(item.id)}
+                    className={`p-1 rounded-full transition-colors mr-3 ${
+                      item.isChecked ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                    }`}
+                    title={item.isChecked ? 'Purchased' : 'Mark as purchased'}
                   >
-                    <Calculator className="h-4 w-4" />
+                    <Check className="h-4 w-4" />
                   </button>
+                  
+                  <div className="flex-1">
+                    <div className={`${item.isChecked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                      {item.name}{item.quantity > 1 && <span className="ml-1 text-sm text-gray-500">×{item.quantity}</span>}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              );
+            };
+
+            return (
+              <>
+                {/* Packing Items Section */}
+                {packingItems.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+                      🎒 Packing Items
+                    </h3>
+                    <div className="space-y-2">
+                      {packingItems.map(renderItem)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ingredients Section */}
+                {ingredientItems.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+                      🍽️ Meal Ingredients
+                    </h3>
+                    <div className="space-y-2">
+                      {ingredientItems.map(renderItem)}
+                    </div>
+                  </div>
+                )}
+              </>
             );
-          })}
+          })()}
         </div>
       )}
       
@@ -291,15 +279,6 @@ const ShoppingListPage: React.FC = () => {
         </div>
       )}
       
-      {/* Cost Splitter Modal */}
-      {editingCostItem && (
-        <CostSplitter
-          item={editingCostItem}
-          groups={trip.groups}
-          onSave={handleSaveCostSplit}
-          onCancel={() => setEditingCostItem(null)}
-        />
-      )}
       
       <ToastContainer position="bottom-right" />
     </div>

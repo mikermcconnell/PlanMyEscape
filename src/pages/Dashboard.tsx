@@ -4,6 +4,7 @@ import { Trip, TripType, TRIP_TYPES } from '../types';
 import { getTrips } from '../utils/supabaseTrips';
 import { Tent, Compass, Mountain, Home, Calendar, Users, Plus, MapPin, Activity, Trash2 } from 'lucide-react';
 import { tripService } from '../services/tripService';
+import { parseLocalDate, formatLocalDate } from '../utils/dateUtils';
 
 const Dashboard = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -83,7 +84,7 @@ const Dashboard = () => {
 
   const getUpcomingTrips = () => {
     const now = new Date();
-    return trips.filter(trip => new Date(trip.startDate) >= now).slice(0, 3);
+    return trips.filter(trip => parseLocalDate(trip.startDate) >= now).slice(0, 3);
   };
 
   if (loading) {
@@ -128,7 +129,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         {TRIP_TYPES.map(type => {
           const typeTrips = trips.filter(t => t.tripType === type);
-          const upcomingCount = typeTrips.filter(t => new Date(t.startDate) >= new Date()).length;
+          const upcomingCount = typeTrips.filter(t => parseLocalDate(t.startDate) >= new Date()).length;
           
           return (
             <div key={type} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
@@ -196,7 +197,7 @@ const Dashboard = () => {
                         <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1" />
-                            {new Date(trip.startDate).toLocaleDateString()}
+                            {formatLocalDate(trip.startDate)}
                           </div>
                           {trip.location && (
                             <div className="flex items-center">
@@ -257,7 +258,7 @@ const Dashboard = () => {
             </div>
           ) : (
             trips.map(trip => {
-              const isUpcoming = new Date(trip.startDate) >= new Date();
+              const isUpcoming = parseLocalDate(trip.startDate) >= new Date();
               
               return (
                 <div
@@ -303,7 +304,7 @@ const Dashboard = () => {
                       <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                         <Calendar className="h-4 w-4 mr-2" />
                         <span>
-                          {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+                          {formatLocalDate(trip.startDate)} - {formatLocalDate(trip.endDate)}
                         </span>
                       </div>
                       {trip.location && (

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packing List Persistence Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #e2e3e5; border-color: #d6d8db; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .status-icon { display: inline-block; width: 20px; height: 20px; border-radius: 3px; margin: 0 5px; text-align: center; }
+        .owned { background-color: #28a745; color: white; }
+        .packed { background-color: #17a2b8; color: white; }
+        .needs-buy { background-color: #ffc107; color: black; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Packing List Template Override Fix Test</h1>
+    
+    <div class="test-section info">
+        <h3>📋 Instructions:</h3>
+        <ol>
+            <li>Make sure you're logged into PlanMyEscape in another tab</li>
+            <li>Make sure you have a test trip with some packing items</li>
+            <li>Run this test to verify status icons persist across navigation</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 1: Initialize Test</h3>
+        <button onclick="initializeTest()">Initialize Test</button>
+        <div id="init-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 2: Create Test Items</h3>
+        <button onclick="createTestItems()">Create Test Packing Items</button>
+        <div id="create-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 3: Simulate User Interactions</h3>
+        <button onclick="simulateInteractions()">Mark Items as Owned/Packed</button>
+        <div id="interact-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 4: Test Persistence</h3>
+        <button onclick="testPersistence()">Test Navigation Persistence</button>
+        <div id="persist-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 5: Cleanup</h3>
+        <button onclick="cleanup()">Clean Up Test Data</button>
+        <div id="cleanup-result"></div>
+    </div>
+
+    <script>
+        // Get Supabase client from your app
+        let supabase = null;
+        let testTripId = null;
+        let testItems = [];
+
+        async function initializeTest() {
+            const resultDiv = document.getElementById('init-result');
+            resultDiv.innerHTML = '<p>🔍 Initializing test...</p>';
+
+            try {
+                // Try to get supabase from parent window (if opened from your app)
+                if (window.opener && window.opener.supabase) {
+                    supabase = window.opener.supabase;
+                } else {
+                    // Fall back to manual setup
+                    const supabaseUrl = prompt('Enter your Supabase URL:', 'https://jyulgyuyacyqpzaalaky.supabase.co');
+                    const supabaseKey = prompt('Enter your Supabase anon key:');
+                    if (!supabaseUrl || !supabaseKey) {
+                        throw new Error('Supabase credentials required');
+                    }
+                    supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+                }
+
+                // Check if user is authenticated
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    throw new Error('User not authenticated. Please log in to your app first.');
+                }
+
+                // Get user's first trip
+                const { data: trips, error } = await supabase
+                    .from('trips')
+                    .select('*')
+                    .limit(1);
+
+                if (error) throw error;
+                if (trips.length === 0) {
+                    throw new Error('No trips found. Please create a trip first.');
+                }
+
+                testTripId = trips[0].id;
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <p>✅ Test initialized successfully!</p>
+                        <p>👤 User: ${user.email}</p>
+                        <p>🎒 Test Trip: ${trips[0].trip_name}</p>
+                        <p>🆔 Trip ID: ${testTripId}</p>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p>❌ Initialization failed: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function createTestItems() {
+            const resultDiv = document.getElementById('create-result');
+            if (!supabase || !testTripId) {
+                resultDiv.innerHTML = '<div class="error"><p>❌ Please initialize test first</p></div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>📝 Creating test packing items...</p>';
+
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                testItems = [
+                    {
+                        id: crypto.randomUUID(),
+                        trip_id: testTripId,
+                        user_id: user.id,
+                        name: 'Test Tent (Persistence Test)',
+                        category: 'Shelter',
+                        quantity: 1,
+                        is_checked: false,
+                        is_owned: false,
+                        needs_to_buy: false,
+                        is_packed: false,
+                        required: true,
+                        is_personal: false,
+                        weight: 2000,
+                        notes: 'Template override test item'
+                    },
+                    {
+                        id: crypto.randomUUID(),
+                        trip_id: testTripId,
+                        user_id: user.id,
+                        name: 'Test Sleeping Bag (Persistence Test)',
+                        category: 'Sleep',
+                        quantity: 1,
+                        is_checked: false,
+                        is_owned: false,
+                        needs_to_buy: false,
+                        is_packed: false,
+                        required: true,
+                        is_personal: true,
+                        weight: 1500,
+                        notes: 'Template override test item'
+                    }
+                ];
+
+                const { data, error } = await supabase
+                    .from('packing_items')
+                    .insert(testItems)
+                    .select();
+
+                if (error) throw error;
+
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <p>✅ Created ${data.length} test packing items:</p>
+                        <ul>
+                            ${data.map(item => `<li>${item.name} (${item.category})</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p>❌ Failed to create test items: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function simulateInteractions() {
+            const resultDiv = document.getElementById('interact-result');
+            if (!supabase || !testTripId || testItems.length === 0) {
+                resultDiv.innerHTML = '<div class="error"><p>❌ Please create test items first</p></div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>🎯 Simulating user interactions...</p>';
+
+            try {
+                // Mark first item as owned and packed
+                await supabase
+                    .from('packing_items')
+                    .update({ is_owned: true, is_packed: true })
+                    .eq('id', testItems[0].id);
+
+                // Mark second item as owned but not packed
+                await supabase
+                    .from('packing_items')
+                    .update({ is_owned: true, needs_to_buy: false })
+                    .eq('id', testItems[1].id);
+
+                // Verify the updates
+                const { data: updatedItems, error } = await supabase
+                    .from('packing_items')
+                    .select('*')
+                    .in('id', testItems.map(item => item.id));
+
+                if (error) throw error;
+
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <p>✅ User interactions simulated:</p>
+                        <ul>
+                            ${updatedItems.map(item => {
+                                const statuses = [];
+                                if (item.is_owned) statuses.push('<span class="status-icon owned">O</span>Owned');
+                                if (item.is_packed) statuses.push('<span class="status-icon packed">P</span>Packed');
+                                if (item.needs_to_buy) statuses.push('<span class="status-icon needs-buy">$</span>Needs to Buy');
+                                return `<li>${item.name}: ${statuses.join(', ') || 'No status'}</li>`;
+                            }).join('')}
+                        </ul>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p>❌ Failed to simulate interactions: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testPersistence() {
+            const resultDiv = document.getElementById('persist-result');
+            if (!supabase || !testTripId || testItems.length === 0) {
+                resultDiv.innerHTML = '<div class="error"><p>❌ Please complete previous steps first</p></div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>🔄 Testing persistence across navigation simulation...</p>';
+
+            try {
+                // Get current state (before "navigation")
+                const { data: beforeNav, error: beforeError } = await supabase
+                    .from('packing_items')
+                    .select('*')
+                    .in('id', testItems.map(item => item.id));
+
+                if (beforeError) throw beforeError;
+
+                // Simulate navigation delay
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Get state after "navigation"
+                const { data: afterNav, error: afterError } = await supabase
+                    .from('packing_items')
+                    .select('*')
+                    .in('id', testItems.map(item => item.id));
+
+                if (afterError) throw afterError;
+
+                // Compare results
+                let allStatusPreserved = true;
+                const comparisons = [];
+
+                for (let i = 0; i < beforeNav.length; i++) {
+                    const before = beforeNav[i];
+                    const after = afterNav.find(item => item.id === before.id);
+                    
+                    if (!after) {
+                        allStatusPreserved = false;
+                        comparisons.push(`❌ ${before.name}: Item disappeared!`);
+                        continue;
+                    }
+
+                    const statusFields = ['is_owned', 'is_packed', 'needs_to_buy'];
+                    let itemPreserved = true;
+                    
+                    for (const field of statusFields) {
+                        if (before[field] !== after[field]) {
+                            allStatusPreserved = false;
+                            itemPreserved = false;
+                        }
+                    }
+
+                    const beforeStatuses = [];
+                    const afterStatuses = [];
+                    if (before.is_owned) beforeStatuses.push('Owned');
+                    if (before.is_packed) beforeStatuses.push('Packed');
+                    if (before.needs_to_buy) beforeStatuses.push('Needs to Buy');
+                    if (after.is_owned) afterStatuses.push('Owned');
+                    if (after.is_packed) afterStatuses.push('Packed');
+                    if (after.needs_to_buy) afterStatuses.push('Needs to Buy');
+
+                    comparisons.push(
+                        `${itemPreserved ? '✅' : '❌'} ${before.name}: ${beforeStatuses.join(', ') || 'No status'} → ${afterStatuses.join(', ') || 'No status'}`
+                    );
+                }
+
+                const resultClass = allStatusPreserved ? 'success' : 'error';
+                const resultIcon = allStatusPreserved ? '✅' : '❌';
+                const resultText = allStatusPreserved ? 
+                    'PASS: All status icons preserved! Template override fix is working.' :
+                    'FAIL: Some status icons were lost. Template override issue still exists.';
+
+                resultDiv.innerHTML = `
+                    <div class="${resultClass}">
+                        <h4>${resultIcon} TEST RESULT: ${resultText}</h4>
+                        <p><strong>Status Comparison:</strong></p>
+                        <ul>
+                            ${comparisons.map(comp => `<li>${comp}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p>❌ Persistence test failed: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function cleanup() {
+            const resultDiv = document.getElementById('cleanup-result');
+            if (!supabase || testItems.length === 0) {
+                resultDiv.innerHTML = '<div class="error"><p>❌ No test data to clean up</p></div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>🧹 Cleaning up test data...</p>';
+
+            try {
+                const { error } = await supabase
+                    .from('packing_items')
+                    .delete()
+                    .in('id', testItems.map(item => item.id));
+
+                if (error) throw error;
+
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <p>✅ Test data cleaned up successfully!</p>
+                        <p>Removed ${testItems.length} test packing items</p>
+                    </div>
+                `;
+
+                testItems = [];
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <p>❌ Cleanup failed: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

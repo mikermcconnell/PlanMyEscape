@@ -39,28 +39,55 @@ const MealPlanner = () => {
   const [editMealIngredients, setEditMealIngredients] = useState<string[]>([]);
   const [deletedIngredients, setDeletedIngredients] = useState<Set<string>>(new Set());
 
+  // Save on unmount to prevent data loss
+  useEffect(() => {
+    return () => {
+      if (meals.length > 0) {
+        hybridDataService.saveMeals(tripId, meals).catch(error => {
+          console.error('Failed to save meals on unmount:', error);
+        });
+      }
+    };
+  }, [tripId, meals]);
+
+  // Track if data has been loaded to prevent re-initialization
+  const [hasLoadedMeals, setHasLoadedMeals] = useState(false);
+
   useEffect(() => {
     const loadMealsAndDeletedIngredients = async () => {
-      if (!tripId || !trip) return;
+      if (!tripId) {
+        console.log(`🔄 [MealPlanner] Skip loading - no tripId provided`);
+        return;
+      }
+      
+      console.log(`📥 [MealPlanner] Loading meals and deleted ingredients for trip ${tripId}...`);
+      setHasLoadedMeals(false); // Reset loading flag
       
       const [savedMeals, deletedIngredientsArray] = await Promise.all([
         hybridDataService.getMeals(tripId),
         hybridDataService.getDeletedIngredients(tripId)
       ]);
       
-      if (savedMeals) {
+      console.log(`📊 [MealPlanner] Loaded ${savedMeals?.length || 0} meals from database`);
+      if (savedMeals && savedMeals.length > 0) {
+        console.log(`📝 [MealPlanner] Setting ${savedMeals.length} meals in component state:`, savedMeals.map(m => m.name));
         setMeals(savedMeals);
+      } else {
+        console.log(`📝 [MealPlanner] No meals found, keeping current state (${meals.length} meals)`);
+        setMeals([]);
       }
       
+      console.log(`🚫 [MealPlanner] Loaded ${deletedIngredientsArray?.length || 0} deleted ingredients`);
       setDeletedIngredients(new Set(deletedIngredientsArray));
+      setHasLoadedMeals(true); // Mark as loaded
     };
     loadMealsAndDeletedIngredients();
-  }, [tripId, trip]);
+  }, [tripId]); // Only depend on tripId, not trip object
 
   // Load shopping list on mount (only meal-related items for ingredients sidebar)
   useEffect(() => {
     const loadShoppingList = async () => {
-      if (!tripId) return;
+      if (!tripId || hasLoadedMeals) return; // Wait for meals to load first
       const savedShoppingList = await hybridDataService.getShoppingItems(tripId);
       // Filter to only show food items that are NOT from packing list
       const mealRelatedItems = savedShoppingList.filter(item => 
@@ -69,78 +96,24 @@ const MealPlanner = () => {
       setShoppingItems(mealRelatedItems);
     };
     loadShoppingList();
-  }, [tripId]);
+  }, [tripId, hasLoadedMeals]);
 
-  // Synchronise shopping list when meals change
+  // Trigger shopping list update when meals change
   useEffect(() => {
-    if (!tripId) return;
+    if (!tripId || !hasLoadedMeals) return; // Wait for initial load to complete
 
-    // Generate aggregated list from meals
-    const ingredientCounts = meals.length > 0 
-      ? meals.flatMap(m => m.ingredients).reduce<Record<string, number>>((acc, ing) => {
-          acc[ing] = (acc[ing] || 0) + 1;
-          return acc;
-        }, {})
-      : {};
-
-    console.log('MealPlanner - Meals:', meals.length, 'Ingredient counts:', ingredientCounts);
-    console.log('MealPlanner - Deleted ingredients:', Array.from(deletedIngredients));
-
-    // Update the global shopping list while preserving packing items
+    console.log('MealPlanner - Meals changed, triggering shopping list refresh...');
+    
+    // Use the new method that accepts current meals to avoid database reload race conditions
     (async () => {
-      const existingShoppingItems = await hybridDataService.getShoppingItems(tripId);
-      
-      // Create a map of existing items for quick lookup
-      const existingItems = new Map(existingShoppingItems.map(item => [item.name.toLowerCase(), item]));
-      
-      // Process meal ingredients only, but exclude manually deleted ones
-      const mealIngredients = Object.entries(ingredientCounts)
-        .filter(([name]) => {
-          const normalizedName = name.toLowerCase().trim();
-          const isDeleted = deletedIngredients.has(normalizedName);
-          console.log(`Ingredient "${name}" - deleted: ${isDeleted}`);
-          return !isDeleted;
-        })
-        .map(([name, count]) => {
-          const existing = existingItems.get(name.toLowerCase());
-          return {
-            id: existing ? existing.id : crypto.randomUUID(),
-            name,
-            quantity: count,
-            category: 'food' as const,
-            needsToBuy: existing ? existing.needsToBuy : true,
-            isOwned: existing ? existing.isOwned : false
-            // No sourceItemId means it's from meals, not packing
-          };
-        });
-
-      console.log('MealPlanner - Generated meal ingredients:', mealIngredients);
-
-      // Get items from packing list (items with sourceItemId) and manually added items
-      const nonMealItems = existingShoppingItems.filter(item => 
-        item.sourceItemId || // From packing list
-        (item.category === 'camping') || // Manual camping items
-        (!Object.keys(ingredientCounts).some(ingredient => 
-          ingredient.toLowerCase() === item.name.toLowerCase()
-        ) && item.category === 'food') // Manual food items not from current meals
+      const refreshedShoppingItems = await hybridDataService.getShoppingItemsWithMeals(tripId, meals);
+      // Filter to only show food items that are NOT from packing list for the ingredients sidebar
+      const mealRelatedItems = refreshedShoppingItems.filter(item => 
+        !item.sourceItemId && item.category === 'food'
       );
-
-      // Combine all items for the global shopping list
-      const allShoppingItems = [...mealIngredients, ...nonMealItems];
-      await hybridDataService.saveShoppingItems(tripId, allShoppingItems);
-      
-      // Set local state to only meal-related items for the ingredients sidebar
-      const manualFoodItems = existingShoppingItems.filter(item => 
-        !item.sourceItemId && // Not from packing
-        item.category === 'food' && // Food items only
-        !Object.keys(ingredientCounts).some(ingredient => 
-          ingredient.toLowerCase() === item.name.toLowerCase()
-        ) // Manual food items
-      );
-      
-      setShoppingItems([...mealIngredients, ...manualFoodItems]);
+      setShoppingItems(mealRelatedItems);
     })();
-  }, [meals, tripId, deletedIngredients]);
+  }, [meals, tripId, deletedIngredients, hasLoadedMeals]);
 
   // Helpers for toggling status
   const updateShoppingItem = async (itemId: string, updates: Partial<ShoppingItem>) => {
@@ -248,10 +221,33 @@ const MealPlanner = () => {
 
 
 
-  const deleteMeal = (mealId: string) => {
+  const deleteMeal = async (mealId: string) => {
+    const mealToDelete = meals.find(meal => meal.id === mealId);
+    console.log(`🗑️ [MealPlanner] Deleting meal: ${mealToDelete?.name} (ID: ${mealId})`);
+    console.log(`📊 [MealPlanner] Before deletion - Total meals: ${meals.length}`);
+    
     const updatedMeals = meals.filter(meal => meal.id !== mealId);
+    console.log(`📊 [MealPlanner] After deletion - Total meals: ${updatedMeals.length}`);
+    
     setMeals(updatedMeals);
-    if (tripId) hybridDataService.saveMeals(tripId, updatedMeals);
+    try {
+      // Save immediately for delete operations
+      console.log(`💾 [MealPlanner] Saving ${updatedMeals.length} meals to database...`);
+      await hybridDataService.saveMeals(tripId, updatedMeals);
+      console.log('✅ [MealPlanner] Meal deleted and saved immediately');
+      
+      // Show success feedback
+      setConfirmation(`${mealToDelete?.name || 'Meal'} deleted successfully!`);
+      setTimeout(() => setConfirmation(null), 3000);
+      
+      // The useEffect with [meals] dependency will handle shopping list refresh automatically
+    } catch (error) {
+      console.error('❌ [MealPlanner] Failed to delete meal:', error);
+      // Revert the local state on error
+      setMeals(meals);
+      setConfirmation('Failed to delete meal. Please try again.');
+      setTimeout(() => setConfirmation(null), 3000);
+    }
   };
 
   const startEditingMeal = (meal: Meal) => {
@@ -266,7 +262,7 @@ const MealPlanner = () => {
     setSelectedIngredients([...meal.ingredients]);
   };
 
-  const saveEditedMeal = () => {
+  const saveEditedMeal = async () => {
     if (!editingMeal || !editMealName.trim() || editMealIngredients.length === 0) return;
 
     const updatedMeals = meals.map(meal =>
@@ -281,7 +277,16 @@ const MealPlanner = () => {
     );
 
     setMeals(updatedMeals);
-    if (tripId) hybridDataService.saveMeals(tripId, updatedMeals);
+    try {
+      // Save immediately for edit operations
+      await hybridDataService.saveMeals(tripId, updatedMeals);
+      console.log('MealPlanner: Meal edited and saved immediately');
+    } catch (error) {
+      console.error('Failed to save edited meal:', error);
+      setConfirmation('Failed to save meal. Please try again.');
+      setTimeout(() => setConfirmation(null), 3000);
+      return;
+    }
 
     // Show success feedback
     setConfirmation(`${editMealName.trim()} updated successfully!`);
@@ -329,10 +334,10 @@ const MealPlanner = () => {
   // Computed ingredient list for empty state
   const shoppingListEmpty = shoppingItems.filter(item => item.needsToBuy).length === 0;
 
-  const addCustomMeal = () => {
+  const addCustomMeal = async () => {
     if (customMealName.trim() && selectedIngredients.length > 0) {
       const newMeal = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         name: customMealName.trim(),
         day: selectedDay,
         type: selectedType,
@@ -344,7 +349,16 @@ const MealPlanner = () => {
       };
       const updatedMeals = [...meals, newMeal];
       setMeals(updatedMeals);
-      if (tripId) hybridDataService.saveMeals(tripId, updatedMeals);
+      try {
+        // Save immediately for add operations
+        await hybridDataService.saveMeals(tripId, updatedMeals);
+        console.log('MealPlanner: Meal added and saved immediately');
+      } catch (error) {
+        console.error('Failed to add custom meal:', error);
+        setConfirmation('Failed to add meal. Please try again.');
+        setTimeout(() => setConfirmation(null), 3000);
+        return;
+      }
       
       // Show success feedback
       setConfirmation(`${customMealName.trim()} added to ingredients list!`);
@@ -414,8 +428,10 @@ const MealPlanner = () => {
       name: ingredientName,
       quantity: newIngredientQty,
       category: 'food',
+      isChecked: false,
       needsToBuy: true,
-      isOwned: false
+      isOwned: false,
+      sourceItemId: undefined
     };
     
     // Remove from deleted ingredients list if it was previously deleted
@@ -441,29 +457,53 @@ const MealPlanner = () => {
   };
 
   const clearIngredients = async () => {
-    // Clear all custom meals (meals with isCustom: true)
-    const clearedMeals = meals.filter(meal => !meal.isCustom);
+    // Clear all meals - both custom meals and template meals added by user
+    const clearedMeals: Meal[] = [];
+    console.log(`🧹 [MealPlanner] Clearing all ${meals.length} meals...`);
+    
     setMeals(clearedMeals);
-    if (tripId) await hybridDataService.saveMeals(tripId, clearedMeals);
+    try {
+      console.log('💾 [MealPlanner] Attempting to save empty meals array to database...');
+      await hybridDataService.saveMeals(tripId, clearedMeals);
+      console.log('✅ [MealPlanner] All meals cleared and saved to database');
+      
+      // Verify the save worked by reloading from database after a small delay
+      console.log('🔍 [MealPlanner] Waiting briefly then verifying meals were cleared...');
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for database consistency
+      const verifyMeals = await hybridDataService.getMeals(tripId);
+      console.log(`📊 [MealPlanner] Verification: ${verifyMeals.length} meals found in database after clear`);
+      
+      if (verifyMeals.length > 0) {
+        console.error(`❌ [MealPlanner] Clear verification failed! Found ${verifyMeals.length} meals still in database:`, verifyMeals);
+        setConfirmation(`Clear failed: ${verifyMeals.length} meals still exist. Please try again.`);
+        setTimeout(() => setConfirmation(null), 5000);
+        // Restore the meals that are still in the database
+        setMeals(verifyMeals);
+        return;
+      } else {
+        console.log('✅ [MealPlanner] Clear verification successful - no meals found in database');
+        setConfirmation('All meals cleared successfully!');
+        setTimeout(() => setConfirmation(null), 3000);
+      }
+    } catch (error) {
+      console.error('❌ [MealPlanner] Failed to clear meals:', error);
+      setConfirmation('Failed to clear meals. Please try again.');
+      setTimeout(() => setConfirmation(null), 3000);
+      return;
+    }
     
     // Clear the deleted ingredients list since we're clearing everything
     setDeletedIngredients(new Set());
+    await hybridDataService.saveDeletedIngredients(tripId, []);
     
-    // Update global shopping list: remove custom meal ingredients, keep packing items
-    const allShoppingItems = await hybridDataService.getShoppingItems(tripId);
-    const remainingIngredients = clearedMeals.flatMap(m => m.ingredients);
-    
-    // Keep: 1) Packing items (with sourceItemId), 2) Template meal ingredients, 3) Manual food items
-    const clearedGlobalShoppingItems = allShoppingItems.filter(item => {
-      return item.sourceItemId || // From packing list
-             remainingIngredients.includes(item.name) || // From remaining template meals
-             (item.category === 'food' && !meals.flatMap(m => m.ingredients).includes(item.name)); // Manual food items
-    });
-    
-    await hybridDataService.saveShoppingItems(tripId, clearedGlobalShoppingItems);
-    
-    // Update local ingredients sidebar to show only meal-related items
-    setShoppingItems(clearedGlobalShoppingItems.filter(item => !item.sourceItemId && item.category === 'food'));
+    // Force refresh the shopping list using the cleaned meals to avoid race conditions
+    console.log('🔄 [MealPlanner] Force refreshing shopping list after clearing meals...');
+    const refreshedShoppingItems = await hybridDataService.getShoppingItemsWithMeals(tripId, clearedMeals);
+    const mealRelatedItems = refreshedShoppingItems.filter(item => 
+      !item.sourceItemId && item.category === 'food'
+    );
+    setShoppingItems(mealRelatedItems);
+    console.log(`🛒 [MealPlanner] Shopping list refreshed: ${mealRelatedItems.length} meal-related items`);
     
     setShowClearIngredientsConfirmation(false);
   };
@@ -630,28 +670,13 @@ const MealPlanner = () => {
                 <ShoppingCart className="h-5 w-5 mr-2" />
                 Ingredients List
               </h2>
-              <div className="flex space-x-2">
-                <button
-                  onClick={async () => {
-                    setDeletedIngredients(new Set());
-                    await hybridDataService.saveDeletedIngredients(tripId, []);
-                    setConfirmation('Deleted ingredients list cleared!');
-                    setTimeout(() => setConfirmation(null), 3000);
-                  }}
-                  className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                  title="Clear the list of manually deleted ingredients to restore all meal ingredients"
-                >
-                  <RotateCcw className="h-4 w-4 mr-1" />
-                  Reset Deletions
-                </button>
-                <button
-                  onClick={() => setShowClearIngredientsConfirmation(true)}
-                  className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-                >
-                  <RotateCcw className="h-4 w-4 mr-1" />
-                  Clear
-                </button>
-              </div>
+              <button
+                onClick={() => setShowClearIngredientsConfirmation(true)}
+                className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Clear
+              </button>
             </div>
             
             <div className="p-6">
@@ -1084,7 +1109,7 @@ const MealPlanner = () => {
             
             <div className="space-y-4">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                This will remove all custom meals and manually added ingredients from your ingredients list. Template meals will remain unchanged, and ingredients from custom meals will be removed from the shopping list.
+                This will remove all meals from your meal plan and clear all ingredients from your ingredients list. All meal-related items will be removed from the shopping list. You can start fresh by adding new meals.
               </p>
               
               <div className="flex space-x-2 pt-4">
