@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { initializeMobile, getMobileClasses } from './utils/mobileHelpers';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import LandingPage from './pages/LandingPage';
@@ -23,8 +24,13 @@ import ShoppingListPage from './pages/ShoppingListPage';
 import { GlobalPasswordResetDetector } from './components/GlobalPasswordResetDetector';
 
 function App() {
+  useEffect(() => {
+    initializeMobile();
+  }, []);
+
   return (
     <ErrorBoundary>
+      <div className={getMobileClasses()}>
         <Router>
         {/* Global password reset detector */}
         <GlobalPasswordResetDetector />
@@ -58,7 +64,8 @@ function App() {
           </Route>
         </Routes>
         </Router>
-      </ErrorBoundary>
+      </div>
+    </ErrorBoundary>
   );
 }
 

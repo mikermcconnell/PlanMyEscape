@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import mobile-specific styles */
+@import './styles/mobile.css';
+
 /* Hide scrollbar for horizontal navigation on mobile */
 @layer utilities {
   .scrollbar-hide {

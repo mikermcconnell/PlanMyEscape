@@ -1,0 +1,89 @@
+/* Mobile-specific styles for Capacitor app */
+
+.mobile-app {
+  /* Prevent zoom on inputs */
+  -webkit-text-size-adjust: 100%;
+  
+  /* Disable selection highlighting */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  
+  /* Smooth scrolling */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* iOS specific styles */
+.ios-app {
+  /* Safe area handling */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Android specific styles */
+.android-app {
+  /* Handle status bar on Android */
+  padding-top: 24px;
+}
+
+/* Keyboard adjustments */
+.mobile-app.keyboard-open {
+  /* Adjust layout when keyboard is open */
+  padding-bottom: 0;
+}
+
+/* Mobile-optimized button sizes */
+.mobile-app button {
+  min-height: 44px; /* Apple's recommended touch target size */
+  touch-action: manipulation;
+}
+
+/* Prevent double-tap zoom on buttons */
+.mobile-app button,
+.mobile-app a,
+.mobile-app input[type="submit"] {
+  touch-action: manipulation;
+}
+
+/* Mobile modal adjustments */
+.mobile-app .modal {
+  /* Full screen modals on mobile for better UX */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+}
+
+/* Hide scrollbars in mobile app */
+.mobile-app ::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile-friendly form inputs */
+.mobile-app input,
+.mobile-app textarea,
+.mobile-app select {
+  font-size: 16px; /* Prevent zoom on iOS */
+  border-radius: 8px;
+}
+
+/* Adjust spacing for mobile */
+.mobile-app .container {
+  padding: 1rem 0.75rem;
+}
+
+/* Mobile navigation adjustments */
+.mobile-app .nav-tabs {
+  position: sticky;
+  bottom: 0;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  z-index: 100;
+}
