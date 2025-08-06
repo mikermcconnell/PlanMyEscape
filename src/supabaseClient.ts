@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL as string;
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY as string;
+// TEMPORARY: Hardcoded values for debugging (REMOVE AFTER FIXING)
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://jyulgyuyacyqpzaalaky.supabase.co';
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dWxneXV5YWN5cXB6YWFsYWt5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzNTE1NTQsImV4cCI6MjA2OTkyNzU1NH0.JfM09mYWye7cO05KPUJhYkmcGGVqiQg85DNthNDjRlw';
 
 console.log('🔍 [supabaseClient] Configuration:', {
   supabaseUrl: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'NOT SET',
