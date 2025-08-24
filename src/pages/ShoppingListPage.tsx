@@ -283,27 +283,29 @@ const ShoppingListPage: React.FC = () => {
               sortedItems.forEach(item => {
                 const groupKey = item.assignedGroupId || 'all';
                 if (groupKey === 'all') {
-                  groupedItems['all'].push(item);
+                  groupedItems['all']?.push(item);
                 } else if (groupedItems[groupKey]) {
                   groupedItems[groupKey].push(item);
                 }
               });
               
+              const allGroupItems = groupedItems['all'] || [];
+              
               return (
                 <>
                   {/* All Groups Section */}
-                  {groupedItems['all'].length > 0 && (
+                  {allGroupItems.length > 0 && (
                     <div>
                       <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
                         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                           👥 All Groups
                         </h3>
                         <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {groupedItems['all'].length} items
+                          {allGroupItems.length} items
                         </span>
                       </div>
                       <div className="space-y-2">
-                        {groupedItems['all'].map(renderItem)}
+                        {allGroupItems.map(renderItem)}
                       </div>
                     </div>
                   )}
