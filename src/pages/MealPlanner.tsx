@@ -39,6 +39,8 @@ const MealPlanner = () => {
   const [editMealName, setEditMealName] = useState('');
   const [editMealIngredients, setEditMealIngredients] = useState<string[]>([]);
   const [deletedIngredients, setDeletedIngredients] = useState<Set<string>>(new Set());
+  const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>(undefined);
+  const [filterGroupId, setFilterGroupId] = useState<string>('all');
 
   // Save on unmount to prevent data loss
   useEffect(() => {
@@ -261,6 +263,7 @@ const MealPlanner = () => {
     setSelectedType(meal.type);
     setCustomMealName(meal.name);
     setSelectedIngredients([...meal.ingredients]);
+    setSelectedGroupId(meal.assignedGroupId);
   };
 
   const saveEditedMeal = async () => {
@@ -272,6 +275,7 @@ const MealPlanner = () => {
             ...meal,
             name: editMealName.trim(),
             ingredients: editMealIngredients,
+            assignedGroupId: selectedGroupId,
             lastModifiedAt: new Date().toISOString()
           }
         : meal
@@ -300,6 +304,7 @@ const MealPlanner = () => {
     setCustomMealName('');
     setSelectedIngredients([]);
     setCustomIngredient('');
+    setSelectedGroupId(undefined);
     setShowCustomForm(false);
     setShowMealModal(false);
   };
@@ -311,12 +316,17 @@ const MealPlanner = () => {
     setCustomMealName('');
     setSelectedIngredients([]);
     setCustomIngredient('');
+    setSelectedGroupId(undefined);
     setShowCustomForm(false);
     setShowMealModal(false);
   };
 
   const getMealsByType = (day: number, type: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
-    return meals.filter(meal => meal.day === day && meal.type === type);
+    return meals.filter(meal => {
+      const matchesDayAndType = meal.day === day && meal.type === type;
+      if (filterGroupId === 'all') return matchesDayAndType;
+      return matchesDayAndType && meal.assignedGroupId === filterGroupId;
+    });
   };
 
   const getMealTypeColor = (type: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
@@ -344,7 +354,7 @@ const MealPlanner = () => {
         type: selectedType,
         ingredients: selectedIngredients,
         isCustom: true,
-        assignedGroupId: undefined,
+        assignedGroupId: selectedGroupId,
         sharedServings: true,
         servings: 1 // Ensure servings is defined
       };
@@ -370,6 +380,7 @@ const MealPlanner = () => {
       setSuggestedIngredients([]);
       setSelectedIngredients([]);
       setCustomIngredient('');
+      setSelectedGroupId(undefined);
       setShowCustomForm(false);
       setShowMealModal(false);
     }
@@ -532,6 +543,7 @@ const MealPlanner = () => {
     setSuggestedIngredients([]);
     setSelectedIngredients([]);
     setCustomIngredient('');
+    setSelectedGroupId(undefined);
   };
 
   const totalPeople = trip?.groups.reduce((total, group) => total + group.size, 0) || 0;
@@ -585,6 +597,25 @@ const MealPlanner = () => {
               </p>
             )}
           </div>
+          {trip.groups.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Filter by Group
+              </label>
+              <select
+                value={filterGroupId}
+                onChange={(e) => setFilterGroupId(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
+              >
+                <option value="all">All Groups</option>
+                {trip.groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name} ({group.size} {group.size === 1 ? 'person' : 'people'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -635,6 +666,11 @@ const MealPlanner = () => {
                                 <div>
                                   <div className="font-medium text-gray-900 dark:text-white">
                                     {meal.name}
+                                    {meal.assignedGroupId && (
+                                      <span className="ml-2 text-xs px-2 py-1 bg-white dark:bg-gray-800 rounded">
+                                        {trip.groups.find(g => g.id === meal.assignedGroupId)?.name}
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-sm text-gray-500 dark:text-gray-400">
                                     {meal.ingredients.join(', ')}
@@ -1001,6 +1037,30 @@ const MealPlanner = () => {
                       </div>
                     </div>
                     
+                    {/* Group Assignment */}
+                    {trip.groups.length > 1 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Assign to Group (Optional)
+                        </label>
+                        <select
+                          value={selectedGroupId || ''}
+                          onChange={(e) => setSelectedGroupId(e.target.value || undefined)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
+                        >
+                          <option value="">All Groups (Shared)</option>
+                          {trip.groups.map((group) => (
+                            <option key={group.id} value={group.id}>
+                              {group.name} ({group.size} {group.size === 1 ? 'person' : 'people'})
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Leave unassigned for meals shared by all groups
+                        </p>
+                      </div>
+                    )}
+                    
                     {/* Selected Ingredients List */}
                     {selectedIngredients.length > 0 && (
                       <div>
@@ -1035,6 +1095,7 @@ const MealPlanner = () => {
                           setSuggestedIngredients([]);
                           setSelectedIngredients([]);
                           setCustomIngredient('');
+                          setSelectedGroupId(undefined);
                         }}
                         className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                       >

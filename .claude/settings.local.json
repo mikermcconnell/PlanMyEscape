@@ -45,7 +45,8 @@
       "Bash(dir \"%APPDATA%\\Claude\\*config*\" /s /b)",
       "Read(/C:\\Users\\Mike McConnell\\AppData\\Roaming/**)",
       "Read(/C:\\Users\\Mike McConnell\\AppData\\Roaming/**)",
-      "Bash(checkpoint.bat create \"Added automatic checkpoint system to CLAUDE.md\")"
+      "Bash(checkpoint.bat create \"Added automatic checkpoint system to CLAUDE.md\")",
+      "Bash(npx:*)"
     ],
     "deny": []
   }
