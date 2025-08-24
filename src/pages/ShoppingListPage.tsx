@@ -53,6 +53,76 @@ const ShoppingListPage: React.FC = () => {
     doc.save('shopping-list.pdf');
   };
 
+  const exportGroupPDF = (group: Group) => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text(`Shopping List - ${group.name}`, 14, 20);
+
+    doc.setFontSize(10);
+    doc.text(`${group.size} people`, 14, 28);
+
+    doc.setFontSize(12);
+    let y = 40;
+    
+    // Get items assigned to this group or shared items (no group assignment)
+    const groupItems = allItems.filter(i => 
+      i.needsToBuy && (i.assignedGroupId === group.id || !i.assignedGroupId)
+    );
+
+    if (groupItems.length === 0) {
+      doc.text('No items assigned to this group.', 14, y);
+    } else {
+      groupItems.forEach(item => {
+        const line = `${item.name}${item.quantity && item.quantity > 1 ? ` ×${item.quantity}` : ''}`;
+        doc.rect(14, y - 4, 6, 6); // empty checkbox
+        doc.text(line, 22, y);
+        y += 10;
+        if (y > 280) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+    }
+
+    doc.save(`shopping-list-${group.name.toLowerCase().replace(/\s+/g, '-')}.pdf`);
+  };
+
+  const exportAllGroupPDFs = () => {
+    // Export a shopping list for each group
+    trip.groups.forEach(group => {
+      setTimeout(() => exportGroupPDF(group), 100); // Small delay to prevent browser download blocking
+    });
+    
+    // Also export the shared items (All Groups) list if there are any
+    const sharedItems = allItems.filter(i => i.needsToBuy && !i.assignedGroupId);
+    if (sharedItems.length > 0) {
+      setTimeout(() => {
+        const doc = new jsPDF();
+        doc.setFontSize(18);
+        doc.text('Shopping List - Shared Items', 14, 20);
+        
+        doc.setFontSize(12);
+        let y = 30;
+        
+        sharedItems.forEach(item => {
+          const line = `${item.name}${item.quantity && item.quantity > 1 ? ` ×${item.quantity}` : ''}`;
+          doc.rect(14, y - 4, 6, 6);
+          doc.text(line, 22, y);
+          y += 10;
+          if (y > 280) {
+            doc.addPage();
+            y = 20;
+          }
+        });
+        
+        doc.save('shopping-list-shared-items.pdf');
+      }, trip.groups.length * 100 + 100);
+    }
+    
+    toast.success(`Generating ${trip.groups.length}${sharedItems.length > 0 ? ' + shared items' : ''} shopping lists...`, { autoClose: 3000 });
+  };
+
   const toggleBought = async (itemId: string) => {
     const updated = allItems.map(it => it.id === itemId ? { ...it, isChecked: !it.isChecked } : it);
     setAllItems(updated);
@@ -143,6 +213,15 @@ const ShoppingListPage: React.FC = () => {
             <FileDown className="h-4 w-4 mr-2" />
             Export PDF
           </button>
+          {trip.groups.length > 1 && (
+            <button
+              onClick={exportAllGroupPDFs}
+              className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md"
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              Export All Groups
+            </button>
+          )}
         </div>
       </div>
 
@@ -332,12 +411,40 @@ const ShoppingListPage: React.FC = () => {
                     return (
                       <div key={group.id} className={`rounded-lg p-4 ${colors.bg} border ${colors.border}`}>
                         <div className="flex items-center justify-between mb-3">
-                          <h3 className={`text-lg font-medium ${colors.text}`}>
-                            {group.name}
-                          </h3>
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            {items.length} items • {group.size} people
-                          </span>
+                          <div>
+                            <h3 className={`text-lg font-medium ${colors.text}`}>
+                              {group.name}
+                            </h3>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              {items.length} items • {group.size} people
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => exportGroupPDF(group)}
+                            className={`inline-flex items-center px-3 py-1 text-sm rounded-md transition-colors ${
+                              colors.text.includes('blue') 
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                : colors.text.includes('green')
+                                ? 'bg-green-600 hover:bg-green-700 text-white'
+                                : colors.text.includes('orange')
+                                ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                                : colors.text.includes('purple')
+                                ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                                : colors.text.includes('red')
+                                ? 'bg-red-600 hover:bg-red-700 text-white'
+                                : colors.text.includes('teal')
+                                ? 'bg-teal-600 hover:bg-teal-700 text-white'
+                                : colors.text.includes('pink')
+                                ? 'bg-pink-600 hover:bg-pink-700 text-white'
+                                : colors.text.includes('yellow')
+                                ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                : 'bg-gray-600 hover:bg-gray-700 text-white'
+                            }`}
+                            title={`Export ${group.name} shopping list`}
+                          >
+                            <FileDown className="h-4 w-4 mr-1" />
+                            Export
+                          </button>
                         </div>
                         <div className="space-y-2">
                           {items.map(renderItem)}

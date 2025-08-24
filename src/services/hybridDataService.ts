@@ -239,31 +239,47 @@ export class HybridDataService {
         };
       });
     
-    // 2. Add meal ingredients (excluding deleted ones)
-    const ingredientCounts = meals.length > 0 
-      ? meals.flatMap(m => m.ingredients).reduce<Record<string, number>>((acc, ing) => {
-          const normalizedName = ing.toLowerCase().trim();
-          if (!deletedIngredientsSet.has(normalizedName)) {
-            acc[ing] = (acc[ing] || 0) + 1;
-          }
-          return acc;
-        }, {})
+    // 2. Add meal ingredients (excluding deleted ones) with group assignments
+    const ingredientInfo = meals.length > 0 
+      ? meals.flatMap(m => m.ingredients.map(ing => ({ ingredient: ing, groupId: m.assignedGroupId })))
+          .reduce<Record<string, { count: number, groupId?: string }>>((acc, { ingredient, groupId }) => {
+            const normalizedName = ingredient.toLowerCase().trim();
+            if (!deletedIngredientsSet.has(normalizedName)) {
+              if (!acc[ingredient]) {
+                acc[ingredient] = { count: 0, groupId };
+              }
+              acc[ingredient].count += 1;
+              // If ingredients come from meals with different group assignments, don't assign to a specific group
+              if (acc[ingredient].groupId !== groupId) {
+                acc[ingredient].groupId = undefined;
+              }
+            }
+            return acc;
+          }, {})
       : {};
     
-    console.log(`🍽️ [HybridDataService] Current meal ingredients:`, Object.keys(ingredientCounts));
+    console.log(`🍽️ [HybridDataService] Current meal ingredients with groups:`, Object.keys(ingredientInfo));
     
-    const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientCounts)
-      .map(([name, count]) => {
+    const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientInfo)
+      .map(([name, info]) => {
         const existing = existingItemsMap.get(name.toLowerCase());
-        return existing || {
+        if (existing) {
+          // Update existing item with group assignment if it doesn't have one
+          if (!existing.assignedGroupId && info.groupId) {
+            existing.assignedGroupId = info.groupId;
+          }
+          return existing;
+        }
+        return {
           id: crypto.randomUUID(),
           name,
-          quantity: count,
+          quantity: info.count,
           category: 'food' as const,
           isChecked: false,
           needsToBuy: true,
           isOwned: false,
-          sourceItemId: undefined // No sourceItemId means it's from meals
+          sourceItemId: undefined, // No sourceItemId means it's from meals
+          assignedGroupId: info.groupId // Auto-assign to meal's group
         };
       });
     
@@ -276,7 +292,7 @@ export class HybridDataService {
       // For food items without sourceItemId, only keep them if they're currently in meals
       // This will remove orphaned ingredients from deleted meals
       const isFoodItemWithoutSource = !item.sourceItemId && item.category === 'food';
-      const isCurrentlyInMeals = ingredientCounts[item.name];
+      const isCurrentlyInMeals = ingredientInfo[item.name];
       
       if (isFromPacking) {
         return false; // Will be handled by packing section
@@ -345,31 +361,47 @@ export class HybridDataService {
         };
       });
     
-    // 2. Add meal ingredients from provided meals (excluding deleted ones)
-    const ingredientCounts = currentMeals.length > 0 
-      ? currentMeals.flatMap(m => m.ingredients).reduce<Record<string, number>>((acc, ing) => {
-          const normalizedName = ing.toLowerCase().trim();
-          if (!deletedIngredientsSet.has(normalizedName)) {
-            acc[ing] = (acc[ing] || 0) + 1;
-          }
-          return acc;
-        }, {})
+    // 2. Add meal ingredients from provided meals (excluding deleted ones) with group assignments
+    const ingredientInfo = currentMeals.length > 0 
+      ? currentMeals.flatMap(m => m.ingredients.map(ing => ({ ingredient: ing, groupId: m.assignedGroupId })))
+          .reduce<Record<string, { count: number, groupId?: string }>>((acc, { ingredient, groupId }) => {
+            const normalizedName = ingredient.toLowerCase().trim();
+            if (!deletedIngredientsSet.has(normalizedName)) {
+              if (!acc[ingredient]) {
+                acc[ingredient] = { count: 0, groupId };
+              }
+              acc[ingredient].count += 1;
+              // If ingredients come from meals with different group assignments, don't assign to a specific group
+              if (acc[ingredient].groupId !== groupId) {
+                acc[ingredient].groupId = undefined;
+              }
+            }
+            return acc;
+          }, {})
       : {};
     
-    console.log(`🍽️ [HybridDataService] Using provided meal ingredients:`, Object.keys(ingredientCounts));
+    console.log(`🍽️ [HybridDataService] Using provided meal ingredients with groups:`, Object.keys(ingredientInfo));
     
-    const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientCounts)
-      .map(([name, count]) => {
+    const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientInfo)
+      .map(([name, info]) => {
         const existing = existingItemsMap.get(name.toLowerCase());
-        return existing || {
+        if (existing) {
+          // Update existing item with group assignment if it doesn't have one
+          if (!existing.assignedGroupId && info.groupId) {
+            existing.assignedGroupId = info.groupId;
+          }
+          return existing;
+        }
+        return {
           id: crypto.randomUUID(),
           name,
-          quantity: count,
+          quantity: info.count,
           category: 'food' as const,
           isChecked: false,
           needsToBuy: true,
           isOwned: false,
-          sourceItemId: undefined // No sourceItemId means it's from meals
+          sourceItemId: undefined, // No sourceItemId means it's from meals
+          assignedGroupId: info.groupId // Auto-assign to meal's group
         };
       });
     
@@ -382,7 +414,7 @@ export class HybridDataService {
       // For food items without sourceItemId, only keep them if they're currently in meals
       // This will remove orphaned ingredients from deleted meals
       const isFoodItemWithoutSource = !item.sourceItemId && item.category === 'food';
-      const isCurrentlyInMeals = ingredientCounts[item.name];
+      const isCurrentlyInMeals = ingredientInfo[item.name];
       
       if (isFromPacking) {
         return false; // Will be handled by packing section
