@@ -3,8 +3,8 @@ import { useOutletContext } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { ShoppingCart, FileDown, Check, RotateCcw, X } from 'lucide-react';
-import { Trip, ShoppingItem } from '../types';
+import { ShoppingCart, FileDown, Check, RotateCcw, X, Users } from 'lucide-react';
+import { Trip, ShoppingItem, Group } from '../types';
 import { hybridDataService } from '../services/hybridDataService';
 
 interface TripContextType {
@@ -17,6 +17,7 @@ const ShoppingListPage: React.FC = () => {
   const tripId = trip.id;
   const [allItems, setAllItems] = useState<ShoppingItem[]>([]);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const [groupByAssignment, setGroupByAssignment] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -67,6 +68,18 @@ const ShoppingListPage: React.FC = () => {
     }
   };
 
+  const updateItemGroup = async (itemId: string, groupId: string | undefined) => {
+    const updated = allItems.map(it => 
+      it.id === itemId ? { ...it, assignedGroupId: groupId } : it
+    );
+    setAllItems(updated);
+    await hybridDataService.saveShoppingItems(tripId, updated);
+
+    // Force refresh from storage to ensure UI is in sync
+    const refreshed = await hybridDataService.getShoppingItems(tripId);
+    setAllItems(refreshed);
+  };
+
 
   const clearUserInput = async () => {
     // This should reset the needsToBuy flags in the source lists (packing and meals)
@@ -104,6 +117,18 @@ const ShoppingListPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setGroupByAssignment(!groupByAssignment)}
+            className={`inline-flex items-center px-4 py-2 rounded-md transition-colors ${
+              groupByAssignment 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'
+            }`}
+            title={groupByAssignment ? 'Show as list' : 'Group by assignment'}
+          >
+            <Users className="h-4 w-4 mr-2" />
+            {groupByAssignment ? 'Grouped View' : 'List View'}
+          </button>
           <button
             onClick={() => setShowClearConfirmation(true)}
             className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
@@ -161,7 +186,7 @@ const ShoppingListPage: React.FC = () => {
       {allItems.filter(i => i.needsToBuy).length === 0 ? (
         <div className="text-gray-500 dark:text-gray-400">No items marked as need to buy.</div>
       ) : (
-        <div className="space-y-6 max-w-2xl">
+        <div className="space-y-6 max-w-4xl">
           {(() => {
             const itemsToBuy = allItems.filter(i => i.needsToBuy);
             
@@ -187,6 +212,29 @@ const ShoppingListPage: React.FC = () => {
             const ingredientItems = sortedItems.filter(item => item.category === 'food');
             
             const renderItem = (item: ShoppingItem) => {
+              const assignedGroup = trip.groups.find(g => g.id === item.assignedGroupId);
+              
+              // Helper function to get color classes based on group color
+              const getGroupColorClasses = () => {
+                if (!assignedGroup) {
+                  return 'bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300';
+                }
+                
+                // Map group colors to Tailwind classes (using actual hex values from GROUP_COLORS)
+                const colorMap: Record<string, string> = {
+                  '#4299E1': 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-300',
+                  '#48BB78': 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900 dark:border-green-700 dark:text-green-300',
+                  '#ED8936': 'bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-900 dark:border-orange-700 dark:text-orange-300',
+                  '#9F7AEA': 'bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-900 dark:border-purple-700 dark:text-purple-300',
+                  '#F56565': 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900 dark:border-red-700 dark:text-red-300',
+                  '#38B2AC': 'bg-teal-50 border-teal-200 text-teal-700 dark:bg-teal-900 dark:border-teal-700 dark:text-teal-300',
+                  '#ED64A6': 'bg-pink-50 border-pink-200 text-pink-700 dark:bg-pink-900 dark:border-pink-700 dark:text-pink-300',
+                  '#ECC94B': 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-300',
+                };
+                
+                return colorMap[assignedGroup.color] || 'bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300';
+              };
+              
               return (
                 <div key={item.id} className="flex items-center p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                   <button
@@ -199,23 +247,121 @@ const ShoppingListPage: React.FC = () => {
                     <Check className="h-4 w-4" />
                   </button>
                   
-                  <div className="flex-1">
+                  <div className="flex-1 flex items-center justify-between">
                     <div className={`${item.isChecked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
                       {item.name}{item.quantity > 1 && <span className="ml-1 text-sm text-gray-500">×{item.quantity}</span>}
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <select
+                        value={item.assignedGroupId || ''}
+                        onChange={(e) => updateItemGroup(item.id, e.target.value || undefined)}
+                        className={`px-3 py-1 text-sm rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${getGroupColorClasses()}`}
+                      >
+                        <option value="">All Groups</option>
+                        {trip.groups.map(group => (
+                          <option key={group.id} value={group.id}>
+                            {group.name} ({group.size} people)
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
               );
             };
 
+            // If grouping by assignment, reorganize the display
+            if (groupByAssignment) {
+              // Create groups for each assignment
+              const groupedItems: Record<string, ShoppingItem[]> = {
+                'all': [],
+                ...Object.fromEntries(trip.groups.map(g => [g.id, []]))
+              };
+              
+              // Sort items into groups
+              sortedItems.forEach(item => {
+                const groupKey = item.assignedGroupId || 'all';
+                if (groupKey === 'all') {
+                  groupedItems['all'].push(item);
+                } else if (groupedItems[groupKey]) {
+                  groupedItems[groupKey].push(item);
+                }
+              });
+              
+              return (
+                <>
+                  {/* All Groups Section */}
+                  {groupedItems['all'].length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                          👥 All Groups
+                        </h3>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {groupedItems['all'].length} items
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {groupedItems['all'].map(renderItem)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Individual Group Sections */}
+                  {trip.groups.map(group => {
+                    const items = groupedItems[group.id];
+                    if (!items || items.length === 0) return null;
+                    
+                    // Get group color classes
+                    const colorMap: Record<string, { bg: string, text: string, border: string }> = {
+                      '#4299E1': { bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-700' },
+                      '#48BB78': { bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-700 dark:text-green-300', border: 'border-green-200 dark:border-green-700' },
+                      '#ED8936': { bg: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-700 dark:text-orange-300', border: 'border-orange-200 dark:border-orange-700' },
+                      '#9F7AEA': { bg: 'bg-purple-50 dark:bg-purple-900/20', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-700' },
+                      '#F56565': { bg: 'bg-red-50 dark:bg-red-900/20', text: 'text-red-700 dark:text-red-300', border: 'border-red-200 dark:border-red-700' },
+                      '#38B2AC': { bg: 'bg-teal-50 dark:bg-teal-900/20', text: 'text-teal-700 dark:text-teal-300', border: 'border-teal-200 dark:border-teal-700' },
+                      '#ED64A6': { bg: 'bg-pink-50 dark:bg-pink-900/20', text: 'text-pink-700 dark:text-pink-300', border: 'border-pink-200 dark:border-pink-700' },
+                      '#ECC94B': { bg: 'bg-yellow-50 dark:bg-yellow-900/20', text: 'text-yellow-700 dark:text-yellow-300', border: 'border-yellow-200 dark:border-yellow-700' },
+                    };
+                    
+                    const colors = colorMap[group.color] || { bg: 'bg-gray-50 dark:bg-gray-900/20', text: 'text-gray-700 dark:text-gray-300', border: 'border-gray-200 dark:border-gray-700' };
+                    
+                    return (
+                      <div key={group.id} className={`rounded-lg p-4 ${colors.bg} border ${colors.border}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className={`text-lg font-medium ${colors.text}`}>
+                            {group.name}
+                          </h3>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {items.length} items • {group.size} people
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {items.map(renderItem)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            }
+            
+            // Original category-based view
             return (
               <>
                 {/* Packing Items Section */}
                 {packingItems.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
-                      🎒 Packing Items
-                    </h3>
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                        🎒 Packing Items
+                      </h3>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                        <Users className="h-4 w-4 mr-1" />
+                        Assign to groups
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       {packingItems.map(renderItem)}
                     </div>
@@ -225,9 +371,15 @@ const ShoppingListPage: React.FC = () => {
                 {/* Ingredients Section */}
                 {ingredientItems.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
-                      🍽️ Meal Ingredients
-                    </h3>
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                        🍽️ Meal Ingredients
+                      </h3>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                        <Users className="h-4 w-4 mr-1" />
+                        Assign to groups
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       {ingredientItems.map(renderItem)}
                     </div>
