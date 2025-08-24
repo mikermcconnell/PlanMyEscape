@@ -267,14 +267,14 @@ const MealPlanner = () => {
   };
 
   const saveEditedMeal = async () => {
-    if (!editingMeal || !editMealName.trim() || editMealIngredients.length === 0) return;
+    if (!editingMeal || !customMealName.trim() || selectedIngredients.length === 0) return;
 
     const updatedMeals = meals.map(meal =>
       meal.id === editingMeal.id
         ? {
             ...meal,
-            name: editMealName.trim(),
-            ingredients: editMealIngredients,
+            name: customMealName.trim(),
+            ingredients: selectedIngredients,
             assignedGroupId: selectedGroupId,
             lastModifiedAt: new Date().toISOString()
           }
@@ -294,7 +294,7 @@ const MealPlanner = () => {
     }
 
     // Show success feedback
-    setConfirmation(`${editMealName.trim()} updated successfully!`);
+    setConfirmation(`${customMealName.trim()} updated successfully!`);
     setTimeout(() => setConfirmation(null), 3000);
 
     // Reset editing state
@@ -591,9 +591,9 @@ const MealPlanner = () => {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               You control serving amounts - set quantities that work for your group
             </p>
-            {trip.isCoordinated && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Meals can be assigned to specific groups
+            {trip.groups.length > 1 && (
+              <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                ✓ Group meal assignments enabled - assign meals to specific groups
               </p>
             )}
           </div>
@@ -663,18 +663,27 @@ const MealPlanner = () => {
                           <div className="space-y-2">
                             {dayMeals.map(meal => (
                               <div key={meal.id} className={`flex items-center justify-between p-2 ${getMealTypeColor(mealType)} rounded`}>
-                                <div>
+                                <div className="flex-1">
                                   <div className="font-medium text-gray-900 dark:text-white">
                                     {meal.name}
-                                    {meal.assignedGroupId && (
-                                      <span className="ml-2 text-xs px-2 py-1 bg-white dark:bg-gray-800 rounded">
-                                        {trip.groups.find(g => g.id === meal.assignedGroupId)?.name}
-                                      </span>
-                                    )}
                                   </div>
                                   <div className="text-sm text-gray-500 dark:text-gray-400">
                                     {meal.ingredients.join(', ')}
                                   </div>
+                                  {meal.assignedGroupId && (
+                                    <div className="mt-1">
+                                      <span className="inline-flex items-center text-xs px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">
+                                        <span className="font-semibold">Responsible: {trip.groups.find(g => g.id === meal.assignedGroupId)?.name}</span>
+                                      </span>
+                                    </div>
+                                  )}
+                                  {!meal.assignedGroupId && trip.groups.length > 1 && (
+                                    <div className="mt-1">
+                                      <span className="inline-flex items-center text-xs px-2 py-1 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 rounded">
+                                        Shared by all groups
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   <button
@@ -1124,6 +1133,72 @@ const MealPlanner = () => {
           groups={trip.groups}
           onClose={() => setShowShoppingList(false)} 
         />
+      )}
+
+      {/* Group Meal Responsibilities Summary */}
+      {trip.groups.length > 1 && meals.length > 0 && (
+        <div className="mt-8 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            Group Meal Responsibilities
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {trip.groups.map(group => {
+              const groupMeals = meals.filter(meal => meal.assignedGroupId === group.id);
+              return (
+                <div key={group.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                    {group.name}
+                  </h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    {group.size} {group.size === 1 ? 'person' : 'people'}
+                  </p>
+                  <div className="space-y-1">
+                    {groupMeals.length === 0 ? (
+                      <p className="text-sm text-gray-400 italic">No meals assigned</p>
+                    ) : (
+                      <>
+                        <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                          {groupMeals.length} {groupMeals.length === 1 ? 'meal' : 'meals'} assigned
+                        </p>
+                        {groupMeals.slice(0, 3).map(meal => (
+                          <p key={meal.id} className="text-sm text-gray-600 dark:text-gray-400">
+                            • Day {meal.day} {meal.type}: {meal.name}
+                          </p>
+                        ))}
+                        {groupMeals.length > 3 && (
+                          <p className="text-sm text-gray-400 italic">
+                            ...and {groupMeals.length - 3} more
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {/* Shared meals section */}
+            {meals.filter(meal => !meal.assignedGroupId).length > 0 && (
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                  Shared Meals
+                </h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  All groups together
+                </p>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                    {meals.filter(meal => !meal.assignedGroupId).length} shared {meals.filter(meal => !meal.assignedGroupId).length === 1 ? 'meal' : 'meals'}
+                  </p>
+                  {meals.filter(meal => !meal.assignedGroupId).slice(0, 3).map(meal => (
+                    <p key={meal.id} className="text-sm text-gray-600 dark:text-gray-400">
+                      • Day {meal.day} {meal.type}: {meal.name}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Trip Meal Suggestions */}
