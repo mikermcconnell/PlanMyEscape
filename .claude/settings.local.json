@@ -39,7 +39,13 @@
       "Bash(./supabase.exe db push --include-all --debug)",
       "Bash(./supabase.exe db push:*)",
       "Bash(supabase login:*)",
-      "Bash(./supabase.exe --help)"
+      "Bash(./supabase.exe --help)",
+      "Bash(curl:*)",
+      "mcp__Ref__ref_search_documentation",
+      "Bash(dir \"%APPDATA%\\Claude\\*config*\" /s /b)",
+      "Read(/C:\\Users\\Mike McConnell\\AppData\\Roaming/**)",
+      "Read(/C:\\Users\\Mike McConnell\\AppData\\Roaming/**)",
+      "Bash(checkpoint.bat create \"Added automatic checkpoint system to CLAUDE.md\")"
     ],
     "deny": []
   }

@@ -1,5 +1,36 @@
 # PlanMyEscape - Claude Reference Guide
 
+## AUTOMATIC CHECKPOINT SYSTEM
+Claude will automatically create Git checkpoints before any significant changes:
+
+### When Checkpoints Are Created
+- **Before Component Changes**: Modifying any React component
+- **Before Service Updates**: Changes to data services or API integrations  
+- **Before Database Migrations**: Any Supabase schema changes
+- **Before Major Refactoring**: Restructuring code or file organization
+- **Before Feature Implementation**: Adding new functionality
+- **Before Deletion**: Removing files or significant code blocks
+- **Before Package Updates**: npm install/update operations
+- **Before Configuration Changes**: Modifying env vars, build configs, etc.
+
+### Checkpoint Commands
+```bash
+# Windows
+checkpoint.bat create "Description"  # Create checkpoint
+checkpoint.bat list                  # List checkpoints
+checkpoint.bat restore <name>        # Restore to checkpoint
+
+# Unix/Mac
+./checkpoint.sh create "Description"
+./checkpoint.sh list
+./checkpoint.sh restore <name>
+```
+
+### Automatic Checkpoint Naming Convention
+- Format: `checkpoint-YYYYMMDD-HHMMSS`
+- Example: `checkpoint-20250824-084456`
+- Always includes descriptive commit message
+
 ## Project Overview
 PlanMyEscape is a React/TypeScript camping and trip planning web application with Supabase backend. Users can plan trips, manage packing lists, coordinate meals, and collaborate with groups.
 
