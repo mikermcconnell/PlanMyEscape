@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../supabaseClient';
 import FullPageSpinner from '../components/FullPageSpinner';
@@ -24,47 +24,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [migrationStatus, setMigrationStatus] = useState<'pending' | 'complete' | 'error' | 'retrying' | null>(null);
   const [hasTriggeredMigration, setHasTriggeredMigration] = useState(false);
-  const [migrationRetryCount, setMigrationRetryCount] = useState(0);
+  const [, setMigrationRetryCount] = useState(0);
   const maxRetries = 3;
 
-  useEffect(() => {
-    let isMounted = true;
-
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (isMounted) {
-        setSession(data.session);
-        setLoading(false);
-      }
-    })();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (isMounted) {
-        setSession(newSession);
-        
-        // Trigger data migration when user signs in
-        if (event === 'SIGNED_IN' && newSession?.user && !hasTriggeredMigration) {
-          setHasTriggeredMigration(true);
-          performMigration();
-        }
-        
-        // Reset migration status and flag on sign out
-        if (event === 'SIGNED_OUT') {
-          setHasTriggeredMigration(false);
-          setMigrationStatus(null);
-          setMigrationRetryCount(0);
-        }
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-  
   // Migration function with retry logic
-  const performMigration = async () => {
+  const performMigration = useCallback(async () => {
     let currentRetryCount = 0;
     
     const attemptMigration = async (): Promise<void> => {
@@ -107,7 +71,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     await attemptMigration();
-  };
+  }, [maxRetries]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (isMounted) {
+        setSession(data.session);
+        setLoading(false);
+      }
+    })();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (isMounted) {
+        setSession(newSession);
+        
+        // Trigger data migration when user signs in
+        if (event === 'SIGNED_IN' && newSession?.user && !hasTriggeredMigration) {
+          setHasTriggeredMigration(true);
+          performMigration();
+        }
+        
+        // Reset migration status and flag on sign out
+        if (event === 'SIGNED_OUT') {
+          setHasTriggeredMigration(false);
+          setMigrationStatus(null);
+          setMigrationRetryCount(0);
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [hasTriggeredMigration, performMigration]);
   
   // Manual retry function for user-triggered retries
   const retryMigration = async () => {

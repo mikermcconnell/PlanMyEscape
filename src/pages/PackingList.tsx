@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, Activity, Tent, UtensilsCrossed, Shirt, Wrench, Bed, Gamepad2, Backpack, Car, Zap, Camera, Flashlight, Compass, Flame, ChefHat, Coffee, Hammer, Key, Phone, Book, Music, Gift, Map, Heart, Droplets, Smile, StickyNote } from 'lucide-react';
+import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, StickyNote, Activity } from 'lucide-react';
 import { PackingItem, Trip, TripType } from '../types';
 import { hybridDataService } from '../services/hybridDataService';
 import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
@@ -20,68 +20,6 @@ interface TripContextType {
 // the array identity stable across renders and eliminates 'missing dependency' warnings.
 export const PACKING_CATEGORIES = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Safety', 'Transportation', 'Fun and games', 'Other'] as const;
 
-// Icon mapping function for packing items
-const getItemIcon = (itemName: string, category: string) => {
-  const name = itemName.toLowerCase();
-  
-  // Specific item name matches (highest priority)
-  if (name.includes('tent')) return { icon: Tent, color: 'text-green-500' };
-  if (name.includes('sleeping bag') || name.includes('sleep sack')) return { icon: Bed, color: 'text-blue-500' };
-  if (name.includes('pillow')) return { icon: Bed, color: 'text-purple-500' };
-  if (name.includes('flashlight') || name.includes('headlamp') || name.includes('torch')) return { icon: Flashlight, color: 'text-yellow-500' };
-  if (name.includes('first aid') || name.includes('medical')) return { icon: Heart, color: 'text-red-500' };
-  if (name.includes('knife') || name.includes('multi-tool')) return { icon: Wrench, color: 'text-gray-600' };
-  if (name.includes('compass')) return { icon: Compass, color: 'text-indigo-500' };
-  if (name.includes('map')) return { icon: Map, color: 'text-orange-500' };
-  if (name.includes('camera')) return { icon: Camera, color: 'text-pink-500' };
-  if (name.includes('phone') || name.includes('mobile')) return { icon: Phone, color: 'text-blue-600' };
-  if (name.includes('battery') || name.includes('power bank')) return { icon: Zap, color: 'text-yellow-600' };
-  if (name.includes('stove') || name.includes('burner')) return { icon: Flame, color: 'text-red-600' };
-  if (name.includes('pot') || name.includes('pan') || name.includes('cookware')) return { icon: ChefHat, color: 'text-orange-600' };
-  if (name.includes('coffee') || name.includes('tea')) return { icon: Coffee, color: 'text-amber-700' };
-  if (name.includes('water bottle') || name.includes('hydration')) return { icon: Droplets, color: 'text-blue-400' };
-  if (name.includes('backpack') || name.includes('pack') || name.includes('bag')) return { icon: Backpack, color: 'text-green-600' };
-  if (name.includes('shirt') || name.includes('t-shirt')) return { icon: Shirt, color: 'text-teal-500' };
-  if (name.includes('jacket') || name.includes('coat')) return { icon: Shield, color: 'text-gray-700' };
-  if (name.includes('soap') || name.includes('shampoo') || name.includes('wash')) return { icon: Droplets, color: 'text-cyan-500' };
-  if (name.includes('toothbrush') || name.includes('dental')) return { icon: Smile, color: 'text-green-400' };
-  if (name.includes('game') || name.includes('cards') || name.includes('puzzle')) return { icon: Gamepad2, color: 'text-purple-600' };
-  if (name.includes('book') || name.includes('journal')) return { icon: Book, color: 'text-amber-600' };
-  if (name.includes('music') || name.includes('speaker') || name.includes('headphones')) return { icon: Music, color: 'text-violet-500' };
-  if (name.includes('rope') || name.includes('cord')) return { icon: Activity, color: 'text-orange-400' };
-  if (name.includes('hammer') || name.includes('tool')) return { icon: Hammer, color: 'text-gray-500' };
-  if (name.includes('key') || name.includes('lock')) return { icon: Key, color: 'text-yellow-700' };
-  if (name.includes('gift') || name.includes('present')) return { icon: Gift, color: 'text-red-400' };
-  if (name.includes('sunscreen') || name.includes('sun protection')) return { icon: Sun, color: 'text-yellow-500' };
-  if (name.includes('insect') || name.includes('bug spray')) return { icon: Shield, color: 'text-green-500' };
-  
-  // Category-based fallbacks (lower priority)
-  switch (category.toLowerCase()) {
-    case 'shelter':
-      return { icon: Tent, color: 'text-green-500' };
-    case 'kitchen':
-      return { icon: UtensilsCrossed, color: 'text-orange-500' };
-    case 'clothing':
-      return { icon: Shirt, color: 'text-blue-500' };
-    case 'personal':
-      return { icon: Smile, color: 'text-teal-500' };
-    case 'tools':
-      return { icon: Wrench, color: 'text-gray-600' };
-    case 'sleep':
-      return { icon: Bed, color: 'text-purple-500' };
-    case 'comfort':
-    case 'fun and games':
-      return { icon: Gamepad2, color: 'text-purple-600' };
-    case 'pack':
-      return { icon: Backpack, color: 'text-green-600' };
-    case 'safety':
-      return { icon: Heart, color: 'text-red-500' };
-    case 'transportation':
-      return { icon: Car, color: 'text-blue-600' };
-    default:
-      return { icon: Package, color: 'text-gray-500' };
-  }
-};
 
 const PackingList = () => {
   const { trip } = useOutletContext<TripContextType>();

@@ -11,6 +11,27 @@ const GroupSchema = z.object({
   color: z.string().regex(/^#[0-9A-F]{6}$/i)
 });
 
+const ActivitySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  type: z.enum(['outdoor', 'indoor', 'water', 'entertainment']),
+  equipment: z.array(z.string()).optional(),
+  notes: z.string().max(500).optional(),
+  schedules: z.array(z.object({
+    day: z.number().int().min(1),
+    timeOfDay: z.string().max(50)
+  })).optional(),
+  isCompleted: z.boolean().optional()
+});
+
+const EmergencyContactSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  type: z.enum(['hospital', 'police', 'park_services', 'local_services']),
+  phone: z.string().min(1).max(20),
+  address: z.string().max(200).optional()
+});
+
 export const TripSchema = z.object({
   id: z.string().min(1),
   tripName: z.string().min(1).max(100),
@@ -21,8 +42,8 @@ export const TripSchema = z.object({
   location: z.string().max(200).optional(),
   isCoordinated: z.boolean(),
   groups: z.array(GroupSchema),
-  activities: z.array(z.any()).optional(),
-  emergencyContacts: z.array(z.any()).optional()
+  activities: z.array(ActivitySchema).optional(),
+  emergencyContacts: z.array(EmergencyContactSchema).optional()
 }).refine(data => {
   const start = new Date(data.startDate);
   const end = new Date(data.endDate);

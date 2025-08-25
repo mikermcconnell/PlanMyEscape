@@ -3,6 +3,7 @@ import { Trip } from '../types';
 import { saveTripToDB } from '../utils/db';
 
 jest.mock('../utils/db', () => ({
+  initDB: jest.fn(() => Promise.resolve({})),
   saveTripToDB: jest.fn(() => Promise.resolve()),
   getTripsFromDB: jest.fn(() => Promise.resolve([])),
   deleteTripFromDB: jest.fn(() => Promise.resolve())

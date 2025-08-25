@@ -13,6 +13,7 @@ import {
 } from '../utils/storage';
 import { supabase } from '../supabaseClient';
 import { PackingItem, Meal, ShoppingItem, GearItem, TodoItem } from '../types';
+import logger from '../utils/logger';
 
 /**
  * Hybrid data service that tries Supabase first, falls back to local storage
@@ -24,10 +25,10 @@ export class HybridDataService {
     try {
       const { data, error } = await supabase.auth.getUser();
       const signedIn = !error && !!data.user;
-      console.log(`🔐 [HybridDataService] Auth check - Signed in: ${signedIn}, User ID: ${data.user?.id || 'none'}`);
+      logger.log(`🔐 [HybridDataService] Auth check - Signed in: ${signedIn}, User ID: ${data.user?.id || 'none'}`);
       return signedIn;
     } catch (authError) {
-      console.error('❌ [HybridDataService] Auth check failed:', authError);
+      logger.error('❌ [HybridDataService] Auth check failed:', authError);
       return false;
     }
   }
