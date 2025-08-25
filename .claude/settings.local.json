@@ -46,7 +46,10 @@
       "Read(/C:\\Users\\Mike McConnell\\AppData\\Roaming/**)",
       "Read(/C:\\Users\\Mike McConnell\\AppData\\Roaming/**)",
       "Bash(checkpoint.bat create \"Added automatic checkpoint system to CLAUDE.md\")",
-      "Bash(npx:*)"
+      "Bash(npx:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(checkpoint.bat create \"Before comprehensive code review fixes - implementing critical issues, hook dependencies, dead code removal, and type safety improvements\")",
+      "Bash(./checkpoint.bat create \"Before comprehensive code review fixes - implementing critical issues, hook dependencies, dead code removal, and type safety improvements\")"
     ],
     "deny": []
   }
