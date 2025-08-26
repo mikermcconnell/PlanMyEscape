@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, StickyNote, Activity } from 'lucide-react';
-import { PackingItem, Trip, TripType } from '../types';
+import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, StickyNote, Activity, Save, Download, Upload } from 'lucide-react';
+import { PackingItem, Trip, TripType, PackingTemplate } from '../types';
 import { hybridDataService } from '../services/hybridDataService';
 import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
 import { separateAndItems, PackingSuggestion } from '../data/activityEquipment';
 import ShoppingList from '../components/ShoppingList';
 import SEOHead from '../components/SEOHead';
+import { createPackingTemplate, loadPackingTemplate, filterCompatibleTemplates, getPackingTemplateSummary } from '../utils/templateHelpers';
 
 interface TripContextType {
   trip: Trip;
@@ -44,6 +45,13 @@ const PackingList = () => {
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Template management state
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [availableTemplates, setAvailableTemplates] = useState<PackingTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [currentTemplateName, setCurrentTemplateName] = useState<string>('');
 
   // Ref to keep track of the current timeout across renders
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -386,6 +394,7 @@ const PackingList = () => {
       
       // Save the merged items and set them through updateItems for consistency
       updateItems(mergedItems);
+      setCurrentTemplateName(`Default ${renderTripTypeText(trip.tripType)} List`);
       
       setConfirmation('Template updated while preserving your status changes!');
       setTimeout(() => setConfirmation(null), 3000);
@@ -443,6 +452,7 @@ const PackingList = () => {
             // Set items directly and save them
             setItems(templateItems);
             await hybridDataService.savePackingItems(tripId, templateItems);
+            setCurrentTemplateName(`Default ${renderTripTypeText(trip.tripType)} List`);
             log(`✅ Created and saved ${templateItems.length} template items`);
           } catch (templateError) {
             logError('❌ Failed to create template:', templateError);
@@ -453,6 +463,10 @@ const PackingList = () => {
         } else if (savedItems.length > 0) {
           log(`📦 Loading ${savedItems.length} existing packing items from database`);
           setItems(savedItems);
+          // If loading existing items and no template name is set, set it to 'Custom List'
+          if (!currentTemplateName) {
+            setCurrentTemplateName('Custom List');
+          }
         } else {
           log('⏭️ Skipping template creation - conditions not met');
         }
@@ -689,6 +703,57 @@ const PackingList = () => {
     setShowClearConfirmation(false);
   };
 
+  // Template management functions
+  const loadTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const templates = await hybridDataService.getPackingTemplates();
+      const compatibleTemplates = filterCompatibleTemplates(templates, trip.tripType);
+      setAvailableTemplates(compatibleTemplates);
+    } catch (error) {
+      setUpdateError('Failed to load templates. Please try again.');
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const saveAsTemplate = async () => {
+    if (items.length === 0) {
+      setUpdateError('Cannot save empty packing list as template');
+      return;
+    }
+
+    setSavingTemplate(true);
+    try {
+      const template = createPackingTemplate(trip.tripName, trip.tripType, items);
+      await hybridDataService.savePackingTemplate(template);
+      setConfirmation(`Packing list saved as "${trip.tripName}" template!`);
+      setTimeout(() => setConfirmation(null), 3000);
+    } catch (error) {
+      setUpdateError(getErrorMessage(error, 'saving template'));
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const loadTemplate = async (template: PackingTemplate) => {
+    setIsLoading(true);
+    try {
+      const templateItems = loadPackingTemplate(template, tripId, trip);
+      // Replace existing items with template items (don't concatenate)
+      setItems(templateItems);
+      await hybridDataService.savePackingItems(tripId, templateItems);
+      setCurrentTemplateName(template.name); // Update the current template name
+      setShowTemplateModal(false);
+      setConfirmation(`Loaded "${template.name}" packing list!`);
+      setTimeout(() => setConfirmation(null), 3000);
+    } catch (error) {
+      setUpdateError(getErrorMessage(error, 'loading template'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'Activity Items':
@@ -755,6 +820,12 @@ const PackingList = () => {
             <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
               {trip.tripName} • {renderTripTypeText(trip.tripType)} • {calculateTotalCampers(trip)} person{calculateTotalCampers(trip) > 1 ? 's' : ''}
             </p>
+            {currentTemplateName && (
+              <p className="text-xs sm:text-sm text-green-600 dark:text-green-400 mt-1">
+                <Package className="h-3 w-3 inline mr-1" />
+                Current List: {currentTemplateName}
+              </p>
+            )}
             <p className="text-xs sm:text-sm text-gray-500 mt-2">
               {getPackingListDescription(trip.tripType)}
             </p>
@@ -780,8 +851,47 @@ const PackingList = () => {
               ) : (
                 <>
                   <Package className="h-4 w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Reset to Template Packing List</span>
+                  <span className="hidden sm:inline">Use Default List</span>
                   <span className="sm:hidden">Reset Template</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                loadTemplates();
+                setShowTemplateModal(true);
+              }}
+              disabled={loadingTemplates}
+              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {loadingTemplates ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1 sm:mr-2"></div>
+                  <span className="hidden sm:inline">Loading...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Load Saved List</span>
+                  <span className="sm:hidden">Load Template</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={saveAsTemplate}
+              disabled={savingTemplate || items.length === 0}
+              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {savingTemplate ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1 sm:mr-2"></div>
+                  <span className="hidden sm:inline">Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Save This List</span>
+                  <span className="sm:hidden">Save Template</span>
                 </>
               )}
             </button>
@@ -1947,6 +2057,88 @@ const PackingList = () => {
           groups={trip.groups}
           onClose={() => setShowShoppingList(false)} 
         />
+      )}
+
+      {/* Template Selection Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Choose a Saved List
+              </h3>
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Choose a packing list template to add to your current list. Items from the template will be added to your existing items.
+            </p>
+            
+            {availableTemplates.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-gray-400 mb-2">No compatible templates found</p>
+                <p className="text-sm text-gray-500">
+                  Create your first template by customizing your packing list and clicking "Save This List"
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {availableTemplates.map((template) => (
+                  <div key={template.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-gray-900 dark:text-white">
+                        {template.name}
+                      </h4>
+                      <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                        {template.tripType}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      {getPackingTemplateSummary(template)}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">
+                        Created: {new Date(template.createdAt).toLocaleDateString()}
+                      </span>
+                      <button
+                        onClick={() => loadTemplate(template)}
+                        disabled={isLoading}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-3 w-3 mr-1" />
+                            Load Template
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Confirmation Message */}

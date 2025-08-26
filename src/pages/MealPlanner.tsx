@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Plus, Trash2, Edit3, X, ShoppingCart, Calendar, CheckCircle, RotateCcw } from 'lucide-react';
-import { Meal, Trip, TripType } from '../types';
+import { Plus, Trash2, Edit3, X, ShoppingCart, Calendar, CheckCircle, RotateCcw, Save, Download, Upload } from 'lucide-react';
+import { Meal, Trip, TripType, MealTemplate } from '../types';
 import { hybridDataService } from '../services/hybridDataService';
 import { getMealTemplates } from '../data/mealTemplates';
 import ShoppingList from '../components/ShoppingList';
@@ -10,6 +10,7 @@ import { ShoppingItem } from '../types';
 import { suggestIngredients } from '../data/recipeSuggestions';
 import SEOHead from '../components/SEOHead';
 import { tripMealSuggestions } from '../data/tripMealSuggestions';
+import { createMealTemplate, loadMealTemplate, filterCompatibleTemplates, getMealTemplateSummary, getTripDuration } from '../utils/templateHelpers';
 
 interface TripContextType {
   trip: Trip;
@@ -41,6 +42,12 @@ const MealPlanner = () => {
   const [deletedIngredients, setDeletedIngredients] = useState<Set<string>>(new Set());
   const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>(undefined);
   const [filterGroupId, setFilterGroupId] = useState<string>('all');
+
+  // Template management state
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [availableTemplates, setAvailableTemplates] = useState<MealTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // Save on unmount to prevent data loss
   useEffect(() => {
@@ -321,6 +328,59 @@ const MealPlanner = () => {
     setShowMealModal(false);
   };
 
+  // Template management functions
+  const loadTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const templates = await hybridDataService.getMealTemplates();
+      const compatibleTemplates = filterCompatibleTemplates(templates, trip.tripType);
+      setAvailableTemplates(compatibleTemplates);
+    } catch (error) {
+      setConfirmation('Failed to load templates. Please try again.');
+      setTimeout(() => setConfirmation(null), 3000);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const saveAsTemplate = async () => {
+    if (meals.length === 0) {
+      setConfirmation('Cannot save empty meal plan as template');
+      setTimeout(() => setConfirmation(null), 3000);
+      return;
+    }
+
+    setSavingTemplate(true);
+    try {
+      const tripDuration = getTripDuration(trip.startDate, trip.endDate);
+      const template = createMealTemplate(trip.tripName, trip.tripType, tripDuration, meals);
+      await hybridDataService.saveMealTemplate(template);
+      setConfirmation(`Meal plan saved as "${trip.tripName}" template!`);
+      setTimeout(() => setConfirmation(null), 3000);
+    } catch (error) {
+      setConfirmation('Failed to save template. Please try again.');
+      setTimeout(() => setConfirmation(null), 3000);
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const loadTemplate = async (template: MealTemplate) => {
+    try {
+      const tripDuration = getTripDuration(trip.startDate, trip.endDate);
+      const templateMeals = loadMealTemplate(template, tripId, trip, tripDuration);
+      const updatedMeals = [...meals, ...templateMeals];
+      setMeals(updatedMeals);
+      await hybridDataService.saveMeals(tripId, updatedMeals);
+      setShowTemplateModal(false);
+      setConfirmation(`Loaded "${template.name}" meal plan template!`);
+      setTimeout(() => setConfirmation(null), 3000);
+    } catch (error) {
+      setConfirmation('Failed to load template. Please try again.');
+      setTimeout(() => setConfirmation(null), 3000);
+    }
+  };
+
   const getMealsByType = (day: number, type: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
     return meals.filter(meal => {
       const matchesDayAndType = meal.day === day && meal.type === type;
@@ -579,7 +639,7 @@ const MealPlanner = () => {
       />
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
               Meal Planner
@@ -597,26 +657,65 @@ const MealPlanner = () => {
               </p>
             )}
           </div>
-          {trip.groups.length > 1 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Filter by Group
-              </label>
-              <select
-                value={filterGroupId}
-                onChange={(e) => setFilterGroupId(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
-              >
-                <option value="all">All Groups</option>
-                {trip.groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name} ({group.size} {group.size === 1 ? 'person' : 'people'})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <button
+              onClick={() => {
+                loadTemplates();
+                setShowTemplateModal(true);
+              }}
+              disabled={loadingTemplates}
+              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {loadingTemplates ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1 sm:mr-2"></div>
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-1 sm:mr-2" />
+                  Load a Meal Plan
+                </>
+              )}
+            </button>
+            <button
+              onClick={saveAsTemplate}
+              disabled={savingTemplate || meals.length === 0}
+              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {savingTemplate ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1 sm:mr-2"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-1 sm:mr-2" />
+                  Save This Meal Plan
+                </>
+              )}
+            </button>
+          </div>
         </div>
+        {trip.groups.length > 1 && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Filter by Group
+            </label>
+            <select
+              value={filterGroupId}
+              onChange={(e) => setFilterGroupId(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
+            >
+              <option value="all">All Groups</option>
+              {trip.groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name} ({group.size} {group.size === 1 ? 'person' : 'people'})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
 
@@ -1269,6 +1368,78 @@ const MealPlanner = () => {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Template Selection Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Load Meal Plan Template
+              </h3>
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Choose a meal plan template to add to your current plan. Meals from the template will be added to your existing meals.
+            </p>
+            
+            {availableTemplates.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-gray-400 mb-2">No compatible templates found</p>
+                <p className="text-sm text-gray-500">
+                  Create your first template by planning meals and clicking "Save This Meal Plan"
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {availableTemplates.map((template) => (
+                  <div key={template.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-gray-900 dark:text-white">
+                        {template.name}
+                      </h4>
+                      <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                        {template.tripType}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      {getMealTemplateSummary(template)}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">
+                        Created: {new Date(template.createdAt).toLocaleDateString()}
+                      </span>
+                      <button
+                        onClick={() => loadTemplate(template)}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Load Template
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
