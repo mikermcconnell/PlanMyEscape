@@ -364,7 +364,7 @@ const ShoppingListPage: React.FC = () => {
                 if (groupKey === 'all') {
                   groupedItems['all']?.push(item);
                 } else if (groupedItems[groupKey]) {
-                  groupedItems[groupKey].push(item);
+                  groupedItems[groupKey]!.push(item);
                 }
               });
               
