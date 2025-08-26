@@ -52,6 +52,7 @@ const PackingList = () => {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [currentTemplateName, setCurrentTemplateName] = useState<string>('');
+  const [loadedTemplateName, setLoadedTemplateName] = useState<string>('');
 
   // Ref to keep track of the current timeout across renders
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -395,6 +396,7 @@ const PackingList = () => {
       // Save the merged items and set them through updateItems for consistency
       updateItems(mergedItems);
       setCurrentTemplateName(`Default ${renderTripTypeText(trip.tripType)} List`);
+      setLoadedTemplateName(''); // Clear loaded template name when resetting to default
       
       setConfirmation('Template updated while preserving your status changes!');
       setTimeout(() => setConfirmation(null), 3000);
@@ -453,6 +455,7 @@ const PackingList = () => {
             setItems(templateItems);
             await hybridDataService.savePackingItems(tripId, templateItems);
             setCurrentTemplateName(`Default ${renderTripTypeText(trip.tripType)} List`);
+            setLoadedTemplateName(''); // Clear any loaded template when creating new default
             log(`✅ Created and saved ${templateItems.length} template items`);
           } catch (templateError) {
             logError('❌ Failed to create template:', templateError);
@@ -743,7 +746,8 @@ const PackingList = () => {
       // Replace existing items with template items (don't concatenate)
       setItems(templateItems);
       await hybridDataService.savePackingItems(tripId, templateItems);
-      setCurrentTemplateName(template.name); // Update the current template name
+      setCurrentTemplateName(`Default ${renderTripTypeText(trip.tripType)} List`); // Keep the base template name
+      setLoadedTemplateName(template.name); // Track the loaded saved template
       setShowTemplateModal(false);
       setConfirmation(`Loaded "${template.name}" packing list!`);
       setTimeout(() => setConfirmation(null), 3000);
@@ -824,6 +828,11 @@ const PackingList = () => {
               <p className="text-xs sm:text-sm text-green-600 dark:text-green-400 mt-1">
                 <Package className="h-3 w-3 inline mr-1" />
                 Current List: {currentTemplateName}
+                {loadedTemplateName && (
+                  <span className="ml-1 text-blue-600 dark:text-blue-400">
+                    (Loaded: {loadedTemplateName})
+                  </span>
+                )}
               </p>
             )}
             <p className="text-xs sm:text-sm text-gray-500 mt-2">

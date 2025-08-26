@@ -106,12 +106,16 @@ src/
 -- Core tables with RLS enabled
 trips (id, user_id, trip_name, trip_type, start_date, end_date, ...)
 groups (id, trip_id, name, size, contact_name, contact_email, color)
-packing_items (id, trip_id, name, category, quantity, is_checked, needs_to_buy, is_owned, is_packed, ...)
+packing_items (id, trip_id, name, category, quantity, is_checked, needs_to_buy, is_owned, is_packed, assigned_group_id, ...)
 meals (id, trip_id, name, day, type, ingredients, assigned_group_id, is_custom)
-shopping_items (id, trip_id, name, quantity, category, is_checked, cost, paid_by_group_id, splits, ...)
+shopping_items (id, trip_id, name, quantity, category, is_checked, cost, paid_by_group_id, splits, assigned_group_id, ...)
 gear_items (id, user_id, name, category, weight, notes)
 todo_items (id, trip_id, name, is_completed, assigned_group_id)
 security_logs (id, user_id, event_type, timestamp, details)
+
+-- Template tables (added 2025-08-26)
+packing_templates (id, user_id, name, trip_type, items, created_at)
+meal_templates (id, user_id, name, trip_type, trip_duration, meals, created_at)
 ```
 
 ## Authentication Flow
@@ -138,9 +142,18 @@ security_logs (id, user_id, event_type, timestamp, details)
 - **TripNavigation**: Tab navigation between trip sections
 
 ### Feature Components
-- **PackingList**: Manage packing items with templates and status tracking
+- **PackingList**: Manage packing items with templates, status tracking, and group assignments
+  - Shows both default template name and loaded saved template name
+  - Group assignment dropdown for each item (when trip is coordinated)
+  - Template save/load functionality with user-specific templates
 - **MealPlanner**: Plan meals with recipe suggestions and custom meal creation
+  - Template save/load functionality for meal plans
+  - Automatic ingredient grouping for shopping list
+  - Group assignment for meals
 - **ShoppingListPage**: Main shopping list with cost tracking and expense splitting
+  - Auto-populates from packing items (needsToBuy) and meal ingredients
+  - Group-based item organization and filtering
+  - Automatic group assignment from source items (meals/packing)
 - **ActivitiesPlanner**: Activity planning and equipment recommendations
 
 ### Data Components
@@ -571,3 +584,44 @@ const useShoppingListSync = (tripId: string) => {
 - **Environment**: Set vars in Vercel dashboard
 - **Database**: Supabase hosted PostgreSQL
 - **Static Assets**: Served from public/ directory
+
+## Recent Changes (2025-08-26)
+
+### TypeScript & Build Fixes
+- **TypeScript Version**: Downgraded from 5.x to 4.9.5 for react-scripts compatibility
+- **Import Fixes**: Fixed MealTemplate type imports with explicit type imports
+- **Method Binding**: Fixed `this` context binding in SupabaseDataService mapper methods
+- **Strict Mode**: Fixed TypeScript strict mode compliance issues
+
+### Feature Enhancements
+- **Packing List Templates**: 
+  - Now displays both default template name and loaded saved template name
+  - Example: "Current List: Default Car Camping List (Loaded: Summer 2024 Trip)"
+  - Clear distinction between base template and user-saved templates
+  
+- **Group Assignment**:
+  - Packing items now have group assignment dropdowns (visible when trip is coordinated)
+  - Automatic group assignment propagation to shopping list
+  - Visual group indicators with colored borders
+  
+- **Shopping List Improvements**:
+  - Automatic ingredient grouping from meals
+  - Group-based filtering and organization
+  - Preservation of group assignments from source items
+  
+- **Template Management**:
+  - User-specific packing and meal templates
+  - Save current lists as reusable templates
+  - Load previously saved templates
+  - Templates stored in Supabase with RLS
+
+### Database Updates
+- Added `packing_templates` table for saving packing list templates
+- Added `meal_templates` table for saving meal plan templates
+- Both tables include RLS policies for user data isolation
+
+### Bug Fixes
+- Fixed orphaned meal ingredients removal in shopping list
+- Fixed template loading to preserve existing item statuses
+- Fixed context binding issues in data service mappers
+- Resolved Vercel deployment TypeScript compilation errors
