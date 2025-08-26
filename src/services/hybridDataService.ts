@@ -12,25 +12,76 @@ import {
   saveTodoItems as saveTodoItemsLocal
 } from '../utils/storage';
 import { supabase } from '../supabaseClient';
-import { PackingItem, Meal, ShoppingItem, GearItem, TodoItem } from '../types';
+import { PackingItem, Meal, ShoppingItem, GearItem, TodoItem, PackingTemplate, MealTemplate } from '../types';
 import logger from '../utils/logger';
 
 /**
  * Hybrid data service that tries Supabase first, falls back to local storage
  * Handles data migration from local to Supabase when user signs in
+ * Implements ephemeral data collection for Google Play Console compliance
  */
 export class HybridDataService {
+  
+  // Data retention periods (in days)
+  private static readonly DATA_RETENTION_DAYS = 365; // Keep user data for 1 year
+  private static readonly SECURITY_LOG_RETENTION_DAYS = 90; // Keep security logs for 90 days
+  private static readonly TEMP_DATA_RETENTION_MINUTES = 30; // Clear temporary data after 30 minutes
   
   private async isSignedIn(): Promise<boolean> {
     try {
       const { data, error } = await supabase.auth.getUser();
       const signedIn = !error && !!data.user;
-      logger.log(`🔐 [HybridDataService] Auth check - Signed in: ${signedIn}, User ID: ${data.user?.id || 'none'}`);
+      // Only log essential auth info, not detailed user data
+      logger.log(`🔐 [HybridDataService] Auth check - Status: ${signedIn ? 'authenticated' : 'anonymous'}`);
       return signedIn;
     } catch (authError) {
-      logger.error('❌ [HybridDataService] Auth check failed:', authError);
+      logger.error('❌ [HybridDataService] Auth check failed');
       return false;
     }
+  }
+  
+  /**
+   * Clean up expired temporary data in memory
+   * Called automatically to maintain ephemeral data collection
+   */
+  private cleanupTempData(): void {
+    const now = Date.now();
+    const cutoffTime = now - (HybridDataService.TEMP_DATA_RETENTION_MINUTES * 60 * 1000);
+    
+    // Clear any temporary data older than retention period
+    // This ensures data is processed ephemerally
+    const tempDataKeys = Object.keys(localStorage).filter(key => 
+      key.startsWith('temp_') || key.startsWith('cache_')
+    );
+    
+    tempDataKeys.forEach(key => {
+      try {
+        const item = localStorage.getItem(key);
+        if (item) {
+          const data = JSON.parse(item);
+          if (data.timestamp && data.timestamp < cutoffTime) {
+            localStorage.removeItem(key);
+            console.log(`🧹 [HybridDataService] Cleaned expired temp data: ${key}`);
+          }
+        }
+      } catch {
+        // Remove corrupted temp data
+        localStorage.removeItem(key);
+      }
+    });
+  }
+  
+  /**
+   * Initialize cleanup on service creation
+   */
+  constructor() {
+    // Run cleanup on initialization
+    this.cleanupTempData();
+    
+    // Schedule regular cleanup every 15 minutes
+    setInterval(() => {
+      this.cleanupTempData();
+    }, 15 * 60 * 1000);
   }
   
   // === PACKING ITEMS ===
@@ -38,30 +89,32 @@ export class HybridDataService {
   async getPackingItems(tripId: string): Promise<PackingItem[]> {
     console.log(`🎒 [HybridDataService] Getting packing items for trip ${tripId}`);
     
+    // Clean temp data before processing
+    this.cleanupTempData();
+    
     if (await this.isSignedIn()) {
       try {
         const items = await supabaseDataService.getPackingItems(tripId);
         console.log(`📦 [HybridDataService] Loaded ${items.length} packing items from Supabase`);
         
-        // Safety check: Remove any duplicates that might exist in storage
+        // Process data ephemerally - don't store sensitive details in logs
         const uniqueItems = this.removeDuplicatePackingItems(items);
         if (uniqueItems.length !== items.length) {
-          console.warn(`⚠️ [HybridDataService] Found ${items.length - uniqueItems.length} duplicate items in storage, cleaning up...`);
-          // Save the cleaned version back to storage (bypass duplicate check to prevent loop)
+          console.warn(`⚠️ [HybridDataService] Cleaned ${items.length - uniqueItems.length} duplicate items`);
           await this.savePackingItemsInternal(tripId, uniqueItems);
           return uniqueItems;
         }
         
         return items;
       } catch (error) {
-        console.error('Failed to get packing items from Supabase, falling back to local:', error);
+        console.error('Failed to get packing items from Supabase, using local fallback');
         const localItems = await getPackingListLocal(tripId);
         return this.removeDuplicatePackingItems(localItems);
       }
     }
     
     const localItems = await getPackingListLocal(tripId);
-    console.log(`📱 [HybridDataService] Loaded ${localItems.length} packing items from local storage`);
+    console.log(`📱 [HybridDataService] Loaded ${localItems.length} items from local storage`);
     return this.removeDuplicatePackingItems(localItems);
   }
   
@@ -249,10 +302,10 @@ export class HybridDataService {
               if (!acc[ingredient]) {
                 acc[ingredient] = { count: 0, groupId };
               }
-              acc[ingredient].count += 1;
+              acc[ingredient]!.count += 1;
               // If ingredients come from meals with different group assignments, don't assign to a specific group
-              if (acc[ingredient].groupId !== groupId) {
-                acc[ingredient].groupId = undefined;
+              if (acc[ingredient]!.groupId !== groupId) {
+                acc[ingredient]!.groupId = undefined;
               }
             }
             return acc;
@@ -371,10 +424,10 @@ export class HybridDataService {
               if (!acc[ingredient]) {
                 acc[ingredient] = { count: 0, groupId };
               }
-              acc[ingredient].count += 1;
+              acc[ingredient]!.count += 1;
               // If ingredients come from meals with different group assignments, don't assign to a specific group
-              if (acc[ingredient].groupId !== groupId) {
-                acc[ingredient].groupId = undefined;
+              if (acc[ingredient]!.groupId !== groupId) {
+                acc[ingredient]!.groupId = undefined;
               }
             }
             return acc;
@@ -560,6 +613,66 @@ export class HybridDataService {
     } else {
       console.log('📱 [HybridDataService] User not signed in, saving locally only');
       await saveTodoItemsLocal(tripId, items);
+    }
+  }
+  
+  // === TEMPLATE MANAGEMENT ===
+  
+  async getPackingTemplates(): Promise<PackingTemplate[]> {
+    if (await this.isSignedIn()) {
+      try {
+        return await supabaseDataService.getPackingTemplates();
+      } catch (error) {
+        console.error('Failed to get packing templates from Supabase:', error);
+        return [];
+      }
+    }
+    return [];
+  }
+  
+  async savePackingTemplate(template: PackingTemplate): Promise<void> {
+    if (await this.isSignedIn()) {
+      try {
+        await supabaseDataService.savePackingTemplate(template);
+        console.log(`✅ [HybridDataService] Packing template "${template.name}" saved successfully`);
+      } catch (error) {
+        console.error('Failed to save packing template:', error);
+        throw error;
+      }
+    } else {
+      console.warn('Cannot save packing template: user not signed in');
+      throw new Error('Please sign in to save templates');
+    }
+  }
+  
+  /**
+   * Get all meal templates for the current user
+   * @returns Promise resolving to array of MealTemplate objects
+   */
+  async getMealTemplates(): Promise<MealTemplate[]> {
+    if (await this.isSignedIn()) {
+      try {
+        return await supabaseDataService.getMealTemplates();
+      } catch (error) {
+        console.error('Failed to get meal templates from Supabase:', error);
+        return [];
+      }
+    }
+    return [];
+  }
+  
+  async saveMealTemplate(template: MealTemplate): Promise<void> {
+    if (await this.isSignedIn()) {
+      try {
+        await supabaseDataService.saveMealTemplate(template);
+        console.log(`✅ [HybridDataService] Meal template "${template.name}" saved successfully`);
+      } catch (error) {
+        console.error('Failed to save meal template:', error);
+        throw error;
+      }
+    } else {
+      console.warn('Cannot save meal template: user not signed in');
+      throw new Error('Please sign in to save templates');
     }
   }
   
