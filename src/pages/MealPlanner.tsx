@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Plus, Trash2, Edit3, X, ShoppingCart, Calendar, CheckCircle, RotateCcw, Save, Download, Upload } from 'lucide-react';
-import { Meal, Trip, TripType, MealTemplate } from '../types';
+import { Meal, Trip, TripType } from '../types';
+import type { MealTemplate } from '../types';
 import { hybridDataService } from '../services/hybridDataService';
 import { getMealTemplates } from '../data/mealTemplates';
 import ShoppingList from '../components/ShoppingList';

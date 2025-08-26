@@ -161,4 +161,25 @@ export interface TodoItem {
   displayOrder: number;
 }
 
- 
+// Template interfaces for saving trip data as reusable templates
+export interface PackingTemplate {
+  id: string;
+  name: string; // Trip name this template was created from
+  tripType: TripType;
+  items: Omit<PackingItem, 'id' | 'isChecked' | 'isPacked' | 'assignedGroupId' | 'packedByUserId' | 'lastModifiedBy' | 'lastModifiedAt'>[];
+  createdAt: string;
+  userId?: string;
+}
+
+export interface MealTemplate {
+  id: string;
+  name: string; // Trip name this template was created from
+  tripType: TripType;
+  tripDuration: number; // Number of days
+  meals: Omit<Meal, 'id' | 'assignedGroupId' | 'lastModifiedBy' | 'lastModifiedAt'>[];
+  createdAt: string;
+  userId?: string;
+}
+
+// Explicit export to ensure type is available
+export type { MealTemplate as MealTemplateType };
