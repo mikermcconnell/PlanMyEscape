@@ -1,11 +1,13 @@
 import { supabase } from '../supabaseClient';
-import { PackingItem, Meal, ShoppingItem, GearItem, TodoItem } from '../types';
+import { PackingItem, Meal, ShoppingItem, GearItem, TodoItem, PackingTemplate, MealTemplate } from '../types';
 
 /**
  * Comprehensive Supabase data service for cross-device persistence
  * Handles all user data operations (packing items, meals, shopping lists, gear)
  */
 export class SupabaseDataService {
+  
+  // === PACKING ITEMS ===
   
   // Helper function to validate UUID format
   private isValidUUID(id: string): boolean {
@@ -28,6 +30,100 @@ export class SupabaseDataService {
     return uuid;
   }
   
+  // === TEMPLATE MANAGEMENT ===
+  
+  async getPackingTemplates(): Promise<PackingTemplate[]> {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('Not signed in');
+    
+    const { data, error } = await supabase
+      .from('packing_templates')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(item => this.mapPackingTemplateFromDB(item));
+  }
+  
+  async savePackingTemplate(template: PackingTemplate): Promise<void> {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('Not signed in');
+    
+    const dbTemplate = {
+      id: template.id,
+      user_id: user.id,
+      name: template.name,
+      trip_type: template.tripType,
+      items: JSON.stringify(template.items),
+      created_at: template.createdAt
+    };
+    
+    const { error } = await supabase
+      .from('packing_templates')
+      .upsert(dbTemplate);
+    
+    if (error) throw error;
+  }
+  
+  async getMealTemplates(): Promise<MealTemplate[]> {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('Not signed in');
+    
+    const { data, error } = await supabase
+      .from('meal_templates')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(item => this.mapMealTemplateFromDB(item));
+  }
+  
+  async saveMealTemplate(template: MealTemplate): Promise<void> {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('Not signed in');
+    
+    const dbTemplate = {
+      id: template.id,
+      user_id: user.id,
+      name: template.name,
+      trip_type: template.tripType,
+      trip_duration: template.tripDuration,
+      meals: JSON.stringify(template.meals),
+      created_at: template.createdAt
+    };
+    
+    const { error } = await supabase
+      .from('meal_templates')
+      .upsert(dbTemplate);
+    
+    if (error) throw error;
+  }
+  
+  private mapPackingTemplateFromDB(dbTemplate: any): PackingTemplate {
+    return {
+      id: dbTemplate.id,
+      name: dbTemplate.name,
+      tripType: dbTemplate.trip_type,
+      items: JSON.parse(dbTemplate.items || '[]'),
+      createdAt: dbTemplate.created_at,
+      userId: dbTemplate.user_id
+    };
+  }
+  
+  private mapMealTemplateFromDB(dbTemplate: any): MealTemplate {
+    return {
+      id: dbTemplate.id,
+      name: dbTemplate.name,
+      tripType: dbTemplate.trip_type,
+      tripDuration: dbTemplate.trip_duration,
+      meals: JSON.parse(dbTemplate.meals || '[]'),
+      createdAt: dbTemplate.created_at,
+      userId: dbTemplate.user_id
+    };
+  }
+  
   // === PACKING ITEMS ===
   
   async getPackingItems(tripId: string): Promise<PackingItem[]> {
@@ -41,7 +137,7 @@ export class SupabaseDataService {
       .eq('user_id', user.id);
     
     if (error) throw error;
-    return (data || []).map(this.mapPackingItemFromDB);
+    return (data || []).map(item => this.mapPackingItemFromDB(item));
   }
   
   async savePackingItems(tripId: string, items: PackingItem[]): Promise<void> {
@@ -170,7 +266,7 @@ export class SupabaseDataService {
       throw error;
     }
     
-    const meals = (data || []).map(this.mapMealFromDB);
+    const meals = (data || []).map(item => this.mapMealFromDB(item));
     console.log(`📊 [SupabaseDataService] Retrieved ${meals.length} meals from database`);
     if (meals.length > 0 && meals[0]) {
       console.log(`🔍 [SupabaseDataService] First meal details:`, {
@@ -391,7 +487,7 @@ export class SupabaseDataService {
       .eq('user_id', user.id);
     
     if (error) throw error;
-    return (data || []).map(this.mapShoppingItemFromDB);
+    return (data || []).map(item => this.mapShoppingItemFromDB(item));
   }
   
   async saveShoppingItems(tripId: string, items: ShoppingItem[]): Promise<void> {
@@ -484,7 +580,7 @@ export class SupabaseDataService {
       .eq('user_id', user.id);
     
     if (error) throw error;
-    return (data || []).map(this.mapGearItemFromDB);
+    return (data || []).map(item => this.mapGearItemFromDB(item));
   }
   
   async saveGearItems(items: GearItem[]): Promise<void> {
@@ -618,7 +714,7 @@ export class SupabaseDataService {
       .order('display_order', { ascending: true });
     
     if (error) throw error;
-    return (data || []).map(this.mapTodoItemFromDB);
+    return (data || []).map(item => this.mapTodoItemFromDB(item));
   }
   
   async saveTodoItems(tripId: string, items: TodoItem[]): Promise<void> {
