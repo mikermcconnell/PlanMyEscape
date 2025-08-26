@@ -49,7 +49,17 @@
       "Bash(npx:*)",
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(checkpoint.bat create \"Before comprehensive code review fixes - implementing critical issues, hook dependencies, dead code removal, and type safety improvements\")",
-      "Bash(./checkpoint.bat create \"Before comprehensive code review fixes - implementing critical issues, hook dependencies, dead code removal, and type safety improvements\")"
+      "Bash(./checkpoint.bat create \"Before comprehensive code review fixes - implementing critical issues, hook dependencies, dead code removal, and type safety improvements\")",
+      "Bash(./gradlew:*)",
+      "Read(/C:\\Users\\Mike McConnell\\Documents\\mike_apps\\Keystore\\PlanMyEscape/**)",
+      "Bash(jarsigner:*)",
+      "Bash(checkpoint.bat create \"Before implementing ephemeral data collection for Google Play Console compliance\")",
+      "Bash(./checkpoint.bat:*)",
+      "Read(/C:\\Users\\Mike McConnell\\Documents\\mike_apps\\PlanMyEscape-main\\src\\pages/**)",
+      "Read(/C:\\Users\\Mike McConnell\\Documents\\mike_apps\\PlanMyEscape-main\\src\\pages/**)",
+      "mcp__browsermcp__browser_navigate",
+      "Read(/C:\\Users\\Mike McConnell\\AppData\\Roaming\\Code\\User/**)",
+      "Bash(checkpoint.bat create \"Before fixing TypeScript version conflict for Vercel deployment\")"
     ],
     "deny": []
   }

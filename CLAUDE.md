@@ -1,4 +1,8 @@
-# PlanMyEscape - Claude Reference Guide
+# PlanMyEscape - Claude AI Development Guide
+
+> **Quick Start**: This is your primary reference when working with Claude on PlanMyEscape.
+> For app philosophy, see [DEVELOPMENT_CONTEXT.md](./DEVELOPMENT_CONTEXT.md)
+> For troubleshooting, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 
 ## AUTOMATIC CHECKPOINT SYSTEM
 Claude will automatically create Git checkpoints before any significant changes:

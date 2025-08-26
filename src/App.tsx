@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { initializeMobile, getMobileClasses } from './utils/mobileHelpers';
+import { DataRetentionPolicy } from './utils/dataRetentionPolicy';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import LandingPage from './pages/LandingPage';
@@ -26,6 +27,9 @@ import { GlobalPasswordResetDetector } from './components/GlobalPasswordResetDet
 function App() {
   useEffect(() => {
     initializeMobile();
+    
+    // Initialize data retention policy for Google Play Console compliance
+    DataRetentionPolicy.initialize();
   }, []);
 
   return (

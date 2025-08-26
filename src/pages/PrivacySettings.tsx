@@ -30,7 +30,15 @@ const PrivacySettings = () => {
   const handleAnalyticsChange = (value: boolean) => {
     setAnalytics(value);
     localStorage.setItem('allow_analytics', String(value));
-    // Optionally trigger analytics opt-out API
+    
+    if (!value) {
+      // Clear any existing analytics data when opted out
+      const analyticsKeys = Object.keys(localStorage).filter(key => 
+        key.startsWith('analytics_') || key.startsWith('tracking_')
+      );
+      analyticsKeys.forEach(key => localStorage.removeItem(key));
+      console.log('🚫 Analytics data cleared due to opt-out');
+    }
   };
 
   const handleMarketingChange = (value: boolean) => {
