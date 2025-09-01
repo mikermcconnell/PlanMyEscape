@@ -78,7 +78,13 @@
       "Read(C:\\Users\\Mike McConnell\\AppData\\Roaming\\Claude/**)",
       "mcp__playwright__browser_navigate",
       "Bash(git restore:*)",
-      "Bash(checkpoint.bat create \"Before major PackingList refactoring - extracting hooks, components, and services\")"
+      "Bash(checkpoint.bat create \"Before major PackingList refactoring - extracting hooks, components, and services\")",
+      "Bash(checkpoint.bat create \"Before moving status icons to left and removing checkbox from packing list\")",
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_take_screenshot"
     ],
     "deny": []
   }

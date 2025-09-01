@@ -66,12 +66,6 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
       
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3 flex-1">
-          <input
-            type="checkbox"
-            checked={item.isChecked}
-            onChange={(e) => onUpdate(item.id, { isChecked: e.target.checked })}
-            className="h-5 w-5 text-blue-600"
-          />
 
           {isEditingName ? (
             <div className="flex items-center space-x-2 flex-1">
@@ -91,7 +85,7 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
             </div>
           ) : (
             <div className="flex items-center space-x-2 flex-1">
-              <span className={`font-medium ${item.isChecked ? 'line-through text-gray-500' : ''}`}>
+              <span className="font-medium">
                 {item.name}
               </span>
               <button onClick={() => setIsEditingName(true)} className="text-gray-600 hover:text-gray-800">

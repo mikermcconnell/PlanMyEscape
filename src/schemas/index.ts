@@ -58,7 +58,6 @@ export const PackingItemSchema = z.object({
   name: z.string().min(1).max(100),
   category: z.string().min(1),
   quantity: z.number().int().positive(),
-  isChecked: z.boolean(),
   weight: z.number().nullable().optional(),
   isOwned: z.boolean(),
   needsToBuy: z.boolean(),

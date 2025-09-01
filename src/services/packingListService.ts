@@ -172,7 +172,6 @@ export class PackingListService {
       name: this.sanitizeInput(name),
       category,
       quantity,
-      isChecked: false,
       needsToBuy: false,
       isOwned: false,
       isPacked: false,

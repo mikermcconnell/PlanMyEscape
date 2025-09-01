@@ -365,7 +365,6 @@ const PackingList = () => {
         name: suggestion.name,
         category: suggestion.category,
         quantity: suggestion.quantity || 1,
-        isChecked: false,
         weight: undefined,
         isOwned: false,
         needsToBuy: false,
@@ -424,7 +423,6 @@ const PackingList = () => {
             isOwned: existingItem.isOwned, // Preserve owned status
             needsToBuy: existingItem.needsToBuy, // Preserve shopping status
             isPacked: existingItem.isPacked, // Preserve packed status
-            isChecked: existingItem.isChecked, // Preserve checked status
             notes: existingItem.notes, // Preserve user notes
             assignedGroupId: existingItem.assignedGroupId, // Preserve group assignments
             assignedGroupIds: existingItem.assignedGroupIds // Preserve multiple group assignments

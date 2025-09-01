@@ -48,7 +48,6 @@ export interface PackingItem {
   name: string;
   category: string;
   quantity: number;
-  isChecked: boolean;
   weight?: number;
   isOwned: boolean;
   needsToBuy: boolean;
@@ -167,7 +166,7 @@ export interface PackingTemplate {
   id: string;
   name: string; // Trip name this template was created from
   tripType: TripType;
-  items: Omit<PackingItem, 'id' | 'isChecked' | 'isPacked' | 'assignedGroupId' | 'packedByUserId' | 'lastModifiedBy' | 'lastModifiedAt'>[];
+  items: Omit<PackingItem, 'id' | 'isPacked' | 'assignedGroupId' | 'packedByUserId' | 'lastModifiedBy' | 'lastModifiedAt'>[];
   createdAt: string;
   userId?: string;
 }
