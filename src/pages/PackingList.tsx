@@ -205,8 +205,16 @@ const PackingList = () => {
   const displayedItems = useMemo(() =>
     selectedGroupId === 'all'
       ? items
-      : items.filter((i: PackingItem) => i.assignedGroupId === selectedGroupId),
-    [items, selectedGroupId]);
+      : items.filter((i: PackingItem) => {
+          // Check both old single assignment and new multiple assignments
+          if (i.assignedGroupId === selectedGroupId) return true;
+          if (i.assignedGroupIds?.includes(selectedGroupId)) return true;
+          // Show shared items (items assigned to all groups) for any specific group view
+          if (i.assignedGroupIds && i.assignedGroupIds.length === trip.groups.length && 
+              trip.groups.every(g => i.assignedGroupIds?.includes(g.id))) return true;
+          return false;
+        }),
+    [items, selectedGroupId, trip.groups]);
 
   // Separate items by packed status first, then by personal/group
   const unpackedItems = useMemo(() => displayedItems.filter((item: PackingItem) => !item.isPacked), [displayedItems]);
@@ -277,6 +285,37 @@ const PackingList = () => {
     updateItems(updatedItems);
   };
 
+  const toggleGroupAssignment = (itemId: string, groupId: string | null) => {
+    const updatedItems = items.map((item: PackingItem) => {
+      if (item.id === itemId) {
+        const currentGroups = item.assignedGroupIds || [];
+        let newGroups: string[];
+        
+        if (groupId === null) {
+          // Toggle "Shared" - if checked, assign to ALL groups; if unchecked, clear all
+          const allGroupIds = trip.groups.map(g => g.id);
+          const isCurrentlyShared = allGroupIds.every(id => currentGroups.includes(id)) || currentGroups.length === 0;
+          newGroups = isCurrentlyShared ? [] : allGroupIds;
+        } else {
+          // Toggle specific group
+          if (currentGroups.includes(groupId)) {
+            newGroups = currentGroups.filter(id => id !== groupId);
+          } else {
+            newGroups = [...currentGroups, groupId];
+          }
+        }
+        
+        return {
+          ...item,
+          assignedGroupIds: newGroups,
+          assignedGroupId: newGroups.length === 1 ? newGroups[0] : undefined // Keep backward compatibility
+        };
+      }
+      return item;
+    });
+    updateItems(updatedItems, true); // Save immediately for important changes
+  };
+
   const openAddItemModal = (category: string, assignedGroupId?: string, isPersonal: boolean = false) => {
     setAddItemModal({ 
       show: true, 
@@ -333,6 +372,7 @@ const PackingList = () => {
         isPacked: false,
         required: suggestion.required,
         assignedGroupId: addItemModal.assignedGroupId,
+        assignedGroupIds: addItemModal.assignedGroupId ? [addItemModal.assignedGroupId] : [],
         isPersonal: addItemModal.isPersonal
       }));
       
@@ -386,7 +426,8 @@ const PackingList = () => {
             isPacked: existingItem.isPacked, // Preserve packed status
             isChecked: existingItem.isChecked, // Preserve checked status
             notes: existingItem.notes, // Preserve user notes
-            assignedGroupId: existingItem.assignedGroupId // Preserve group assignments
+            assignedGroupId: existingItem.assignedGroupId, // Preserve group assignments
+            assignedGroupIds: existingItem.assignedGroupIds // Preserve multiple group assignments
           };
         }
         
@@ -1265,22 +1306,39 @@ const PackingList = () => {
                               <div className="flex items-center space-x-2">
                                 {/* Group Assignment */}
                                 {trip.isCoordinated && (
-                                  <select
-                                    value={item.assignedGroupId || ''}
-                                    onChange={(e) => assignItemToGroup(item.id, e.target.value || undefined)}
-                                    className="text-xs border rounded-md py-1 px-2 dark:bg-gray-700"
-                                    style={{
-                                      borderColor: trip.groups.find(g => g.id === item.assignedGroupId)?.color || 'transparent',
-                                      color: trip.groups.find(g => g.id === item.assignedGroupId)?.color
-                                    }}
-                                  >
-                                    <option value="">Shared</option>
+                                  <div className="flex items-center space-x-2 text-xs">
+                                    {/* Shared checkbox */}
+                                    <label className="flex items-center space-x-1 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={
+                                          !item.assignedGroupIds || 
+                                          item.assignedGroupIds.length === 0 || 
+                                          (item.assignedGroupIds.length === trip.groups.length && 
+                                           trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
+                                        }
+                                        onChange={() => toggleGroupAssignment(item.id, null)}
+                                        className="rounded border-gray-300 dark:border-gray-600"
+                                      />
+                                      <span className="text-gray-600 dark:text-gray-400">Shared</span>
+                                    </label>
+                                    {/* Group checkboxes */}
                                     {trip.groups.map((group) => (
-                                      <option key={group.id} value={group.id}>
-                                        {group.name}
-                                      </option>
+                                      <label 
+                                        key={group.id} 
+                                        className="flex items-center space-x-1 cursor-pointer"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={item.assignedGroupIds?.includes(group.id) || false}
+                                          onChange={() => toggleGroupAssignment(item.id, group.id)}
+                                          className="rounded border-gray-300 dark:border-gray-600"
+                                          style={{ accentColor: group.color }}
+                                        />
+                                        <span style={{ color: group.color }}>{group.name}</span>
+                                      </label>
                                     ))}
-                                  </select>
+                                  </div>
                                 )}
                               </div>
                               
@@ -1389,22 +1447,39 @@ const PackingList = () => {
                                   </div>
                                   {/* Group Assignment */}
                                   {trip.isCoordinated && (
-                                    <select
-                                      value={item.assignedGroupId || ''}
-                                      onChange={(e) => assignItemToGroup(item.id, e.target.value || undefined)}
-                                      className="text-sm border rounded-md py-1 px-2 dark:bg-gray-700 ml-2"
-                                      style={{
-                                        borderColor: trip.groups.find(g => g.id === item.assignedGroupId)?.color || 'transparent',
-                                        color: trip.groups.find(g => g.id === item.assignedGroupId)?.color
-                                      }}
-                                    >
-                                      <option value="">Shared</option>
+                                    <div className="flex items-center space-x-2 text-sm ml-2">
+                                      {/* Shared checkbox */}
+                                      <label className="flex items-center space-x-1 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={
+                                            !item.assignedGroupIds || 
+                                            item.assignedGroupIds.length === 0 || 
+                                            (item.assignedGroupIds.length === trip.groups.length && 
+                                             trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
+                                          }
+                                          onChange={() => toggleGroupAssignment(item.id, null)}
+                                          className="rounded border-gray-300 dark:border-gray-600"
+                                        />
+                                        <span className="text-gray-600 dark:text-gray-400">Shared</span>
+                                      </label>
+                                      {/* Group checkboxes */}
                                       {trip.groups.map((group) => (
-                                        <option key={group.id} value={group.id}>
-                                          {group.name}
-                                        </option>
+                                        <label 
+                                          key={group.id} 
+                                          className="flex items-center space-x-1 cursor-pointer"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={item.assignedGroupIds?.includes(group.id) || false}
+                                            onChange={() => toggleGroupAssignment(item.id, group.id)}
+                                            className="rounded border-gray-300 dark:border-gray-600"
+                                            style={{ accentColor: group.color }}
+                                          />
+                                          <span style={{ color: group.color }}>{group.name}</span>
+                                        </label>
                                       ))}
-                                    </select>
+                                    </div>
                                   )}
                                   <div className="flex items-center space-x-2 ml-4">
                                     <button
@@ -1705,22 +1780,39 @@ const PackingList = () => {
                               <div className="flex items-center space-x-2">
                                 {/* Group Assignment */}
                                 {trip.isCoordinated && (
-                                  <select
-                                    value={item.assignedGroupId || ''}
-                                    onChange={(e) => assignItemToGroup(item.id, e.target.value || undefined)}
-                                    className="text-xs border rounded-md py-1 px-2 dark:bg-gray-700"
-                                    style={{
-                                      borderColor: trip.groups.find(g => g.id === item.assignedGroupId)?.color || 'transparent',
-                                      color: trip.groups.find(g => g.id === item.assignedGroupId)?.color
-                                    }}
-                                  >
-                                    <option value="">Shared</option>
+                                  <div className="flex items-center space-x-2 text-xs">
+                                    {/* Shared checkbox */}
+                                    <label className="flex items-center space-x-1 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={
+                                          !item.assignedGroupIds || 
+                                          item.assignedGroupIds.length === 0 || 
+                                          (item.assignedGroupIds.length === trip.groups.length && 
+                                           trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
+                                        }
+                                        onChange={() => toggleGroupAssignment(item.id, null)}
+                                        className="rounded border-gray-300 dark:border-gray-600"
+                                      />
+                                      <span className="text-gray-600 dark:text-gray-400">Shared</span>
+                                    </label>
+                                    {/* Group checkboxes */}
                                     {trip.groups.map((group) => (
-                                      <option key={group.id} value={group.id}>
-                                        {group.name}
-                                      </option>
+                                      <label 
+                                        key={group.id} 
+                                        className="flex items-center space-x-1 cursor-pointer"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={item.assignedGroupIds?.includes(group.id) || false}
+                                          onChange={() => toggleGroupAssignment(item.id, group.id)}
+                                          className="rounded border-gray-300 dark:border-gray-600"
+                                          style={{ accentColor: group.color }}
+                                        />
+                                        <span style={{ color: group.color }}>{group.name}</span>
+                                      </label>
                                     ))}
-                                  </select>
+                                  </div>
                                 )}
                               </div>
                               
@@ -1829,22 +1921,39 @@ const PackingList = () => {
                                   </div>
                                   {/* Group Assignment */}
                                   {trip.isCoordinated && (
-                                    <select
-                                      value={item.assignedGroupId || ''}
-                                      onChange={(e) => assignItemToGroup(item.id, e.target.value || undefined)}
-                                      className="text-sm border rounded-md py-1 px-2 dark:bg-gray-700 ml-2"
-                                      style={{
-                                        borderColor: trip.groups.find(g => g.id === item.assignedGroupId)?.color || 'transparent',
-                                        color: trip.groups.find(g => g.id === item.assignedGroupId)?.color
-                                      }}
-                                    >
-                                      <option value="">Shared</option>
+                                    <div className="flex items-center space-x-2 text-sm ml-2">
+                                      {/* Shared checkbox */}
+                                      <label className="flex items-center space-x-1 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={
+                                            !item.assignedGroupIds || 
+                                            item.assignedGroupIds.length === 0 || 
+                                            (item.assignedGroupIds.length === trip.groups.length && 
+                                             trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
+                                          }
+                                          onChange={() => toggleGroupAssignment(item.id, null)}
+                                          className="rounded border-gray-300 dark:border-gray-600"
+                                        />
+                                        <span className="text-gray-600 dark:text-gray-400">Shared</span>
+                                      </label>
+                                      {/* Group checkboxes */}
                                       {trip.groups.map((group) => (
-                                        <option key={group.id} value={group.id}>
-                                          {group.name}
-                                        </option>
+                                        <label 
+                                          key={group.id} 
+                                          className="flex items-center space-x-1 cursor-pointer"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={item.assignedGroupIds?.includes(group.id) || false}
+                                            onChange={() => toggleGroupAssignment(item.id, group.id)}
+                                            className="rounded border-gray-300 dark:border-gray-600"
+                                            style={{ accentColor: group.color }}
+                                          />
+                                          <span style={{ color: group.color }}>{group.name}</span>
+                                        </label>
                                       ))}
-                                    </select>
+                                    </div>
                                   )}
                                   <div className="flex items-center space-x-2 ml-4">
                                     <button

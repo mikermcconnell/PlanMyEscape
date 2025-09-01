@@ -48,6 +48,11 @@ const TripContainer: React.FC = () => {
           } : null
         });
         
+        // Ensure isCoordinated property exists (for older trips)
+        if (currentTrip && currentTrip.isCoordinated === undefined) {
+          currentTrip.isCoordinated = currentTrip.groups && currentTrip.groups.length > 0;
+        }
+        
         setTrip(currentTrip || null);
         
       } catch (error) {

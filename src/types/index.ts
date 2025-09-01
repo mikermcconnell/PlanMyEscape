@@ -54,7 +54,8 @@ export interface PackingItem {
   needsToBuy: boolean;
   isPacked: boolean;
   required: boolean;
-  assignedGroupId?: string;
+  assignedGroupId?: string; // Deprecated - kept for backward compatibility
+  assignedGroupIds?: string[]; // New: supports multiple group assignments
   isPersonal: boolean; // true for personal items (per person), false for group items (shared)
   packedByUserId?: string; // ID of user who packed this item
   lastModifiedBy?: string; // ID of user who last modified this item

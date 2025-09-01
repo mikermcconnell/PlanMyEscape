@@ -1,0 +1,110 @@
+-- Fix Security Definer issues for trip_performance_stats
+-- This migration addresses both the view and function security issues
+
+-- 1. Drop the existing view and any dependencies
+DROP VIEW IF EXISTS public.trip_performance_stats CASCADE;
+
+-- 2. Drop the existing function (which has SECURITY DEFINER)
+DROP FUNCTION IF EXISTS public.get_user_trip_performance_stats();
+
+-- 3. Recreate the view WITHOUT SECURITY DEFINER or SECURITY INVOKER
+-- This view is for admin/reporting only and should not be directly accessed by users
+CREATE VIEW public.trip_performance_stats AS
+SELECT 
+  t.id,
+  t.trip_name,
+  t.user_id,
+  COUNT(DISTINCT pi.id) as packing_items_count,
+  COUNT(DISTINCT m.id) as meals_count,
+  COUNT(DISTINCT si.id) as shopping_items_count,
+  COUNT(DISTINCT ti.id) as todo_items_count,
+  CASE 
+    WHEN COUNT(DISTINCT pi.id) > 500 OR COUNT(DISTINCT m.id) > 200 THEN 'HIGH'
+    WHEN COUNT(DISTINCT pi.id) > 200 OR COUNT(DISTINCT m.id) > 100 THEN 'MEDIUM'
+    ELSE 'LOW'
+  END as complexity_level,
+  t.created_at,
+  t.updated_at
+FROM trips t
+LEFT JOIN packing_items pi ON t.id = pi.trip_id
+LEFT JOIN meals m ON t.id = m.trip_id
+LEFT JOIN shopping_items si ON t.id = si.trip_id
+LEFT JOIN todo_items ti ON t.id = ti.trip_id
+-- No WHERE clause - admin view shows all data
+GROUP BY t.id, t.trip_name, t.user_id, t.created_at, t.updated_at;
+
+-- 4. Restrict view access to postgres role only (admin use)
+REVOKE ALL ON public.trip_performance_stats FROM PUBLIC;
+REVOKE ALL ON public.trip_performance_stats FROM authenticated;
+REVOKE ALL ON public.trip_performance_stats FROM anon;
+GRANT SELECT ON public.trip_performance_stats TO postgres;
+
+-- 5. Create a new secure function WITHOUT SECURITY DEFINER
+-- This function uses the querying user's permissions (SECURITY INVOKER is default)
+CREATE OR REPLACE FUNCTION public.get_user_trip_performance_stats()
+RETURNS TABLE (
+  id UUID,
+  trip_name TEXT,
+  user_id UUID,
+  packing_items_count BIGINT,
+  meals_count BIGINT,
+  shopping_items_count BIGINT,
+  todo_items_count BIGINT,
+  complexity_level TEXT,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
+LANGUAGE sql
+STABLE
+AS $$
+  -- This function runs with the permissions of the calling user (SECURITY INVOKER)
+  -- RLS policies on the underlying tables will be enforced
+  SELECT 
+    t.id,
+    t.trip_name,
+    t.user_id,
+    COUNT(DISTINCT pi.id) as packing_items_count,
+    COUNT(DISTINCT m.id) as meals_count,
+    COUNT(DISTINCT si.id) as shopping_items_count,
+    COUNT(DISTINCT ti.id) as todo_items_count,
+    CASE 
+      WHEN COUNT(DISTINCT pi.id) > 500 OR COUNT(DISTINCT m.id) > 200 THEN 'HIGH'::TEXT
+      WHEN COUNT(DISTINCT pi.id) > 200 OR COUNT(DISTINCT m.id) > 100 THEN 'MEDIUM'::TEXT
+      ELSE 'LOW'::TEXT
+    END as complexity_level,
+    t.created_at,
+    t.updated_at
+  FROM trips t
+  LEFT JOIN packing_items pi ON t.id = pi.trip_id
+  LEFT JOIN meals m ON t.id = m.trip_id
+  LEFT JOIN shopping_items si ON t.id = si.trip_id
+  LEFT JOIN todo_items ti ON t.id = ti.trip_id
+  WHERE t.user_id = auth.uid()  -- Filter to current user's trips only
+  GROUP BY t.id, t.trip_name, t.user_id, t.created_at, t.updated_at;
+$$;
+
+-- 6. Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION public.get_user_trip_performance_stats() TO authenticated;
+
+-- 7. Add comments documenting the security model
+COMMENT ON VIEW public.trip_performance_stats IS 
+'Admin-only view for trip performance statistics. 
+This view is restricted to postgres role and should not be accessed by application users.
+Application should use get_user_trip_performance_stats() function instead.';
+
+COMMENT ON FUNCTION public.get_user_trip_performance_stats() IS 
+'User-accessible function for trip performance statistics.
+Runs with SECURITY INVOKER (default) - uses the calling user''s permissions.
+RLS policies on underlying tables are enforced.
+Returns only the current user''s trip statistics.';
+
+-- 8. Verify the changes
+DO $$
+BEGIN
+  RAISE NOTICE 'Security Definer issues resolved:';
+  RAISE NOTICE '1. View trip_performance_stats recreated without SECURITY DEFINER';
+  RAISE NOTICE '2. View access restricted to postgres role only';
+  RAISE NOTICE '3. Function get_user_trip_performance_stats recreated without SECURITY DEFINER';
+  RAISE NOTICE '4. Function uses SECURITY INVOKER (default) to respect RLS policies';
+  RAISE NOTICE '5. Application should continue using the function, not the view';
+END $$;

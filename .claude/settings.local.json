@@ -59,7 +59,26 @@
       "Read(/C:\\Users\\Mike McConnell\\Documents\\mike_apps\\PlanMyEscape-main\\src\\pages/**)",
       "mcp__browsermcp__browser_navigate",
       "Read(/C:\\Users\\Mike McConnell\\AppData\\Roaming\\Code\\User/**)",
-      "Bash(checkpoint.bat create \"Before fixing TypeScript version conflict for Vercel deployment\")"
+      "Bash(checkpoint.bat create \"Before fixing TypeScript version conflict for Vercel deployment\")",
+      "Bash(.supabase.exe db push)",
+      "Bash(./supabase.exe status)",
+      "Bash(./supabase.exe login --help)",
+      "Bash(./supabase.exe:*)",
+      "Bash(copy:*)",
+      "mcp__browsermcp__browser_screenshot",
+      "mcp__browsermcp__browser_snapshot",
+      "mcp__browsermcp__browser_press_key",
+      "Read(C:\\Users\\Mike McConnell\\AppData\\Roaming\\Claude/**)",
+      "Read(C:\\Users\\Mike McConnell\\AppData\\Roaming\\Claude/**)",
+      "Read(C:\\Users\\Mike McConnell\\Documents\\mike_apps\\Scheduler2/**)",
+      "Read(C:\\Users\\Mike McConnell\\AppData\\Roaming\\Claude/**)",
+      "mcp__browsermcp__browser_wait",
+      "Bash(cross-env:*)",
+      "Read(C:\\Users\\Mike McConnell\\AppData\\Roaming\\Claude/**)",
+      "Read(C:\\Users\\Mike McConnell\\AppData\\Roaming\\Claude/**)",
+      "mcp__playwright__browser_navigate",
+      "Bash(git restore:*)",
+      "Bash(checkpoint.bat create \"Before major PackingList refactoring - extracting hooks, components, and services\")"
     ],
     "deny": []
   }
