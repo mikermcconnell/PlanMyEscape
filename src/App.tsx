@@ -6,7 +6,7 @@ import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import LandingPage from './pages/LandingPage';
 import TripSetup from './pages/TripSetup';
-import PackingList from './pages/PackingList';
+import PackingListRefactored from './pages/PackingListRefactored';
 import MealPlanner from './pages/MealPlanner';
 import TripContainer from './components/TripContainer';
 import TripOverview from './pages/TripOverview';
@@ -60,7 +60,7 @@ function App() {
           {/* Trip-specific routes with navigation - allow unauthenticated access */}
           <Route path="/trip/:tripId" element={<ProtectedRoute allowUnauthenticated={true}><Layout><TripContainer /></Layout></ProtectedRoute>}>
             <Route index element={<TripOverview />} />
-            <Route path="packing" element={<PackingList />} />
+            <Route path="packing" element={<PackingListRefactored />} />
             <Route path="meals" element={<MealPlanner />} />
             <Route path="schedule" element={<TripSchedule />} />
             <Route path="todos" element={<TodoList />} />
