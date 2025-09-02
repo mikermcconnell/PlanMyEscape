@@ -61,7 +61,12 @@ const PackingListRefactored: React.FC = () => {
   const [targetGroupId, setTargetGroupId] = useState<string>('');
 
   const isCoordinated = trip.isCoordinated === true;
-  const groupOptions = [{ id: 'all', name: 'All' as const }, ...trip.groups];
+  const groups = trip.groups || [];
+  const groupOptions = [
+    { id: 'all', name: 'All Items' as const },
+    { id: 'shared', name: 'Shared Items' as const },
+    ...groups.map(g => ({ ...g, name: `${g.name}'s Items` }))
+  ];
 
   useEffect(() => {
     if (trip.tripType) {
@@ -257,15 +262,70 @@ const PackingListRefactored: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
             Packing List for {trip.tripName}
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            {currentTemplateName ? `Current List: ${currentTemplateName}` : `Current List: ${loadedTemplateName}`}
-            {loadedTemplateName && currentTemplateName && loadedTemplateName !== currentTemplateName && 
-              ` (Loaded: ${loadedTemplateName})`
-            }
-          </p>
+          <div className="space-y-1">
+            <p className="text-gray-600 dark:text-gray-400">
+              {currentTemplateName ? `Current List: ${currentTemplateName}` : `Current List: ${loadedTemplateName}`}
+              {loadedTemplateName && currentTemplateName && loadedTemplateName !== currentTemplateName && 
+                ` (Loaded: ${loadedTemplateName})`
+              }
+            </p>
+            {selectedGroupId !== 'all' && (
+              <p className="text-lg font-medium text-blue-600">
+                Viewing: {
+                  selectedGroupId === 'shared' 
+                    ? 'Shared Items Only' 
+                    : `${groups.find(g => g.id === selectedGroupId)?.name}'s Items`
+                }
+              </p>
+            )}
+          </div>
         </div>
 
         <PackingProgress progress={progress} />
+
+        {/* Group Filter Tabs */}
+        {groups && groups.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedGroupId('all')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedGroupId === 'all'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              All Items
+            </button>
+            <button
+              onClick={() => setSelectedGroupId('shared')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedGroupId === 'shared'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Shared Items
+            </button>
+            {groups.map(group => (
+              <button
+                key={group.id}
+                onClick={() => setSelectedGroupId(group.id)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedGroupId === group.id
+                    ? 'text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+                style={
+                  selectedGroupId === group.id
+                    ? { backgroundColor: group.color || '#3B82F6' }
+                    : {}
+                }
+              >
+                {group.name}'s Items
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="mb-6 flex flex-wrap gap-3">
           <div className="flex-1 min-w-[200px]">
@@ -280,20 +340,6 @@ const PackingListRefactored: React.FC = () => {
               />
             </div>
           </div>
-
-          {isCoordinated && !groupAssignmentMode && (
-            <select
-              value={selectedGroupId}
-              onChange={(e) => setSelectedGroupId(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {groupOptions.map(group => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-          )}
 
           {isCoordinated && (
             <button

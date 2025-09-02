@@ -99,7 +99,8 @@
       "Bash(set PORT=3009)",
       "Read(c:\\Users\\Mike McConnell\\Documents\\mike_apps\\Scheduler2/**)",
       "Read(c:\\Users\\Mike McConnell\\Documents\\mike_apps\\Scheduler2/**)",
-      "Bash(checkpoint.bat create \"Before implementing group assignment feature for packing list items\")"
+      "Bash(checkpoint.bat create \"Before implementing group assignment feature for packing list items\")",
+      "Bash(checkpoint.bat create \"Fixed radio button single-click assignment for group functionality\")"
     ],
     "deny": []
   }

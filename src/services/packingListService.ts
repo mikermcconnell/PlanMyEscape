@@ -98,9 +98,13 @@ export class PackingListService {
     if (groupId === 'all') {
       return items;
     }
+    if (groupId === 'shared') {
+      // Return only items without a group assignment (shared items)
+      return items.filter(item => !item.assignedGroupId);
+    }
+    // Return items assigned to specific group plus shared items
     return items.filter(item => 
-      item.assignedGroupId === groupId || 
-      (!item.assignedGroupId && !item.isPersonal)
+      item.assignedGroupId === groupId || !item.assignedGroupId
     );
   }
 

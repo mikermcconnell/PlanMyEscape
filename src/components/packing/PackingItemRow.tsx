@@ -156,19 +156,6 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
               <StickyNote className="h-4 w-4" />
             </button>
 
-            {isCoordinated && (
-              <select
-                value={item.assignedGroupId || ''}
-                onChange={(e) => onUpdate(item.id, { assignedGroupId: e.target.value || undefined })}
-                className="px-2 py-1 border rounded text-xs"
-              >
-                <option value="">Shared</option>
-                {groups.map(group => (
-                  <option key={group.id} value={group.id}>{group.name}</option>
-                ))}
-              </select>
-            )}
-
             <button
               onClick={() => onDelete(item.id)}
               className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
@@ -178,6 +165,38 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Third Row - Group assignment (if groups exist) */}
+        {groups && groups.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <label className="flex items-center gap-1 text-xs cursor-pointer">
+              <input
+                type="radio"
+                name={`group-${item.id}`}
+                value="shared"
+                checked={!item.assignedGroupId}
+                onClick={() => onUpdate(item.id, { assignedGroupId: undefined })}
+                onChange={() => {}} 
+                className="h-3 w-3 cursor-pointer"
+              />
+              <span>Shared</span>
+            </label>
+            {groups.map(group => (
+              <label key={group.id} className="flex items-center gap-1 text-xs cursor-pointer">
+                <input
+                  type="radio"
+                  name={`group-${item.id}`}
+                  value={group.id}
+                  checked={item.assignedGroupId === group.id}
+                  onClick={() => onUpdate(item.id, { assignedGroupId: group.id })}
+                  onChange={() => {}}
+                  className="h-3 w-3 cursor-pointer"
+                />
+                <span>{group.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Desktop Layout - Single Row */}
@@ -265,17 +284,36 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
             <StickyNote className="h-4 w-4" />
           </button>
 
-          {isCoordinated && (
-            <select
-              value={item.assignedGroupId || ''}
-              onChange={(e) => onUpdate(item.id, { assignedGroupId: e.target.value || undefined })}
-              className="px-2 py-1 border rounded text-sm"
-            >
-              <option value="">Shared</option>
+          {groups && groups.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name={`group-${item.id}`}
+                  value="shared"
+                  checked={!item.assignedGroupId}
+                  onClick={() => onUpdate(item.id, { assignedGroupId: undefined })}
+                  onChange={() => {}}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <span>Shared</span>
+              </label>
               {groups.map(group => (
-                <option key={group.id} value={group.id}>{group.name}</option>
+                <label key={group.id} className="flex items-center gap-1 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`group-${item.id}`}
+                    value={group.id}
+                    checked={item.assignedGroupId === group.id}
+                    onClick={() => onUpdate(item.id, { assignedGroupId: group.id })}
+                    onChange={() => {}}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    style={group.color ? { accentColor: group.color } : {}}
+                  />
+                  <span>{group.name}</span>
+                </label>
               ))}
-            </select>
+            </div>
           )}
 
           <button

@@ -175,6 +175,41 @@ export class SupabaseStorageAdapter implements StorageAdapter {
     });
 
     if (error) throw error;
+    
+    // Load groups from the groups table for all trips
+    const tripIds = (data ?? []).map(trip => trip.id);
+    let groupsByTripId: Record<string, any[]> = {};
+    
+    if (tripIds.length > 0) {
+      const { data: groupsData, error: groupsError } = await supabase
+        .from('groups')
+        .select('*')
+        .in('trip_id', tripIds);
+      
+      console.log('🔍 [SupabaseStorageAdapter.getTrips] Groups loaded:', {
+        groupsData,
+        groupsError,
+        groupsCount: groupsData?.length
+      });
+      
+      if (!groupsError && groupsData) {
+        // Group the groups by trip_id
+        groupsByTripId = groupsData.reduce((acc, group) => {
+          if (!acc[group.trip_id]) {
+            acc[group.trip_id] = [];
+          }
+          acc[group.trip_id].push({
+            id: group.id,
+            name: group.name,
+            size: group.size,
+            contactName: group.contact_name,
+            contactEmail: group.contact_email,
+            color: group.color
+          });
+          return acc;
+        }, {} as Record<string, any[]>);
+      }
+    }
 
     // Remove potential duplicates (edge case: if somehow the same trip appears multiple times)
     const uniqueTrips = (data ?? []).reduce((acc: any[], row: any) => {
@@ -203,7 +238,8 @@ export class SupabaseStorageAdapter implements StorageAdapter {
         tripName: row.trip_name, // Override with correct DB column
         startDate: row.start_date, // Override with correct DB column  
         endDate: row.end_date, // Override with correct DB column
-        groups: (row.data?.groups || []).map(coerceToGroup)
+        // Use groups from the groups table if available, otherwise fall back to JSONB data
+        groups: (groupsByTripId[row.id] || row.data?.groups || []).map(coerceToGroup)
       };
       
       console.log('🔍 [SupabaseStorageAdapter.getTrips] Transformed trip:', {
