@@ -312,7 +312,7 @@ export class HybridDataService {
           }, {})
       : {};
     
-    console.log(`🍽️ [HybridDataService] Current meal ingredients with groups:`, Object.keys(ingredientInfo));
+    console.log(`🍽️ [HybridDataService] Current meal ingredients with groups:`, ingredientInfo);
     
     const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientInfo)
       .map(([name, info]) => {
@@ -416,6 +416,12 @@ export class HybridDataService {
       });
     
     // 2. Add meal ingredients from provided meals (excluding deleted ones) with group assignments
+    console.log(`🍽️ [HybridDataService] Processing meals for ingredients:`, currentMeals.map(m => ({
+      name: m.name,
+      assignedGroupId: m.assignedGroupId,
+      ingredients: m.ingredients
+    })));
+    
     const ingredientInfo = currentMeals.length > 0 
       ? currentMeals.flatMap(m => m.ingredients.map(ing => ({ ingredient: ing, groupId: m.assignedGroupId })))
           .reduce<Record<string, { count: number, groupId?: string }>>((acc, { ingredient, groupId }) => {
@@ -423,10 +429,12 @@ export class HybridDataService {
             if (!deletedIngredientsSet.has(normalizedName)) {
               if (!acc[ingredient]) {
                 acc[ingredient] = { count: 0, groupId };
+                console.log(`🍽️ [HybridDataService] Adding ingredient "${ingredient}" with groupId: ${groupId || 'none'}`);
               }
               acc[ingredient]!.count += 1;
               // If ingredients come from meals with different group assignments, don't assign to a specific group
               if (acc[ingredient]!.groupId !== groupId) {
+                console.log(`🍽️ [HybridDataService] Ingredient "${ingredient}" has conflicting groups: ${acc[ingredient]!.groupId} vs ${groupId}, clearing assignment`);
                 acc[ingredient]!.groupId = undefined;
               }
             }
@@ -434,7 +442,7 @@ export class HybridDataService {
           }, {})
       : {};
     
-    console.log(`🍽️ [HybridDataService] Using provided meal ingredients with groups:`, Object.keys(ingredientInfo));
+    console.log(`🍽️ [HybridDataService] Processed ingredient info:`, ingredientInfo);
     
     const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientInfo)
       .map(([name, info]) => {
@@ -442,11 +450,12 @@ export class HybridDataService {
         if (existing) {
           // Update existing item with group assignment if it doesn't have one
           if (!existing.assignedGroupId && info.groupId) {
+            console.log(`🛒 [HybridDataService] Updating existing item "${name}" with groupId: ${info.groupId}`);
             existing.assignedGroupId = info.groupId;
           }
           return existing;
         }
-        return {
+        const newItem = {
           id: crypto.randomUUID(),
           name,
           quantity: info.count,
@@ -457,6 +466,8 @@ export class HybridDataService {
           sourceItemId: undefined, // No sourceItemId means it's from meals
           assignedGroupId: info.groupId // Auto-assign to meal's group
         };
+        console.log(`🛒 [HybridDataService] Creating new shopping item "${name}" with groupId: ${info.groupId || 'none'}`);
+        return newItem;
       });
     
     // 3. Get manually added items (items not from packing or current meals)

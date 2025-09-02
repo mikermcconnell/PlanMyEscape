@@ -84,7 +84,22 @@
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_click",
       "mcp__playwright__browser_type",
-      "mcp__playwright__browser_take_screenshot"
+      "mcp__playwright__browser_take_screenshot",
+      "Bash(checkpoint.bat create \"Before completing PackingItemSection integration - partial Personal Items section replacement\")",
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_wait_for",
+      "Bash(checkpoint.bat create \"Before removing blue fill from quantity display when quantity > 1\")",
+      "Bash(dir:*)",
+      "Bash(checkpoint.bat create \"Improved CLAUDE.md context management - added hierarchical levels and decision trees\")",
+      "Read(C:\\Users\\Mike McConnell\\Documents\\mike_apps\\Scheduler2/**)",
+      "Bash(checkpoint.bat create \"Before reformatting packing list - moving status icons to left and improving category headings\")",
+      "Bash(timeout:*)",
+      "Bash(set NODE_OPTIONS=--max-old-space-size=4096)",
+      "Bash(set PORT=3009)",
+      "Read(c:\\Users\\Mike McConnell\\Documents\\mike_apps\\Scheduler2/**)",
+      "Read(c:\\Users\\Mike McConnell\\Documents\\mike_apps\\Scheduler2/**)",
+      "Bash(checkpoint.bat create \"Before implementing group assignment feature for packing list items\")"
     ],
     "deny": []
   }

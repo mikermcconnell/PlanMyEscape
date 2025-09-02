@@ -396,6 +396,50 @@ export class SupabaseDataService {
     const dbMeals = meals.map(meal => this.mapMealToDB(meal, tripId, user.id));
     console.log(`📝 [SupabaseDataService] Mapped ${dbMeals.length} meals for database:`, dbMeals[0] ? dbMeals[0] : 'No meals');
     
+    // Validate that assigned group IDs exist before saving
+    const assignedGroupIds = dbMeals
+      .map(meal => meal.assigned_group_id)
+      .filter(groupId => groupId !== null && groupId !== undefined);
+    
+    if (assignedGroupIds.length > 0) {
+      console.log(`🔍 [SupabaseDataService] Validating ${assignedGroupIds.length} assigned group IDs...`);
+      const { data: existingGroups, error: groupError } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('trip_id', tripId)
+        .in('id', assignedGroupIds);
+      
+      if (groupError) {
+        console.error('❌ [SupabaseDataService] Failed to validate group IDs:', groupError);
+        throw new Error('Failed to validate group assignments');
+      }
+      
+      const existingGroupIds = new Set((existingGroups || []).map(g => g.id));
+      const invalidGroupIds = assignedGroupIds.filter(groupId => !existingGroupIds.has(groupId));
+      
+      if (invalidGroupIds.length > 0) {
+        console.error(`❌ [SupabaseDataService] Invalid group IDs found:`, invalidGroupIds);
+        console.error(`❌ [SupabaseDataService] Valid group IDs in database:`, Array.from(existingGroupIds));
+        
+        // Set invalid group IDs to null to prevent foreign key constraint violation
+        const clearedMeals: string[] = [];
+        dbMeals.forEach(meal => {
+          if (meal.assigned_group_id && invalidGroupIds.includes(meal.assigned_group_id)) {
+            console.log(`🔧 [SupabaseDataService] Clearing invalid group ID ${meal.assigned_group_id} for meal: ${meal.name}`);
+            clearedMeals.push(meal.name);
+            meal.assigned_group_id = null;
+          }
+        });
+        
+        // Warn about cleared assignments
+        if (clearedMeals.length > 0) {
+          console.warn(`⚠️ [SupabaseDataService] Group assignments were cleared for ${clearedMeals.length} meal(s): ${clearedMeals.join(', ')}`);
+          console.warn(`⚠️ [SupabaseDataService] This may indicate groups exist locally but not in the database. Consider refreshing the page.`);
+        }
+      }
+      console.log(`✅ [SupabaseDataService] Group ID validation complete`);
+    }
+    
     const { error } = await supabase
       .from('meals')
       .upsert(dbMeals, { 

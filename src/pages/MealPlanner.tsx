@@ -38,8 +38,6 @@ const MealPlanner = () => {
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [showClearIngredientsConfirmation, setShowClearIngredientsConfirmation] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
-  const [editMealName, setEditMealName] = useState('');
-  const [editMealIngredients, setEditMealIngredients] = useState<string[]>([]);
   const [deletedIngredients, setDeletedIngredients] = useState<Set<string>>(new Set());
   const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>(undefined);
   const [filterGroupId, setFilterGroupId] = useState<string>('all');
@@ -49,6 +47,25 @@ const MealPlanner = () => {
   const [availableTemplates, setAvailableTemplates] = useState<MealTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
+
+  // Sync groups to database when component mounts
+  useEffect(() => {
+    const syncGroupsToDatabase = async () => {
+      if (trip && trip.groups && trip.groups.length > 0) {
+        try {
+          console.log('🔄 [MealPlanner] Syncing groups to database...');
+          // Re-save the trip to ensure groups are in the database
+          const { saveTrip } = await import('../utils/supabaseTrips');
+          await saveTrip(trip);
+          console.log('✅ [MealPlanner] Groups synced successfully');
+        } catch (error) {
+          console.error('❌ [MealPlanner] Failed to sync groups:', error);
+        }
+      }
+    };
+    
+    syncGroupsToDatabase();
+  }, [trip]);
 
   // Save on unmount to prevent data loss
   useEffect(() => {
@@ -263,8 +280,6 @@ const MealPlanner = () => {
 
   const startEditingMeal = (meal: Meal) => {
     setEditingMeal(meal);
-    setEditMealName(meal.name);
-    setEditMealIngredients([...meal.ingredients]);
     setShowMealModal(true);
     setShowCustomForm(true);
     setSelectedDay(meal.day);
@@ -283,7 +298,7 @@ const MealPlanner = () => {
             ...meal,
             name: customMealName.trim(),
             ingredients: selectedIngredients,
-            assignedGroupId: selectedGroupId,
+            assignedGroupId: selectedGroupId || undefined, // Ensure undefined if not selected
             lastModifiedAt: new Date().toISOString()
           }
         : meal
@@ -307,8 +322,6 @@ const MealPlanner = () => {
 
     // Reset editing state
     setEditingMeal(null);
-    setEditMealName('');
-    setEditMealIngredients([]);
     setCustomMealName('');
     setSelectedIngredients([]);
     setCustomIngredient('');
@@ -319,8 +332,6 @@ const MealPlanner = () => {
 
   const cancelEditingMeal = () => {
     setEditingMeal(null);
-    setEditMealName('');
-    setEditMealIngredients([]);
     setCustomMealName('');
     setSelectedIngredients([]);
     setCustomIngredient('');
@@ -415,7 +426,7 @@ const MealPlanner = () => {
         type: selectedType,
         ingredients: selectedIngredients,
         isCustom: true,
-        assignedGroupId: selectedGroupId,
+        assignedGroupId: selectedGroupId || undefined, // Ensure undefined if not selected
         sharedServings: true,
         servings: 1 // Ensure servings is defined
       };
@@ -452,9 +463,6 @@ const MealPlanner = () => {
   const addCustomIngredientToList = () => {
     if (customIngredient.trim() && !selectedIngredients.includes(customIngredient.trim())) {
       setSelectedIngredients(prev => [...prev, customIngredient.trim()]);
-      if (editingMeal) {
-        setEditMealIngredients(prev => [...prev, customIngredient.trim()]);
-      }
       setCustomIngredient('');
     }
   };
@@ -462,9 +470,6 @@ const MealPlanner = () => {
   // Remove ingredient from suggestion list (during custom meal creation)
   const removeIngredient = (ingredient: string) => {
     setSelectedIngredients(prev => prev.filter(i => i !== ingredient));
-    if (editingMeal) {
-      setEditMealIngredients(prev => prev.filter(i => i !== ingredient));
-    }
   };
 
   // Remove item from ingredients list sidebar
@@ -1146,27 +1151,42 @@ const MealPlanner = () => {
                       </div>
                     </div>
                     
-                    {/* Group Assignment */}
+                    {/* Group Assignment with Checkboxes */}
                     {trip.groups.length > 1 && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Assign to Group (Optional)
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Who's Responsible for This Meal?
                         </label>
-                        <select
-                          value={selectedGroupId || ''}
-                          onChange={(e) => setSelectedGroupId(e.target.value || undefined)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
-                        >
-                          <option value="">All Groups (Shared)</option>
+                        <div className="space-y-2">
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="mealGroup"
+                              value=""
+                              checked={!selectedGroupId}
+                              onChange={() => setSelectedGroupId(undefined)}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Shared</span> - All groups together
+                            </span>
+                          </label>
                           {trip.groups.map((group) => (
-                            <option key={group.id} value={group.id}>
-                              {group.name} ({group.size} {group.size === 1 ? 'person' : 'people'})
-                            </option>
+                            <label key={group.id} className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="mealGroup"
+                                value={group.id}
+                                checked={selectedGroupId === group.id}
+                                onChange={() => setSelectedGroupId(group.id)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700 dark:text-gray-300">
+                                <span className="font-medium">{group.name}</span> ({group.size} {group.size === 1 ? 'person' : 'people'})
+                              </span>
+                            </label>
                           ))}
-                        </select>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Leave unassigned for meals shared by all groups
-                        </p>
+                        </div>
                       </div>
                     )}
                     

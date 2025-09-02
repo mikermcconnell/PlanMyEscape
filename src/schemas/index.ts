@@ -93,7 +93,11 @@ export const ShoppingItemSchema = z.object({
   isChecked: z.boolean().optional(),
   isOwned: z.boolean().optional(),
   needsToBuy: z.boolean().optional(),
-  sourceItemId: z.string().optional()
+  sourceItemId: z.string().optional(),
+  assignedGroupId: z.string().optional(),
+  cost: z.number().optional(),
+  paidByGroupId: z.string().optional(),
+  paidByUserName: z.string().optional()
 });
 
 export const TodoItemSchema = z.object({

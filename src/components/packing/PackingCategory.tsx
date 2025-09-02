@@ -15,6 +15,9 @@ interface PackingCategoryProps {
   onDeleteItem: (itemId: string) => void;
   onEditName: (itemId: string, newName: string) => void;
   onEditNotes: (itemId: string, notes: string) => void;
+  groupAssignmentMode?: boolean;
+  selectedItems?: Set<string>;
+  onToggleItemSelection?: (itemId: string) => void;
 }
 
 export const PackingCategory: React.FC<PackingCategoryProps> = ({
@@ -28,61 +31,66 @@ export const PackingCategory: React.FC<PackingCategoryProps> = ({
   onUpdateItem,
   onDeleteItem,
   onEditName,
-  onEditNotes
+  onEditNotes,
+  groupAssignmentMode = false,
+  selectedItems = new Set(),
+  onToggleItemSelection = () => {}
 }) => {
   const ownedCount = items.filter(item => item.isOwned).length;
   const packedCount = items.filter(item => item.isPacked).length;
   const needToBuyCount = items.filter(item => item.needsToBuy).length;
 
   return (
-    <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+    <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700">
       <div
-        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+        className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-800 cursor-pointer hover:from-blue-100 hover:to-indigo-100 dark:hover:from-gray-600 dark:hover:to-gray-700 transition-all"
         onClick={onToggleExpand}
       >
         <div className="flex items-center space-x-3">
           {isExpanded ? (
-            <ChevronDown className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <ChevronDown className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           ) : (
-            <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <ChevronRight className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           )}
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase tracking-wide">
             {category}
           </h3>
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            ({items.length} items)
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-600 px-2 py-1 rounded-full">
+            {items.length} items
           </span>
         </div>
 
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 text-sm">
+            {needToBuyCount > 0 && (
+              <span className="px-2.5 py-1 bg-orange-100 text-orange-800 rounded-full font-semibold">
+                🛒 {needToBuyCount} to buy
+              </span>
+            )}
             {ownedCount > 0 && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-                {ownedCount} owned
+              <span className="px-2.5 py-1 bg-green-100 text-green-800 rounded-full font-semibold">
+                ✓ {ownedCount} owned
               </span>
             )}
             {packedCount > 0 && (
-              <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full">
-                {packedCount} packed
-              </span>
-            )}
-            {needToBuyCount > 0 && (
-              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">
-                {needToBuyCount} to buy
+              <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full font-semibold">
+                ✓ {packedCount} packed
               </span>
             )}
           </div>
           
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddItem(category);
-            }}
-            className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-            title={`Add item to ${category}`}
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+          {!groupAssignmentMode && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddItem(category);
+              }}
+              className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+              title={`Add item to ${category}`}
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -98,7 +106,82 @@ export const PackingCategory: React.FC<PackingCategoryProps> = ({
                 Add your first item
               </button>
             </div>
+          ) : groupAssignmentMode ? (
+            // Simplified checkbox view for group assignment mode
+            items.map(item => {
+              const isSelected = selectedItems.has(item.id);
+              const assignedGroup = groups.find(g => g.id === item.assignedGroupId);
+              
+              return (
+                <div
+                  key={item.id}
+                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    isSelected 
+                      ? 'bg-purple-50 border-purple-400' 
+                      : 'bg-white border-gray-200 hover:border-purple-300'
+                  }`}
+                  onClick={() => onToggleItemSelection(item.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onToggleItemSelection(item.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-5 w-5 text-purple-600 rounded focus:ring-purple-500"
+                      />
+                    </div>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium ${isSelected ? 'text-purple-800' : 'text-gray-800'}`}>
+                          {item.name}
+                        </span>
+                        {item.quantity > 1 && (
+                          <span className="text-sm text-gray-500">×{item.quantity}</span>
+                        )}
+                      </div>
+                      
+                      {assignedGroup && (
+                        <div className="mt-1">
+                          <span 
+                            className="inline-block px-2 py-0.5 text-xs font-medium rounded-full"
+                            style={{ 
+                              backgroundColor: `${assignedGroup.color}20`,
+                              color: assignedGroup.color,
+                              border: `1px solid ${assignedGroup.color}`
+                            }}
+                          >
+                            {assignedGroup.name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      {item.needsToBuy && (
+                        <span className="p-1 bg-orange-100 text-orange-600 rounded" title="Need to buy">
+                          🛒
+                        </span>
+                      )}
+                      {item.isOwned && (
+                        <span className="p-1 bg-green-100 text-green-600 rounded" title="Owned">
+                          ✓
+                        </span>
+                      )}
+                      {item.isPacked && (
+                        <span className="p-1 bg-blue-100 text-blue-600 rounded" title="Packed">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           ) : (
+            // Normal view with full editing capabilities
             items.map(item => (
               <PackingItemRow
                 key={item.id}

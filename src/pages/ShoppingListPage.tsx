@@ -21,8 +21,14 @@ const ShoppingListPage: React.FC = () => {
 
   useEffect(() => {
     const load = async () => {
-      console.log(`📥 [ShoppingListPage] Loading shopping items for trip ${tripId}...`);
-      const list = await hybridDataService.getShoppingItems(tripId);
+      console.log(`📥 [ShoppingListPage] Loading meals and shopping items for trip ${tripId}...`);
+      
+      // First load meals to get their group assignments
+      const meals = await hybridDataService.getMeals(tripId);
+      console.log(`📊 [ShoppingListPage] Loaded ${meals.length} meals with group assignments`);
+      
+      // Then load shopping items with meal context
+      const list = await hybridDataService.getShoppingItemsWithMeals(tripId, meals);
       console.log(`📊 [ShoppingListPage] Loaded ${list.length} shopping items`);
       setAllItems(list);
     };

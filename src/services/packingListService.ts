@@ -150,9 +150,7 @@ export class PackingListService {
   }
 
   static getItemStatusClass(item: PackingItem): string {
-    if (item.isPacked) return 'bg-green-100 border-green-300';
-    if (item.isOwned) return 'bg-blue-100 border-blue-300';
-    if (item.needsToBuy) return 'bg-yellow-100 border-yellow-300';
+    // Always return the default styling regardless of status
     return 'bg-gray-50 border-gray-200';
   }
 

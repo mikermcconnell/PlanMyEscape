@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Trash2, RotateCcw, Save, Download, Upload, ShoppingCart, Search } from 'lucide-react';
+import { Trash2, RotateCcw, Save, ShoppingCart, Search, Users } from 'lucide-react';
 import { PackingItem, Trip, PackingTemplate } from '../types';
 import { usePackingItems } from '../hooks/usePackingItems';
 import { usePackingTemplates } from '../hooks/usePackingTemplates';
@@ -56,6 +56,9 @@ const PackingListRefactored: React.FC = () => {
     category: ''
   });
   const [templateNameInput, setTemplateNameInput] = useState('');
+  const [groupAssignmentMode, setGroupAssignmentMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [targetGroupId, setTargetGroupId] = useState<string>('');
 
   const isCoordinated = trip.isCoordinated === true;
   const groupOptions = [{ id: 'all', name: 'All' as const }, ...trip.groups];
@@ -183,6 +186,45 @@ const PackingListRefactored: React.FC = () => {
     });
   }, []);
 
+  const handleToggleItemSelection = useCallback((itemId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleAssignSelectedToGroup = useCallback(() => {
+    if (selectedItems.size === 0 || !targetGroupId) return;
+    
+    const updatedItems = items.map(item => {
+      if (selectedItems.has(item.id)) {
+        return {
+          ...item,
+          assignedGroupId: targetGroupId === 'none' ? undefined : targetGroupId
+        };
+      }
+      return item;
+    });
+    
+    updateItems(updatedItems, true);
+    setSelectedItems(new Set());
+    setGroupAssignmentMode(false);
+  }, [items, selectedItems, targetGroupId, updateItems]);
+
+  const handleSelectAll = useCallback(() => {
+    const allItemIds = filteredItems.map((item: PackingItem) => item.id);
+    setSelectedItems(new Set(allItemIds));
+  }, [filteredItems]);
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedItems(new Set());
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -239,7 +281,7 @@ const PackingListRefactored: React.FC = () => {
             </div>
           </div>
 
-          {isCoordinated && (
+          {isCoordinated && !groupAssignmentMode && (
             <select
               value={selectedGroupId}
               onChange={(e) => setSelectedGroupId(e.target.value)}
@@ -253,38 +295,114 @@ const PackingListRefactored: React.FC = () => {
             </select>
           )}
 
-          <button
-            onClick={() => setShowShoppingList(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-          >
-            <ShoppingCart className="h-5 w-5" />
-            Shopping List
-          </button>
+          {isCoordinated && (
+            <button
+              onClick={() => {
+                setGroupAssignmentMode(!groupAssignmentMode);
+                setSelectedItems(new Set());
+                setTargetGroupId('');
+              }}
+              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                groupAssignmentMode 
+                  ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
+            >
+              <Users className="h-5 w-5" />
+              {groupAssignmentMode ? 'Exit Group Mode' : 'Assign Groups'}
+            </button>
+          )}
 
-          <button
-            onClick={() => setShowTemplateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <Save className="h-5 w-5" />
-            Templates
-          </button>
+          {!groupAssignmentMode && (
+            <button
+              onClick={() => setShowShoppingList(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              Shopping List
+            </button>
+          )}
 
-          <button
-            onClick={handleResetList}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
-          >
-            <RotateCcw className="h-5 w-5" />
-            Reset
-          </button>
+          {!groupAssignmentMode && (
+            <>
+              <button
+                onClick={() => setShowTemplateModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Save className="h-5 w-5" />
+                Templates
+              </button>
 
-          <button
-            onClick={() => setShowClearConfirmation(true)}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-          >
-            <Trash2 className="h-5 w-5" />
-            Clear
-          </button>
+              <button
+                onClick={handleResetList}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+              >
+                <RotateCcw className="h-5 w-5" />
+                Reset
+              </button>
+
+              <button
+                onClick={() => setShowClearConfirmation(true)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+              >
+                <Trash2 className="h-5 w-5" />
+                Clear
+              </button>
+            </>
+          )}
         </div>
+
+        {groupAssignmentMode && (
+          <div className="mb-6 p-4 bg-purple-50 border-2 border-purple-300 rounded-lg">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-purple-800">
+                  {selectedItems.size} items selected
+                </span>
+                <button
+                  onClick={handleSelectAll}
+                  className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors text-sm"
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={handleDeselectAll}
+                  className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm"
+                >
+                  Clear Selection
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-2 flex-1">
+                <span className="text-purple-800 font-medium">Assign to:</span>
+                <select
+                  value={targetGroupId}
+                  onChange={(e) => setTargetGroupId(e.target.value)}
+                  className="px-3 py-1.5 border-2 border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Select a group...</option>
+                  <option value="none">No Group (Shared)</option>
+                  {trip.groups.map(group => (
+                    <option key={group.id} value={group.id}>
+                      {group.name} ({group.size} {group.size === 1 ? 'person' : 'people'})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleAssignSelectedToGroup}
+                  disabled={selectedItems.size === 0 || !targetGroupId}
+                  className={`px-4 py-1.5 rounded-lg font-medium transition-colors ${
+                    selectedItems.size > 0 && targetGroupId
+                      ? 'bg-purple-600 text-white hover:bg-purple-700'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  Apply to Selected
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           {PACKING_CATEGORIES.map(category => {
@@ -303,6 +421,9 @@ const PackingListRefactored: React.FC = () => {
                 onDeleteItem={handleDeleteItem}
                 onEditName={handleEditName}
                 onEditNotes={handleEditNotes}
+                groupAssignmentMode={groupAssignmentMode}
+                selectedItems={selectedItems}
+                onToggleItemSelection={handleToggleItemSelection}
               />
             );
           })}

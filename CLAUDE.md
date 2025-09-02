@@ -1,10 +1,173 @@
 # PlanMyEscape - Claude AI Development Guide
 
+## 🎯 LEVEL 1: IMMEDIATE CONTEXT (What Claude needs first)
+```
+PROJECT: React/TypeScript camping trip planner with Supabase backend
+DATA SERVICE: Always use hybridDataService.ts - never direct Supabase calls
+CHECKPOINT: Run `checkpoint.bat create "description"` before major changes
+COMMANDS: npm start | npm test | npm run type-check | npm run lint
+```
+
+## 🚀 LEVEL 2: HOW DO I...
+| Need to... | File Location | Key Pattern |
+|------------|---------------|-------------|
+| **Toggle item status** | `src/pages/PackingList.tsx:527` | `toggleOwned(itemId)` with immediate save |
+| **Add packing item** | `src/hooks/usePackingItems.ts:25` | `hybridDataService.savePackingItems(tripId, items)` |
+| **Assign meal to group** | `src/pages/MealPlanner.tsx:183` | Radio buttons with `assignedGroupId` |
+| **Handle authentication** | `src/contexts/AuthContext.tsx` | `const { user } = useAuth()` |
+| **Create modal** | `src/components/CostSplitter.tsx` | `isOpen` + `onClose` props pattern |
+| **Save with debouncing** | `src/pages/PackingList.tsx:166` | `updateItems()` with `immediate=false` |
+| **Save immediately** | `src/pages/PackingList.tsx:166` | `updateItems()` with `immediate=true` |
+
+## 🎯 DECISION TREES
+```
+WHEN TO SAVE:
+├── Status change (owned/packed) → immediate=true
+├── Text editing → debounced (150ms)
+├── Template operations → immediate=true
+└── Item deletion → immediate=true
+
+WHICH DATA SERVICE:
+├── Authenticated user → hybridDataService (Supabase + local backup)
+├── Anonymous user → hybridDataService (local only)
+└── NEVER use supabaseDataService directly
+
+COMPONENT STATE:
+├── Trip data → useOutletContext from TripContainer
+├── Authentication → useAuth() hook
+├── Local data fetching → useState + useEffect
+└── Global state → React Context (AuthContext only)
+```
+
+## 🚨 COMMON ERROR PATTERNS
+```
+TypeScript Errors:
+├── "Cannot find module" → Check import paths, run npm install
+├── "Property does not exist" → Check type definitions in src/types/
+├── "Object is possibly null" → Add null checks or optional chaining
+└── "Type X is not assignable to type Y" → Check hybridDataService return types
+
+Build Errors:
+├── "Module not found" → Check file paths, case sensitivity
+├── "Cannot resolve dependency" → npm install missing packages
+├── "TypeScript compilation failed" → npm run type-check for details
+└── "Out of memory" → Restart dev server
+
+Runtime Errors:
+├── "Cannot read property of undefined" → Add loading states
+├── "Network request failed" → Check Supabase connection
+├── "User is not authenticated" → Check useAuth() hook
+└── "RLS policy violation" → Verify user_id in queries
+```
+
+## 🏥 HEALTH CHECK COMMANDS
+```bash
+# Quick system health check (run these in order)
+npm run type-check     # TypeScript errors?
+npm run lint          # Code quality issues?
+npm test             # Tests passing?
+git status           # Uncommitted changes?
+```
+
+## 📍 CONTEXT REFRESH (When Claude gets lost)
+```bash
+# Re-orient commands
+npm start            # Is server running?
+git log --oneline -5 # What changed recently?
+ls src/pages/        # What pages exist?
+ls src/components/   # What components exist?
+```
+
+## 🗺️ FILE IMPACT MAP (Change Dependencies)
+```
+If you modify... → Also check...
+├── ⚠️ IMPORTANT: PackingListRefactored.tsx is ACTIVE (NOT PackingList.tsx)
+├── src/pages/PackingListRefactored.tsx → src/components/packing/PackingItemRow.tsx, PackingCategory.tsx
+├── src/components/packing/PackingItemRow.tsx → Individual item rendering
+├── src/components/packing/PackingCategory.tsx → Category sections
+├── src/services/hybridDataService.ts → All pages, all hooks
+├── src/contexts/AuthContext.tsx → src/components/ProtectedRoute.tsx, all pages
+├── src/types/index.ts → All TypeScript files
+├── supabase/migrations/ → src/services/supabaseDataService.ts
+├── src/pages/MealPlanner.tsx → src/pages/ShoppingListPage.tsx (ingredients)
+└── src/components/TripContainer.tsx → All page components (context)
+```
+
+## 📊 DEVELOPMENT STATE INDICATORS
+```
+System is healthy when:
+✅ npm start runs without errors
+✅ npm run type-check shows no errors  
+✅ npm test passes
+✅ git status shows no unexpected changes
+✅ Supabase connection working (check Network tab)
+
+Red flags:
+🚨 TypeScript errors in console
+🚨 Network requests failing (check Supabase keys)
+🚨 Tests failing after changes
+🚨 Uncommitted changes accumulating
+🚨 Build warnings about unused imports
+```
+
+---
+
+## 📖 FULL REFERENCE (Detailed Documentation)
+
 > **Quick Start**: This is your primary reference when working with Claude on PlanMyEscape.
 > For app philosophy, see [DEVELOPMENT_CONTEXT.md](./DEVELOPMENT_CONTEXT.md)
 > For troubleshooting, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 
-## AUTOMATIC CHECKPOINT SYSTEM
+### Table of Contents
+- [⚡ Essential Commands](#-essential-commands) 
+- [🗂️ Common Tasks](#️-common-tasks)
+- [🔄 Automatic Checkpoint System](#-automatic-checkpoint-system)
+- [🏗️ Project Architecture](#️-project-architecture)
+- [🔐 Security & Authentication](#-security--authentication)
+- [📦 Component Reference](#-component-reference)
+- [🔧 Development Patterns](#-development-patterns)
+- [🧪 Testing Guidelines](#-testing-guidelines)
+- [⚙️ Configuration & Deployment](#️-configuration--deployment)
+- [📋 Architecture Guidelines](#-architecture-guidelines)
+
+## 🚀 Quick Start
+**Get running in 3 commands:**
+```bash
+npm start          # Start development server (port 3000)  
+npm test           # Run test suite
+npm run build      # Build for production
+```
+
+## ⚡ Essential Commands
+```bash
+# Development (Essential ⭐)
+npm start                    # Start dev server (port 3000)
+npm run lint                # Run ESLint 
+npm run type-check          # TypeScript checking
+npm test                    # Run tests
+
+# Database (Essential ⭐)
+supabase db push           # Push migrations
+supabase login             # Authenticate
+
+# Checkpoints (Essential ⭐) - USE ./ PREFIX ON WINDOWS
+./checkpoint.bat create "Description"  # Create checkpoint (Windows - use ./ prefix!)
+./checkpoint.bat list                  # List checkpoints
+```
+
+## 🗂️ Common Tasks
+| Task | Location | Pattern |
+|------|----------|---------|
+| **Add new component** | `src/components/` | → [Component Patterns](#component-interaction-patterns) |
+| **Update packing logic** | `src/pages/PackingListRefactored.tsx` | → [PackingList Patterns](#packinlist-implementation-patterns) |
+| **Modify data service** | `src/services/hybridDataService.ts` | → [Data Operations](#data-operations) |
+| **Handle authentication** | `src/contexts/AuthContext.tsx` | → [Authentication Flow](#authentication-flow) |
+| **Add database table** | `supabase/migrations/` | → [Database Schema](#database-schema-supabase) |
+| **Create modal dialog** | Follow Modal Pattern | → [Modal Patterns](#modal-and-dialog-patterns) |
+
+---
+
+## 🔄 Automatic Checkpoint System
 Claude will automatically create Git checkpoints before any significant changes:
 
 ### When Checkpoints Are Created
@@ -35,10 +198,14 @@ checkpoint.bat restore <name>        # Restore to checkpoint
 - Example: `checkpoint-20250824-084456`
 - Always includes descriptive commit message
 
-## Project Overview
+---
+
+## 🏗️ Project Architecture
+
+### Project Overview
 PlanMyEscape is a React/TypeScript camping and trip planning web application with Supabase backend. Users can plan trips, manage packing lists, coordinate meals, and collaborate with groups.
 
-## Tech Stack
+### Tech Stack
 - **Frontend**: React 18, TypeScript, Tailwind CSS
 - **Backend**: Supabase (PostgreSQL with RLS)
 - **Authentication**: Supabase Auth (Google, Facebook, Email/Password)
@@ -46,23 +213,17 @@ PlanMyEscape is a React/TypeScript camping and trip planning web application wit
 - **Deployment**: Vercel-ready
 - **Build Tool**: Create React App
 
-## Key Commands
+### Advanced Commands (Reference)
 ```bash
-# Development
-npm start                    # Start dev server (port 3000)
-npm test                     # Run tests
+# Build & Testing
 npm run build               # Build for production
-npm run lint                # Run ESLint
-npm run type-check          # TypeScript type checking
 npm run test:coverage       # Run tests with coverage
 
-# Database
-supabase db push            # Push migrations to Supabase
-supabase login              # Authenticate with Supabase
+# Database Advanced
 supabase link --project-ref <ref>  # Link to project
 ```
 
-## Project Structure
+### Project Structure
 ```
 src/
 ├── components/             # Reusable UI components
@@ -105,7 +266,7 @@ src/
 └── middleware/            # Express middleware
 ```
 
-## Database Schema (Supabase)
+### Database Schema (Supabase)
 ```sql
 -- Core tables with RLS enabled
 trips (id, user_id, trip_name, trip_type, start_date, end_date, ...)
@@ -122,7 +283,11 @@ packing_templates (id, user_id, name, trip_type, items, created_at)
 meal_templates (id, user_id, name, trip_type, trip_duration, meals, created_at)
 ```
 
-## Authentication Flow
+---
+
+## 🔐 Security & Authentication
+
+### Authentication Flow
 1. **SupaSignIn** component handles login/signup
 2. **AuthContext** provides auth state throughout app with automatic data migration
 3. **ProtectedRoute** wraps authenticated pages
@@ -130,14 +295,16 @@ meal_templates (id, user_id, name, trip_type, trip_duration, meals, created_at)
 5. RLS policies ensure data isolation per user
 6. **Data Migration**: Upon sign-in, local data is automatically migrated to Supabase with retry logic
 
-## Security Features
+### Security Features
 - **Row Level Security (RLS)**: Each user can only access their own data
 - **Security Logging**: Login attempts, data access logged to security_logs table
 - **Rate Limiting**: Express middleware for login attempts (5 per 15 min)
 - **Input Validation**: Zod schemas for data validation
 - **Security Headers**: CSP, X-Frame-Options, etc. in public/_headers
 
-## Key Components
+---
+
+## 📦 Component Reference
 
 ### Trip Management
 - **TripContainer**: Main trip wrapper with navigation
@@ -146,14 +313,27 @@ meal_templates (id, user_id, name, trip_type, trip_duration, meals, created_at)
 - **TripNavigation**: Tab navigation between trip sections
 
 ### Feature Components
-- **PackingList**: Manage packing items with templates, status tracking, and group assignments
-  - Shows both default template name and loaded saved template name
-  - Group assignment dropdown for each item (when trip is coordinated)
-  - Template save/load functionality with user-specific templates
-- **MealPlanner**: Plan meals with recipe suggestions and custom meal creation
-  - Template save/load functionality for meal plans
-  - Automatic ingredient grouping for shopping list
-  - Group assignment for meals
+- **PackingList**: Simplified packing list with streamlined status management
+  - **Three-Status System**: Items have three key status icons positioned on the left:
+    - 🛒 **Need to Buy** (orange): Items that need to be purchased
+    - ✅ **Owned** (green): Items the user already owns
+    - ✓ **Packed** (blue/gray): Items that have been packed
+  - **Two-Section Layout**: 
+    - **Personal Items**: Individual gear (clothes, toiletries, personal equipment)
+    - **Group Items**: Shared equipment (tents, cooking gear, tools)
+  - **Template System**: Load default templates based on trip type (car camping, canoe camping, etc.)
+  - **Auto-Shopping Integration**: Items marked "need to buy" automatically appear in shopping list
+  - **Smart Status Logic**: Marking as "owned" removes from shopping list; "need to buy" sets owned=false
+  - **Group Filtering**: Filter view by specific groups when trip is coordinated
+  - **Categories**: Items organized by category (Shelter, Kitchen, Clothing, Personal, Tools, etc.)
+  - **Pack Status Tracking**: Separate packed/unpacked sections for easy packing verification
+- **MealPlanner**: Plan meals with recipe suggestions and custom meal creation  
+  - **Simplified Group Assignment**: Radio button interface for meal responsibility:
+    - "Shared" - All groups together
+    - Individual group options (e.g., "Mic", "Dad") with member counts
+  - **Auto-Shopping Integration**: Meal ingredients automatically appear in shopping list with group assignments
+  - **Template System**: Save/load meal plan templates
+  - **Smart Ingredient Management**: Ingredients from assigned meals inherit the group assignment
 - **ShoppingListPage**: Main shopping list with cost tracking and expense splitting
   - Auto-populates from packing items (needsToBuy) and meal ingredients
   - Group-based item organization and filtering
@@ -168,7 +348,11 @@ meal_templates (id, user_id, name, trip_type, trip_duration, meals, created_at)
 - **ExpenseSummary**: Expense reporting and settlement calculations
 - **ShoppingList**: Reusable shopping list modal component
 
-## Data Flow & Architecture
+---
+
+## 🔧 Development Patterns
+
+### Data Flow & Architecture (Essential ⭐)
 
 ### Hybrid Storage Architecture
 The app uses a sophisticated hybrid storage approach that seamlessly integrates local storage with Supabase:
@@ -193,7 +377,7 @@ The app uses a sophisticated hybrid storage approach that seamlessly integrates 
 - **Migration on sign-in**: Existing local data automatically migrated to Supabase
 - **Conflict resolution**: Supabase data takes precedence over local data
 
-## Expense Management & Cost Splitting
+### Expense Management & Cost Splitting (Advanced)
 
 ### Cost Splitting Features
 The app includes comprehensive expense management for group trips:
@@ -239,7 +423,7 @@ const calculateSettlements = (expenses: ShoppingItem[], groups: Group[]) => {
 };
 ```
 
-## Environment Variables
+### Environment Variables (Reference)
 ```env
 REACT_APP_SUPABASE_URL=https://your-project.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=your-anon-key
@@ -247,7 +431,11 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key (optional)
 NEXT_PUBLIC_GA_TRACKING_ID=G-XXXXXXXXXX (optional)
 ```
 
-## Testing Structure & Patterns
+---
+
+## 🧪 Testing Guidelines
+
+### Testing Structure & Patterns (Essential ⭐)
 
 ### Testing Framework
 - **Unit Tests**: `src/__tests__/` using Jest
@@ -335,11 +523,11 @@ describe('HybridDataService', () => {
 });
 ```
 
-## Component Interaction Patterns
+### Component Interaction Patterns (Essential ⭐)
 
 ### Parent-Child Communication
 ```typescript
-// Parent component passing data and callbacks to child
+// src/components/TripContainer.tsx:45 - Parent component passing data and callbacks to child
 const TripContainer: React.FC = () => {
   const [trip, setTrip] = useState<Trip>();
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
@@ -352,7 +540,7 @@ const TripContainer: React.FC = () => {
   );
 };
 
-// Child component receiving context via useOutletContext
+// src/pages/PackingList.tsx:95 - Child component receiving context via useOutletContext
 const PackingList: React.FC = () => {
   const { trip, setTrip, selectedGroupId } = useOutletContext<TripContextType>();
   
@@ -442,7 +630,7 @@ const ParentComponent = () => {
 };
 ```
 
-## Common Patterns
+### Common Patterns (Essential ⭐)
 
 ### Error Handling
 ```typescript
@@ -464,6 +652,7 @@ if (!user) return <Navigate to="/signin" />;
 
 ### Data Fetching with Hybrid Service
 ```typescript
+// src/hooks/usePackingItems.ts:15 - Standard data loading pattern
 const [data, setData] = useState<PackingItem[]>([]);
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState<string | null>(null);
@@ -508,7 +697,80 @@ const updateItem = async (itemId: string, updates: Partial<PackingItem>) => {
 };
 ```
 
-### Shopping List Auto-Population
+### PackingList Implementation Patterns
+
+#### Status Management System
+The PackingList uses a simplified three-status approach with immediate saving:
+
+```typescript
+// src/pages/PackingList.tsx:527 - Status toggle functions with optimistic updates
+const toggleOwned = async (itemId: string) => {
+  const updatedItems = items.map(item => {
+    if (item.id === itemId) {
+      return {
+        ...item,
+        isOwned: !item.isOwned,
+        needsToBuy: !item.isOwned ? false : item.needsToBuy // Smart logic
+      };
+    }
+    return item;
+  });
+  updateItems(updatedItems, true); // immediate=true for status changes
+};
+
+const toggleNeedsToBuy = async (itemId: string) => {
+  const updatedItems = items.map(item => {
+    if (item.id === itemId) {
+      return {
+        ...item,
+        needsToBuy: !item.needsToBuy,
+        isOwned: !item.needsToBuy ? false : item.isOwned // Smart logic
+      };
+    }
+    return item;
+  });
+  updateItems(updatedItems, true); // Immediate save for critical changes
+};
+```
+
+#### Debounced vs Immediate Saving
+```typescript
+// src/pages/PackingList.tsx:166 - Two save strategies based on operation type
+const updateItems = useCallback((newItems: PackingItem[], immediate = false) => {
+  setItems(newItems);
+  if (immediate) {
+    // For critical operations like status toggles, save immediately
+    immediateSave(tripId, newItems);
+  } else {
+    // For typing/editing, use debounced save (150ms)
+    debouncedSave(tripId, newItems);
+  }
+}, [tripId, debouncedSave, immediateSave]);
+```
+
+#### Item Organization & Filtering
+```typescript
+// Separate items by personal/group and packed/unpacked status
+const unpackedPersonalItems = useMemo(() => 
+  displayedItems.filter(item => !item.isPacked && item.isPersonal), 
+  [displayedItems]
+);
+
+const unpackedGroupItems = useMemo(() => 
+  displayedItems.filter(item => !item.isPacked && !item.isPersonal), 
+  [displayedItems]
+);
+
+// Group items by category for organized display
+const groupedItems = useMemo(() =>
+  categories.reduce((acc, category) => {
+    acc[category] = items.filter(item => item.category === category);
+    return acc;
+  }, {} as Record<string, PackingItem[]>)
+, [items, categories]);
+```
+
+### Shopping List Auto-Population (Advanced)
 ```typescript
 // Shopping list automatically populates from packing items and meals
 const useShoppingListSync = (tripId: string) => {
@@ -527,7 +789,7 @@ const useShoppingListSync = (tripId: string) => {
 };
 ```
 
-## Development Workflow
+### Development Workflow (Essential ⭐)
 1. **Start dev server**: `npm start`
 2. **Make changes** to components/pages
 3. **Run tests**: `npm test`
@@ -535,25 +797,70 @@ const useShoppingListSync = (tripId: string) => {
 5. **Lint code**: `npm run lint`
 6. **Build**: `npm run build`
 
-## Common Issues & Solutions
+### Common Issues & Solutions (Essential ⭐)
 - **Authentication**: Check supabaseClient.ts config
 - **RLS Errors**: Verify user_id is included in queries
 - **Build Errors**: Run type-check and lint
 - **Database**: Check migration files in supabase/migrations/
 
-## File Extensions
+---
+
+## ⚙️ Configuration & Deployment
+
+### File Extensions (Reference)
 - `.tsx`: React components
 - `.ts`: TypeScript utilities/services
 - `.test.ts`: Test files
 - `.d.ts`: Type definitions
 
-## Important Notes & Architecture Guidelines
+### Deployment (Essential ⭐)
+- **Vercel**: Configured for automatic deployment
+- **Environment**: Set vars in Vercel dashboard
+- **Database**: Supabase hosted PostgreSQL
+- **Static Assets**: Served from public/ directory
+
+### Migration Files (Reference)
+- `202507072030_rls_security.sql`: Enables RLS and adds user_id columns
+- `202507072041_security_logs_table.sql`: Creates security logging table
+
+---
+
+## 📋 Architecture Guidelines
+
+### Important Notes & Best Practices (Essential ⭐)
 
 ### Data Operations
 - **Always use hybridDataService**: Never directly call supabaseDataService or storage functions
 - **RLS Requirements**: All database operations automatically include user_id for Row Level Security
 - **UUID Generation**: Use `crypto.randomUUID()` for new items to ensure proper database compatibility
 - **Optimistic Updates**: Update UI immediately, then save to storage for responsive UX
+
+### PackingList Status Management Best Practices
+- **Status Icons Position**: Always position status icons on the left side of items for consistency
+- **Three-Status System**: Maintain the simplified owned/needsToBuy/packed status approach
+- **Smart Status Logic**: 
+  - When marking as "owned" → automatically set needsToBuy=false and remove from shopping list
+  - When marking as "needsToBuy" → automatically set isOwned=false
+  - When marking as "packed" → no automatic status changes
+- **Immediate vs Debounced Saves**: Use immediate saves for status changes, debounced saves for text editing
+- **Section Organization**: Keep Personal Items and Group Items as separate sections
+- **Category Grouping**: Items within sections should be grouped by category (Shelter, Kitchen, etc.)
+
+### MealPlanner Group Assignment Best Practices
+- **Radio Button Interface**: Use radio buttons instead of dropdowns for group meal assignment:
+  ```typescript
+  <input
+    type="radio"
+    name="mealGroup"
+    value={group.id}
+    checked={selectedGroupId === group.id}
+    onChange={() => setSelectedGroupId(group.id)}
+    className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+  />
+  ```
+- **Group Assignment Storage**: Store group assignments as `assignedGroupId: string | undefined` in the meal object
+- **Shopping List Integration**: When saving meals with group assignments, ingredients automatically inherit the group assignment
+- **Clear Labels**: Show group names with member counts: "Mic (2 people)", "Dad (1 person)", "Shared - All groups together"
 
 ### Component Architecture
 - **Context Usage**: Use `useOutletContext` for trip data sharing between route components
@@ -579,17 +886,7 @@ const useShoppingListSync = (tripId: string) => {
 - **Component Memoization**: Use `useMemo` and `useCallback` for expensive computations
 - **Bundle Optimization**: Components are code-split by route for optimal loading
 
-## Migration Files
-- `202507072030_rls_security.sql`: Enables RLS and adds user_id columns
-- `202507072041_security_logs_table.sql`: Creates security logging table
-
-## Deployment
-- **Vercel**: Configured for automatic deployment
-- **Environment**: Set vars in Vercel dashboard
-- **Database**: Supabase hosted PostgreSQL
-- **Static Assets**: Served from public/ directory
-
-## Recent Changes (2025-08-26)
+### Recent Changes (2025-08-26) (Reference)
 
 ### TypeScript & Build Fixes
 - **TypeScript Version**: Downgraded from 5.x to 4.9.5 for react-scripts compatibility

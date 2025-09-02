@@ -91,6 +91,46 @@ export class SupabaseStorageAdapter implements StorageAdapter {
     
     if (tripError) throw tripError;
 
+    // Save groups to the groups table
+    if (safeTrip.groups && safeTrip.groups.length > 0) {
+      console.log('🔍 [SupabaseStorageAdapter.saveTrip] Saving groups to groups table...');
+      
+      // Delete existing groups for this trip first
+      const { error: deleteError } = await supabase
+        .from('groups')
+        .delete()
+        .eq('trip_id', tripData.id);
+      
+      if (deleteError) {
+        console.error('❌ [SupabaseStorageAdapter.saveTrip] Failed to delete existing groups:', deleteError);
+      }
+      
+      // Map groups to database format
+      const groupsToSave = safeTrip.groups.map(group => ({
+        id: group.id,
+        trip_id: tripData.id,
+        name: group.name,
+        size: group.size || 1,
+        contact_name: group.contactName || null,
+        contact_email: group.contactEmail || null,
+        color: group.color || null
+      }));
+      
+      console.log('🔍 [SupabaseStorageAdapter.saveTrip] Groups to save:', groupsToSave);
+      
+      const { data: savedGroups, error: groupsError } = await supabase
+        .from('groups')
+        .upsert(groupsToSave)
+        .select();
+      
+      if (groupsError) {
+        console.error('❌ [SupabaseStorageAdapter.saveTrip] Failed to save groups:', groupsError);
+        // Don't throw here - groups are supplementary, trip save succeeded
+      } else {
+        console.log('✅ [SupabaseStorageAdapter.saveTrip] Groups saved successfully:', savedGroups);
+      }
+    }
+
     // Transform the saved data back to Trip format (same logic as getTrips)
     const transformedTrip = {
       ...tripData.data, // spread stored jsonb back in first
