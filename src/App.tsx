@@ -35,38 +35,41 @@ function App() {
   return (
     <ErrorBoundary>
       <div className={getMobileClasses()}>
-        <Router>
-        {/* Global password reset detector */}
-        <GlobalPasswordResetDetector />
-        <Routes>
-          {/* Public landing page */}
-          <Route path="/" element={<LandingPage />} />
+        <Router future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}>
+          {/* Global password reset detector */}
+          <GlobalPasswordResetDetector />
+          <Routes>
+            {/* Public landing page */}
+            <Route path="/" element={<LandingPage />} />
 
-          {/* Public privacy policy */}
-          <Route path="/privacy" element={<PrivacyPolicy />} />
+            {/* Public privacy policy */}
+            <Route path="/privacy" element={<PrivacyPolicy />} />
 
-          {/* Public terms and cookie policy */}
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route path="/cookies" element={<CookiePolicy />} />
+            {/* Public terms and cookie policy */}
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/cookies" element={<CookiePolicy />} />
 
-          {/* Main app routes - allow unauthenticated access */}
-          <Route path="/dashboard" element={<ProtectedRoute allowUnauthenticated={true}><Layout><Dashboard /></Layout></ProtectedRoute>} />
-          <Route path="/trip-setup" element={<ProtectedRoute allowUnauthenticated={true}><Layout><TripSetup /></Layout></ProtectedRoute>} />
-          <Route path="/notes" element={<ProtectedRoute allowUnauthenticated={true}><Layout><Notes /></Layout></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Layout><PrivacySettings /></Layout></ProtectedRoute>} />
-          <Route path="/signin" element={<SupaSignIn />} />
-          <Route path="/reset-password" element={<PasswordReset />} />
-          
-          {/* Trip-specific routes with navigation - allow unauthenticated access */}
-          <Route path="/trip/:tripId" element={<ProtectedRoute allowUnauthenticated={true}><Layout><TripContainer /></Layout></ProtectedRoute>}>
-            <Route index element={<TripOverview />} />
-            <Route path="packing" element={<PackingListRefactored />} />
-            <Route path="meals" element={<MealPlanner />} />
-            <Route path="schedule" element={<TripSchedule />} />
-            <Route path="todos" element={<TodoList />} />
-            <Route path="shopping" element={<ShoppingListPage />} />
-          </Route>
-        </Routes>
+            {/* Main app routes - allow unauthenticated access */}
+            <Route path="/dashboard" element={<ProtectedRoute allowUnauthenticated={true}><Layout><Dashboard /></Layout></ProtectedRoute>} />
+            <Route path="/trip-setup" element={<ProtectedRoute allowUnauthenticated={true}><Layout><TripSetup /></Layout></ProtectedRoute>} />
+            <Route path="/notes" element={<ProtectedRoute allowUnauthenticated={true}><Layout><Notes /></Layout></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Layout><PrivacySettings /></Layout></ProtectedRoute>} />
+            <Route path="/signin" element={<SupaSignIn />} />
+            <Route path="/reset-password" element={<PasswordReset />} />
+            
+            {/* Trip-specific routes with navigation - allow unauthenticated access */}
+            <Route path="/trip/:tripId" element={<ProtectedRoute allowUnauthenticated={true}><Layout><TripContainer /></Layout></ProtectedRoute>}>
+              <Route index element={<TripOverview />} />
+              <Route path="packing" element={<PackingListRefactored />} />
+              <Route path="meals" element={<MealPlanner />} />
+              <Route path="schedule" element={<TripSchedule />} />
+              <Route path="todos" element={<TodoList />} />
+              <Route path="shopping" element={<ShoppingListPage />} />
+            </Route>
+          </Routes>
         </Router>
       </div>
     </ErrorBoundary>

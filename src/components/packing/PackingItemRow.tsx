@@ -172,25 +172,24 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
             <label className="flex items-center gap-1 text-xs cursor-pointer">
               <input
                 type="radio"
-                name={`group-${item.id}`}
+                name={`mobile-group-${item.id}`}
                 value="shared"
                 checked={!item.assignedGroupId}
-                onClick={() => onUpdate(item.id, { assignedGroupId: undefined })}
-                onChange={() => {}} 
-                className="h-3 w-3 cursor-pointer"
+                onChange={() => onUpdate(item.id, { assignedGroupId: undefined })}
+                className="h-5 w-5 text-blue-600 focus:ring-blue-500 cursor-pointer"
               />
               <span>Shared</span>
             </label>
             {groups.map(group => (
-              <label key={group.id} className="flex items-center gap-1 text-xs cursor-pointer">
+              <label key={`${item.id}-${group.id}`} className="flex items-center gap-1 text-xs cursor-pointer">
                 <input
                   type="radio"
-                  name={`group-${item.id}`}
+                  name={`mobile-group-${item.id}`}
                   value={group.id}
                   checked={item.assignedGroupId === group.id}
-                  onClick={() => onUpdate(item.id, { assignedGroupId: group.id })}
-                  onChange={() => {}}
-                  className="h-3 w-3 cursor-pointer"
+                  onChange={() => onUpdate(item.id, { assignedGroupId: group.id })}
+                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  style={group.color ? { accentColor: group.color } : {}}
                 />
                 <span>{group.name}</span>
               </label>
@@ -289,24 +288,22 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
               <label className="flex items-center gap-1 text-sm cursor-pointer">
                 <input
                   type="radio"
-                  name={`group-${item.id}`}
+                  name={`desktop-group-${item.id}`}
                   value="shared"
                   checked={!item.assignedGroupId}
-                  onClick={() => onUpdate(item.id, { assignedGroupId: undefined })}
-                  onChange={() => {}}
+                  onChange={() => onUpdate(item.id, { assignedGroupId: undefined })}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
                 <span>Shared</span>
               </label>
               {groups.map(group => (
-                <label key={group.id} className="flex items-center gap-1 text-sm cursor-pointer">
+                <label key={`${item.id}-${group.id}`} className="flex items-center gap-1 text-sm cursor-pointer">
                   <input
                     type="radio"
-                    name={`group-${item.id}`}
+                    name={`desktop-group-${item.id}`}
                     value={group.id}
                     checked={item.assignedGroupId === group.id}
-                    onClick={() => onUpdate(item.id, { assignedGroupId: group.id })}
-                    onChange={() => {}}
+                    onChange={() => onUpdate(item.id, { assignedGroupId: group.id })}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     style={group.color ? { accentColor: group.color } : {}}
                   />
