@@ -70,10 +70,15 @@ const PackingListRefactored: React.FC = () => {
 
   useEffect(() => {
     if (trip.tripType) {
+      console.log(`🎯 [PackingListRefactored] Template loading effect triggered for trip type: ${trip.tripType}`);
+      console.log(`🎯 [PackingListRefactored] Current items count: ${items.length}, items with groups: ${items.filter(i => i.assignedGroupId).length}`);
+      
       const defaultDescription = getPackingListDescription(trip.tripType);
       setLoadedTemplateName(defaultDescription);
+      
+      console.log(`🎯 [PackingListRefactored] Set template name to: ${defaultDescription}`);
     }
-  }, [trip.tripType, setLoadedTemplateName]);
+  }, [trip.tripType, setLoadedTemplateName, items.length]);
 
   useEffect(() => {
     const allCategories = new Set(PACKING_CATEGORIES);
@@ -116,11 +121,31 @@ const PackingListRefactored: React.FC = () => {
   }, [items, updateItems]);
 
   const handleUpdateItem = useCallback((itemId: string, updates: Partial<PackingItem>) => {
+    console.log(`🔄 [PackingListRefactored] Updating item ${itemId} with:`, updates);
+    
+    // Validate group ID if being assigned
+    if (updates.assignedGroupId !== undefined) {
+      if (updates.assignedGroupId !== null) {
+        const groupExists = trip.groups?.some(g => g.id === updates.assignedGroupId);
+        if (!groupExists) {
+          console.error(`❌ [PackingListRefactored] Invalid group ID: ${updates.assignedGroupId}. Available groups:`, trip.groups?.map(g => `${g.name}(${g.id})`));
+          console.error(`❌ [PackingListRefactored] Clearing invalid group assignment to prevent foreign key violation`);
+          updates.assignedGroupId = undefined;
+        } else {
+          console.log(`✅ [PackingListRefactored] Group ID ${updates.assignedGroupId} validated successfully`);
+        }
+      }
+    }
+    
     const updatedItems = items.map(item =>
       item.id === itemId ? { ...item, ...updates } : item
     );
+    const updatedItem = updatedItems.find(i => i.id === itemId);
+    if (updatedItem) {
+      console.log(`✅ [PackingListRefactored] Updated item now has assignedGroupId: ${updatedItem.assignedGroupId}`);
+    }
     updateItems(updatedItems, true);
-  }, [items, updateItems]);
+  }, [items, updateItems, trip.groups]);
 
   const handleDeleteItem = useCallback((itemId: string) => {
     const updatedItems = items.filter(item => item.id !== itemId);
@@ -144,21 +169,39 @@ const PackingListRefactored: React.FC = () => {
 
   const handleResetList = useCallback(() => {
     if (trip.tripType) {
+      console.log(`🔄 [PackingListRefactored] Resetting list to default template`);
+      console.log(`🔄 [PackingListRefactored] Current items with group assignments: ${items.filter(i => i.assignedGroupId).length}`);
+      
       const groupSize = trip.groups.reduce((sum, g) => sum + g.size, 0) || 1;
       // Calculate trip duration from dates
       const startDate = new Date(trip.startDate);
       const endDate = new Date(trip.endDate);
       const tripDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 || 3;
       const template = getPackingTemplate(trip.tripType, groupSize, tripDays);
-      const newItems = template.map(item => ({
-        ...PackingListService.createNewItem(item.name, item.category, item.quantity),
-        isOwned: item.isOwned || false,
-        isPacked: false,
-        needsToBuy: item.needsToBuy || false
-      }));
+      
+      // Create new items but preserve existing group assignments where possible
+      const newItems = template.map(item => {
+        const existingItem = items.find(existing => existing.name === item.name && existing.category === item.category);
+        const newItem = {
+          ...PackingListService.createNewItem(item.name, item.category, item.quantity),
+          isOwned: item.isOwned || false,
+          isPacked: false,
+          needsToBuy: item.needsToBuy || false
+        };
+        
+        // Preserve group assignment if it exists
+        if (existingItem && existingItem.assignedGroupId) {
+          console.log(`🔄 [PackingListRefactored] Preserving group assignment for "${item.name}": ${existingItem.assignedGroupId}`);
+          newItem.assignedGroupId = existingItem.assignedGroupId;
+        }
+        
+        return newItem;
+      });
+      
+      console.log(`🔄 [PackingListRefactored] After reset, items with group assignments: ${newItems.filter(i => i.assignedGroupId).length}`);
       updateItems(newItems, true);
     }
-  }, [trip, updateItems]);
+  }, [trip, items, updateItems]);
 
   const handleSaveTemplate = useCallback(async () => {
     if (!templateNameInput.trim() || !trip.tripType) return;
@@ -173,11 +216,28 @@ const PackingListRefactored: React.FC = () => {
   }, [templateNameInput, items, trip.tripType, saveTemplate]);
 
   const handleLoadTemplate = useCallback((template: PackingTemplate) => {
+    console.log(`🔄 [PackingListRefactored] Loading template "${template.name}"`);
+    console.log(`🔄 [PackingListRefactored] Current items with group assignments: ${items.filter(i => i.assignedGroupId).length}`);
+    
     const newItems = applyTemplate(template, trip.id, trip);
-    updateItems(newItems, true);
+    console.log(`🔄 [PackingListRefactored] Template applied, new items with group assignments: ${newItems.filter(i => i.assignedGroupId).length}`);
+    
+    // Preserve existing group assignments from current items
+    const preservedItems = newItems.map(newItem => {
+      const existingItem = items.find(existing => existing.name === newItem.name && existing.category === newItem.category);
+      if (existingItem && existingItem.assignedGroupId) {
+        console.log(`🔄 [PackingListRefactored] Preserving group assignment for "${newItem.name}": ${existingItem.assignedGroupId}`);
+        return { ...newItem, assignedGroupId: existingItem.assignedGroupId };
+      }
+      return newItem;
+    });
+    
+    console.log(`🔄 [PackingListRefactored] After preservation, items with group assignments: ${preservedItems.filter(i => i.assignedGroupId).length}`);
+    
+    updateItems(preservedItems, true);
     setLoadedTemplateName(template.name);
     setShowTemplateModal(false);
-  }, [trip, updateItems, applyTemplate, setLoadedTemplateName]);
+  }, [trip, items, updateItems, applyTemplate, setLoadedTemplateName]);
 
   const toggleCategory = useCallback((category: string) => {
     setExpandedCategories(prev => {

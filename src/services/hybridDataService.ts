@@ -97,6 +97,18 @@ export class HybridDataService {
         const items = await supabaseDataService.getPackingItems(tripId);
         console.log(`📦 [HybridDataService] Loaded ${items.length} packing items from Supabase`);
         
+        // Debug group assignments on load
+        const itemsWithGroups = items.filter(i => i.assignedGroupId);
+        if (itemsWithGroups.length > 0) {
+          console.log(`👥 [HybridDataService] Loaded ${itemsWithGroups.length} items with group assignments from Supabase:`);
+          itemsWithGroups.slice(0, 3).forEach(item => {
+            console.log(`  - ${item.name}: assignedGroupId = ${item.assignedGroupId}`);
+          });
+          if (itemsWithGroups.length > 3) {
+            console.log(`  ... and ${itemsWithGroups.length - 3} more`);
+          }
+        }
+        
         // Process data ephemerally - don't store sensitive details in logs
         const uniqueItems = this.removeDuplicatePackingItems(items);
         if (uniqueItems.length !== items.length) {
@@ -121,6 +133,17 @@ export class HybridDataService {
   async savePackingItems(tripId: string, items: PackingItem[]): Promise<void> {
     console.log(`🎒 [HybridDataService] Saving ${items.length} packing items for trip ${tripId}`);
     
+    // Debug group assignments
+    const itemsWithGroups = items.filter(i => i.assignedGroupId);
+    if (itemsWithGroups.length > 0) {
+      console.log(`👥 [HybridDataService] ${itemsWithGroups.length} items have group assignments:`);
+      itemsWithGroups.forEach(item => {
+        console.log(`  - ${item.name}: assignedGroupId = ${item.assignedGroupId}`);
+      });
+    } else {
+      console.log(`👥 [HybridDataService] No items have group assignments`);
+    }
+    
     // DUPLICATE PREVENTION: Check for obvious duplicates before saving
     const uniqueItems = this.removeDuplicatePackingItems(items);
     if (uniqueItems.length !== items.length) {
@@ -138,6 +161,22 @@ export class HybridDataService {
       try {
         console.log('📤 [HybridDataService] User signed in, saving to Supabase...');
         await supabaseDataService.savePackingItems(tripId, items);
+        
+        // Post-save verification for group assignments
+        const itemsWithGroups = items.filter(i => i.assignedGroupId);
+        if (itemsWithGroups.length > 0) {
+          console.log('🔍 [HybridDataService] Verifying group assignments were saved...');
+          const savedItems = await supabaseDataService.getPackingItems(tripId);
+          const savedWithGroups = savedItems.filter(i => i.assignedGroupId);
+          
+          if (savedWithGroups.length !== itemsWithGroups.length) {
+            console.error(`❌ [HybridDataService] GROUP ASSIGNMENT SAVE FAILURE!`);
+            console.error(`❌ Expected ${itemsWithGroups.length} items with groups, got ${savedWithGroups.length}`);
+          } else {
+            console.log(`✅ [HybridDataService] Verified ${savedWithGroups.length} group assignments saved successfully`);
+          }
+        }
+        
         // Also save locally as backup
         await savePackingListLocal(tripId, items);
         console.log('✅ [HybridDataService] Packing items saved successfully to Supabase');
@@ -156,22 +195,46 @@ export class HybridDataService {
    */
   private removeDuplicatePackingItems(items: PackingItem[]): PackingItem[] {
     const seen = new Map<string, PackingItem>();
+    const debugRemovals: string[] = [];
     
     for (const item of items) {
+      // Don't include assignedGroupId in key - we want to merge true duplicates
       const key = `${item.name.toLowerCase().trim()}-${item.category.toLowerCase().trim()}-${item.isPersonal}`;
       
       if (!seen.has(key)) {
         seen.set(key, item);
       } else {
-        // Keep the item with more user data (owned, packed, notes, etc.)
+        // Keep the item with more user data, especially group assignments
         const existing = seen.get(key)!;
-        const hasMoreData = item.isOwned || item.isPacked || item.needsToBuy || item.notes || item.assignedGroupId;
-        const existingHasMoreData = existing.isOwned || existing.isPacked || existing.needsToBuy || existing.notes || existing.assignedGroupId;
         
-        if (hasMoreData && !existingHasMoreData) {
+        // Count the amount of user data each item has
+        const itemDataScore = 
+          (item.isOwned ? 1 : 0) + 
+          (item.isPacked ? 1 : 0) + 
+          (item.needsToBuy ? 1 : 0) + 
+          (item.notes ? 1 : 0) + 
+          (item.assignedGroupId ? 3 : 0); // Weight group assignment much higher
+        
+        const existingDataScore = 
+          (existing.isOwned ? 1 : 0) + 
+          (existing.isPacked ? 1 : 0) + 
+          (existing.needsToBuy ? 1 : 0) + 
+          (existing.notes ? 1 : 0) + 
+          (existing.assignedGroupId ? 3 : 0); // Weight group assignment much higher
+        
+        if (itemDataScore > existingDataScore) {
+          debugRemovals.push(`Replacing "${existing.name}" (group: ${existing.assignedGroupId || 'none'}) with version having group: ${item.assignedGroupId || 'none'}`);
+          seen.set(key, item);
+        } else if (itemDataScore === existingDataScore && item.assignedGroupId && !existing.assignedGroupId) {
+          // If scores are equal but new item has group assignment, prefer it
+          debugRemovals.push(`Updating "${existing.name}" to have group: ${item.assignedGroupId}`);
           seen.set(key, item);
         }
       }
+    }
+    
+    if (debugRemovals.length > 0) {
+      console.log(`🔍 [HybridDataService] Duplicate removal details:`, debugRemovals);
     }
     
     return Array.from(seen.values());
@@ -318,12 +381,16 @@ export class HybridDataService {
       .map(([name, info]) => {
         const existing = existingItemsMap.get(name.toLowerCase());
         if (existing) {
-          // Update existing item with group assignment if it doesn't have one
-          if (!existing.assignedGroupId && info.groupId) {
+          // Always update existing item with group assignment from meal
+          // This ensures ingredients inherit the meal's group assignment
+          if (existing.assignedGroupId !== info.groupId) {
+            console.log(`🔄 [HybridDataService] Updating ingredient "${name}" group assignment: ${existing.assignedGroupId || 'none'} → ${info.groupId || 'shared'}`);
             existing.assignedGroupId = info.groupId;
           }
-          return existing;
+          // Return the updated existing item
+          return { ...existing, assignedGroupId: info.groupId };
         }
+        console.log(`➕ [HybridDataService] Creating new ingredient "${name}" with group: ${info.groupId || 'shared'}`);
         return {
           id: crypto.randomUUID(),
           name,
@@ -376,7 +443,8 @@ export class HybridDataService {
         !allItems.every(item => existingItems.some(existing => 
           existing.id === item.id && 
           existing.name === item.name && 
-          existing.quantity === item.quantity
+          existing.quantity === item.quantity &&
+          existing.assignedGroupId === item.assignedGroupId // Also check group assignment changes
         ))) {
       console.log(`🛒 [HybridDataService] Shopping list changed, saving...`);
       await this.saveShoppingItems(tripId, allItems);
@@ -448,12 +516,14 @@ export class HybridDataService {
       .map(([name, info]) => {
         const existing = existingItemsMap.get(name.toLowerCase());
         if (existing) {
-          // Update existing item with group assignment if it doesn't have one
-          if (!existing.assignedGroupId && info.groupId) {
-            console.log(`🛒 [HybridDataService] Updating existing item "${name}" with groupId: ${info.groupId}`);
+          // Always update existing item with group assignment from meal
+          // This ensures ingredients inherit the meal's group assignment
+          if (existing.assignedGroupId !== info.groupId) {
+            console.log(`🔄 [HybridDataService] Updating ingredient "${name}" group assignment: ${existing.assignedGroupId || 'none'} → ${info.groupId || 'shared'}`);
             existing.assignedGroupId = info.groupId;
           }
-          return existing;
+          // Return the updated existing item
+          return { ...existing, assignedGroupId: info.groupId };
         }
         const newItem = {
           id: crypto.randomUUID(),
@@ -509,7 +579,8 @@ export class HybridDataService {
         !allItems.every(item => existingItems.some(existing => 
           existing.id === item.id && 
           existing.name === item.name && 
-          existing.quantity === item.quantity
+          existing.quantity === item.quantity &&
+          existing.assignedGroupId === item.assignedGroupId // Also check group assignment changes
         ))) {
       console.log(`🛒 [HybridDataService] Shopping list changed, saving...`);
       await this.saveShoppingItems(tripId, allItems);

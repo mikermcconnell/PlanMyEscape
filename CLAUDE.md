@@ -4,6 +4,7 @@
 ```
 PROJECT: React/TypeScript camping trip planner with Supabase backend
 DATA SERVICE: Always use hybridDataService.ts - never direct Supabase calls
+DATA PERSISTENCE: ALL new features with user input MUST save to Supabase
 CHECKPOINT: Run `checkpoint.bat create "description"` before major changes
 COMMANDS: npm start | npm test | npm run type-check | npm run lint
 ```
@@ -19,6 +20,98 @@ COMMANDS: npm start | npm test | npm run type-check | npm run lint
 | **Save with debouncing** | `src/pages/PackingList.tsx:166` | `updateItems()` with `immediate=false` |
 | **Save immediately** | `src/pages/PackingList.tsx:166` | `updateItems()` with `immediate=true` |
 
+## 🧠 TASK THINK WORKFLOW (Explore-Plan-Code-Commit Pattern)
+```
+WHEN TO USE: Complex development tasks requiring context analysis and planning
+TRIGGER: User says "Task Think" or tasks involve multiple files/components
+BENEFITS: Prevents hasty coding, ensures proper context, reduces errors
+```
+
+### The Four-Phase Pattern
+| Phase | Action | Tools/Keywords |
+|-------|--------|----------------|
+| **🔍 Explore** | Read relevant files, understand codebase context | `Read`, `Glob`, `Grep` |
+| **🧠 Plan** | Think through solution with appropriate depth | `think` → `think hard` → `think harder` → `ultrathink` |
+| **⚡ Implement** | Code the planned solution based on analysis | `Edit`, `Write`, `MultiEdit` |
+| **🔗 Integration** | Commit changes, create PRs, verify functionality | `Bash (git)`, tests, linting |
+
+### Usage Pattern
+```typescript
+// When user requests "Task Think":
+1. Use TodoWrite to track the multi-phase approach
+2. Exploration Phase: Read/analyze relevant files without coding
+3. Planning Phase: Use sequential thinking to reason through solution
+4. Implementation Phase: Execute planned changes systematically
+5. Integration Phase: Commit, test, and verify implementation
+```
+
+### Benefits
+- **Context Awareness**: Full understanding before coding
+- **Reduced Errors**: Planning prevents implementation mistakes  
+- **Better Solutions**: Considers edge cases and implications
+- **Systematic Progress**: TodoWrite tracks multi-step progress
+
+## 🧪 TEST-DRIVEN DEVELOPMENT (Write-Fail-Pass-Refactor Pattern)
+```
+WHEN TO USE: User says "Test-Driven Development" or "TDD" for any feature/task
+TRIGGER: "Test-Driven Development: [feature description]"
+BENEFITS: Higher quality code, better test coverage, fewer bugs, living documentation
+```
+
+### The Five-Phase TDD Pattern
+| Phase | Action | Tools/Agents |
+|-------|--------|--------------|
+| **🧪 Test Design** | Write comprehensive tests BEFORE implementation | `test-engineer`, `Write`, test files |
+| **🔴 Verify Failures** | Confirm all tests fail (red state) | `npm test`, verify red state |
+| **✅ Implement** | Write minimal code to make tests pass | `backend-implementer`, `ui-engineer` |
+| **🔄 Iterate** | Code iteratively until all tests green | Keep coding until green |
+| **🔍 Verify Quality** | Review implementation and test coverage | `code-reviewer`, refactor safely |
+
+### TDD Agent Workflow
+```typescript
+// When user requests "Test-Driven Development: [feature]":
+1. Use TodoWrite to track TDD phases
+2. Test Design Phase: test-engineer creates comprehensive test suite
+3. Failure Verification: Run tests, confirm they fail appropriately  
+4. Implementation Phase: Implement minimal passing code
+5. Iteration: Continue until all tests pass (green state)
+6. Quality Review: code-reviewer verifies implementation quality
+```
+
+### TDD Command Patterns
+```bash
+# Phase 1: Test Design (ALWAYS FIRST)
+"Test-Driven Development: Add trip notes with autosave and group sharing"
+→ test-engineer writes comprehensive tests in src/__tests__/
+
+# Phase 2: Verify Failures
+"Run tests to confirm red state"
+→ npm test shows expected failures
+
+# Phase 3-4: Implementation & Iteration  
+"Implement minimal code to make tests pass"
+→ backend-implementer/ui-engineer writes passing code
+
+# Phase 5: Quality Review
+"Review TDD implementation for quality and coverage"
+→ code-reviewer verifies and suggests improvements
+```
+
+### TDD Integration with PlanMyEscape Patterns
+- **Data Service**: Tests must verify hybridDataService usage
+- **Authentication**: Tests include user auth state scenarios
+- **Supabase Integration**: Mock Supabase calls, test RLS compliance
+- **Component Props**: Test isOpen/onClose patterns, prop interfaces
+- **Debounced Saves**: Test timing behavior (e.g., 500ms autosave)
+- **Group Assignment**: Test group filtering and assignment logic
+
+### TDD Benefits
+- **Requirements Clarity**: Tests define exact behavior before coding
+- **Regression Prevention**: New features can't break existing functionality  
+- **Design Quality**: TDD forces better component interfaces
+- **Confidence**: Green tests mean features work as expected
+- **Living Documentation**: Tests serve as behavioral documentation
+
 ## 🎯 DECISION TREES
 ```
 WHEN TO SAVE:
@@ -30,7 +123,8 @@ WHEN TO SAVE:
 WHICH DATA SERVICE:
 ├── Authenticated user → hybridDataService (Supabase + local backup)
 ├── Anonymous user → hybridDataService (local only)
-└── NEVER use supabaseDataService directly
+├── NEVER use supabaseDataService directly
+└── NEW FEATURES → MUST save to Supabase via hybridDataService
 
 COMPONENT STATE:
 ├── Trip data → useOutletContext from TripContainer
@@ -834,6 +928,11 @@ const useShoppingListSync = (tripId: string) => {
 - **RLS Requirements**: All database operations automatically include user_id for Row Level Security
 - **UUID Generation**: Use `crypto.randomUUID()` for new items to ensure proper database compatibility
 - **Optimistic Updates**: Update UI immediately, then save to storage for responsive UX
+- **MANDATORY SUPABASE PERSISTENCE**: ALL new features with user input MUST be configured to save to Supabase
+  - Every new form, input field, or user interaction that creates/modifies data MUST use hybridDataService
+  - All new data types MUST have corresponding Supabase tables with RLS policies
+  - Never create local-only features - all data must sync to Supabase when user is authenticated
+  - Example: If adding a new "trip notes" feature, it MUST save to a `trip_notes` table in Supabase
 
 ### PackingList Status Management Best Practices
 - **Status Icons Position**: Always position status icons on the left side of items for consistency

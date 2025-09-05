@@ -291,7 +291,24 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
                   name={`desktop-group-${item.id}`}
                   value="shared"
                   checked={!item.assignedGroupId}
-                  onChange={() => onUpdate(item.id, { assignedGroupId: undefined })}
+                  onChange={() => {
+                    console.log(`📝 [PackingItemRow] Setting item "${item.name}" to shared (undefined)`);
+                    console.trace('📍 [PackingItemRow] Shared assignment call stack');
+                    
+                    // Debug persistence across reloads
+                    const debugInfo = {
+                      timestamp: Date.now(),
+                      itemId: item.id,
+                      itemName: item.name,
+                      previousGroupId: item.assignedGroupId,
+                      newGroupId: undefined,
+                      groupName: 'Shared',
+                      action: 'shared_assignment'
+                    };
+                    localStorage.setItem('debug_group_assignment_' + item.id, JSON.stringify(debugInfo));
+                    
+                    onUpdate(item.id, { assignedGroupId: undefined });
+                  }}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
                 <span>Shared</span>
@@ -303,7 +320,24 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
                     name={`desktop-group-${item.id}`}
                     value={group.id}
                     checked={item.assignedGroupId === group.id}
-                    onChange={() => onUpdate(item.id, { assignedGroupId: group.id })}
+                    onChange={() => {
+                      console.log(`📝 [PackingItemRow] Setting item "${item.name}" to group "${group.name}" (id: ${group.id}, type: ${typeof group.id})`);
+                      console.trace('📍 [PackingItemRow] Group assignment call stack');
+                      
+                      // Debug persistence across reloads
+                      const debugInfo = {
+                        timestamp: Date.now(),
+                        itemId: item.id,
+                        itemName: item.name,
+                        previousGroupId: item.assignedGroupId,
+                        newGroupId: group.id,
+                        groupName: group.name,
+                        action: 'assignment'
+                      };
+                      localStorage.setItem('debug_group_assignment_' + item.id, JSON.stringify(debugInfo));
+                      
+                      onUpdate(item.id, { assignedGroupId: group.id });
+                    }}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     style={group.color ? { accentColor: group.color } : {}}
                   />

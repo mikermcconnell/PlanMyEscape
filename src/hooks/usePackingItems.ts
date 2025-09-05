@@ -69,6 +69,30 @@ export const usePackingItems = (tripId: string): UsePackingItemsReturn => {
       try {
         setIsLoading(true);
         const data = await hybridDataService.getPackingItems(tripId);
+        
+        // Debug group assignments on initial load
+        const itemsWithGroups = (data || []).filter(item => item.assignedGroupId);
+        console.log(`🚀 [usePackingItems] LOADED ${data?.length || 0} items from data service`);
+        if (itemsWithGroups.length > 0) {
+          console.log(`👥 [usePackingItems] ${itemsWithGroups.length} items have group assignments on LOAD:`);
+          itemsWithGroups.forEach(item => {
+            console.log(`  - "${item.name}": assignedGroupId = ${item.assignedGroupId}`);
+            
+            // Check if this matches previous assignment attempts
+            const debugKey = 'debug_group_assignment_' + item.id;
+            const savedDebug = localStorage.getItem(debugKey);
+            if (savedDebug) {
+              const debugData = JSON.parse(savedDebug);
+              console.log(`  🔍 Previous assignment attempt: ${debugData.groupName} at ${new Date(debugData.timestamp).toLocaleTimeString()}`);
+              if (debugData.newGroupId !== item.assignedGroupId) {
+                console.error(`  ❌ ASSIGNMENT LOST! Expected: ${debugData.newGroupId}, Got: ${item.assignedGroupId}`);
+              }
+            }
+          });
+        } else {
+          console.log(`⚠️ [usePackingItems] No items with group assignments found on load`);
+        }
+        
         setItems(data || []);
       } catch (error) {
         console.error('Error loading packing items:', error);
