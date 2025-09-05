@@ -110,11 +110,16 @@ export class HybridDataService {
         }
         
         // Process data ephemerally - don't store sensitive details in logs
-        const uniqueItems = this.removeDuplicatePackingItems(items);
-        if (uniqueItems.length !== items.length) {
-          console.warn(`⚠️ [HybridDataService] Cleaned ${items.length - uniqueItems.length} duplicate items`);
-          await this.savePackingItemsInternal(tripId, uniqueItems);
-          return uniqueItems;
+        // Check for duplicates but only clean if there are actual issues
+        const duplicateCount = items.length - new Set(items.map(i => `${i.name}-${i.category}`)).size;
+        if (duplicateCount > 0) {
+          console.warn(`⚠️ [HybridDataService] Found ${duplicateCount} potential duplicates on load, cleaning...`);
+          const uniqueItems = this.removeDuplicatePackingItems(items);
+          if (uniqueItems.length !== items.length) {
+            console.warn(`⚠️ [HybridDataService] Cleaned ${items.length - uniqueItems.length} duplicate items`);
+            await this.savePackingItemsInternal(tripId, uniqueItems);
+            return uniqueItems;
+          }
         }
         
         return items;
@@ -145,12 +150,18 @@ export class HybridDataService {
     }
     
     // DUPLICATE PREVENTION: Check for obvious duplicates before saving
-    const uniqueItems = this.removeDuplicatePackingItems(items);
-    if (uniqueItems.length !== items.length) {
-      console.warn(`⚠️ [HybridDataService] Removed ${items.length - uniqueItems.length} duplicate packing items before saving`);
+    const duplicateCount = items.length - new Set(items.map(i => `${i.name}-${i.category}`)).size;
+    if (duplicateCount > 0) {
+      console.warn(`⚠️ [HybridDataService] Found ${duplicateCount} potential duplicates before save, cleaning...`);
+      const uniqueItems = this.removeDuplicatePackingItems(items);
+      if (uniqueItems.length !== items.length) {
+        console.warn(`⚠️ [HybridDataService] Removed ${items.length - uniqueItems.length} duplicate packing items before saving`);
+      }
+      return await this.savePackingItemsInternal(tripId, uniqueItems);
     }
     
-    return await this.savePackingItemsInternal(tripId, uniqueItems);
+    // No duplicates detected, save as-is
+    return await this.savePackingItemsInternal(tripId, items);
   }
   
   /**
@@ -208,27 +219,37 @@ export class HybridDataService {
         const existing = seen.get(key)!;
         
         // Count the amount of user data each item has
+        // Group assignments are CRITICAL - weight them extremely high to prevent loss
         const itemDataScore = 
           (item.isOwned ? 1 : 0) + 
           (item.isPacked ? 1 : 0) + 
           (item.needsToBuy ? 1 : 0) + 
           (item.notes ? 1 : 0) + 
-          (item.assignedGroupId ? 3 : 0); // Weight group assignment much higher
+          (item.assignedGroupId ? 100 : 0); // MASSIVELY weight group assignments
         
         const existingDataScore = 
           (existing.isOwned ? 1 : 0) + 
           (existing.isPacked ? 1 : 0) + 
           (existing.needsToBuy ? 1 : 0) + 
           (existing.notes ? 1 : 0) + 
-          (existing.assignedGroupId ? 3 : 0); // Weight group assignment much higher
+          (existing.assignedGroupId ? 100 : 0); // MASSIVELY weight group assignments
         
-        if (itemDataScore > existingDataScore) {
-          debugRemovals.push(`Replacing "${existing.name}" (group: ${existing.assignedGroupId || 'none'}) with version having group: ${item.assignedGroupId || 'none'}`);
+        // CRITICAL: Never replace an item that has a group assignment with one that doesn't
+        if (existing.assignedGroupId && !item.assignedGroupId) {
+          debugRemovals.push(`🛡️ PROTECTED: Keeping "${existing.name}" with group ${existing.assignedGroupId}, rejecting ungrouped duplicate`);
+          // Keep existing item - don't replace
+        } else if (!existing.assignedGroupId && item.assignedGroupId) {
+          debugRemovals.push(`✨ UPGRADING: "${existing.name}" to have group assignment: ${item.assignedGroupId}`);
+          seen.set(key, item);
+        } else if (itemDataScore > existingDataScore) {
+          debugRemovals.push(`📊 SCORE WIN: Replacing "${existing.name}" (group: ${existing.assignedGroupId || 'none'}, score: ${existingDataScore}) with version (group: ${item.assignedGroupId || 'none'}, score: ${itemDataScore})`);
           seen.set(key, item);
         } else if (itemDataScore === existingDataScore && item.assignedGroupId && !existing.assignedGroupId) {
           // If scores are equal but new item has group assignment, prefer it
-          debugRemovals.push(`Updating "${existing.name}" to have group: ${item.assignedGroupId}`);
+          debugRemovals.push(`⚖️ TIE BREAK: Updating "${existing.name}" to have group: ${item.assignedGroupId}`);
           seen.set(key, item);
+        } else {
+          debugRemovals.push(`✋ KEEPING: "${existing.name}" (group: ${existing.assignedGroupId || 'none'}, score: ${existingDataScore}) over duplicate (group: ${item.assignedGroupId || 'none'}, score: ${itemDataScore})`);
         }
       }
     }
@@ -237,7 +258,31 @@ export class HybridDataService {
       console.log(`🔍 [HybridDataService] Duplicate removal details:`, debugRemovals);
     }
     
-    return Array.from(seen.values());
+    const resultItems = Array.from(seen.values());
+    
+    // VALIDATION: Ensure no group assignments were lost during deduplication
+    const originalWithGroups = items.filter(i => i.assignedGroupId);
+    const resultWithGroups = resultItems.filter(i => i.assignedGroupId);
+    
+    if (originalWithGroups.length !== resultWithGroups.length) {
+      console.error(`🚨 [HybridDataService] GROUP ASSIGNMENT LOSS DETECTED!`);
+      console.error(`🚨 Original items with groups: ${originalWithGroups.length}`);
+      console.error(`🚨 Result items with groups: ${resultWithGroups.length}`);
+      console.error(`🚨 Lost assignments:`, originalWithGroups.filter(orig => 
+        !resultItems.find(result => result.name === orig.name && result.assignedGroupId === orig.assignedGroupId)
+      ));
+      
+      // Emergency fallback - restore lost assignments
+      for (const lostItem of originalWithGroups) {
+        const resultItem = resultItems.find(r => r.name === lostItem.name && r.category === lostItem.category);
+        if (resultItem && !resultItem.assignedGroupId && lostItem.assignedGroupId) {
+          console.log(`🔧 [HybridDataService] RESTORING lost group assignment for "${lostItem.name}": ${lostItem.assignedGroupId}`);
+          resultItem.assignedGroupId = lostItem.assignedGroupId;
+        }
+      }
+    }
+    
+    return resultItems;
   }
   
   // === MEALS ===
