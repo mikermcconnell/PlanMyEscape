@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { PackingItem, Group } from '../../types';
 import { PackingItemRow } from './PackingItemRow';
+import { PackingListService } from '../../services/packingListService';
 
 interface PackingCategoryProps {
   category: string;
@@ -36,9 +37,15 @@ export const PackingCategory: React.FC<PackingCategoryProps> = ({
   selectedItems = new Set(),
   onToggleItemSelection = () => {}
 }) => {
-  const ownedCount = items.filter(item => item.isOwned).length;
-  const packedCount = items.filter(item => item.isPacked).length;
-  const needToBuyCount = items.filter(item => item.needsToBuy).length;
+  // Apply intelligent sorting to items
+  const sortedItems = useMemo(() => 
+    PackingListService.sortItemsIntelligently(items), 
+    [items]
+  );
+
+  const ownedCount = sortedItems.filter(item => item.isOwned).length;
+  const packedCount = sortedItems.filter(item => item.isPacked).length;
+  const needToBuyCount = sortedItems.filter(item => item.needsToBuy).length;
 
   return (
     <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700">
@@ -56,7 +63,7 @@ export const PackingCategory: React.FC<PackingCategoryProps> = ({
             {category}
           </h3>
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-600 px-2 py-1 rounded-full">
-            {items.length} items
+            {sortedItems.length} items
           </span>
         </div>
 
@@ -96,7 +103,7 @@ export const PackingCategory: React.FC<PackingCategoryProps> = ({
 
       {isExpanded && (
         <div className="p-4 space-y-3">
-          {items.length === 0 ? (
+          {sortedItems.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <p>No items in this category yet.</p>
               <button
@@ -108,7 +115,7 @@ export const PackingCategory: React.FC<PackingCategoryProps> = ({
             </div>
           ) : groupAssignmentMode ? (
             // Simplified checkbox view for group assignment mode
-            items.map(item => {
+            sortedItems.map(item => {
               const isSelected = selectedItems.has(item.id);
               const assignedGroup = groups.find(g => g.id === item.assignedGroupId);
               
@@ -135,7 +142,13 @@ export const PackingCategory: React.FC<PackingCategoryProps> = ({
                     
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className={`font-medium ${isSelected ? 'text-purple-800' : 'text-gray-800'}`}>
+                        <span className={`font-medium ${
+                          item.isPacked 
+                            ? 'line-through text-gray-500' 
+                            : isSelected 
+                              ? 'text-purple-800' 
+                              : 'text-gray-800'
+                        }`}>
                           {item.name}
                         </span>
                         {item.quantity > 1 && (
@@ -181,19 +194,63 @@ export const PackingCategory: React.FC<PackingCategoryProps> = ({
               );
             })
           ) : (
-            // Normal view with full editing capabilities
-            items.map(item => (
-              <PackingItemRow
-                key={item.id}
-                item={item}
-                groups={groups}
-                isCoordinated={isCoordinated}
-                onUpdate={onUpdateItem}
-                onDelete={onDeleteItem}
-                onEditName={onEditName}
-                onEditNotes={onEditNotes}
-              />
-            ))
+            // Normal view with separated packed and unpacked sections
+            <>
+              {(() => {
+                const unpackedItems = sortedItems.filter(item => !item.isPacked);
+                const packedItems = sortedItems.filter(item => item.isPacked);
+                
+                return (
+                  <>
+                    {/* Unpacked Items Section */}
+                    {unpackedItems.length > 0 && (
+                      <div className="space-y-3">
+                        {unpackedItems.map(item => (
+                          <PackingItemRow
+                            key={item.id}
+                            item={item}
+                            groups={groups}
+                            isCoordinated={isCoordinated}
+                            onUpdate={onUpdateItem}
+                            onDelete={onDeleteItem}
+                            onEditName={onEditName}
+                            onEditNotes={onEditNotes}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Packed Items Section */}
+                    {packedItems.length > 0 && (
+                      <div className="mt-6">
+                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-blue-200">
+                          <h4 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
+                            📦 Packed Items
+                          </h4>
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded-full">
+                            {packedItems.length} {packedItems.length === 1 ? 'item' : 'items'}
+                          </span>
+                        </div>
+                        <div className="space-y-3">
+                          {packedItems.map(item => (
+                            <PackingItemRow
+                              key={item.id}
+                              item={item}
+                              groups={groups}
+                              isCoordinated={isCoordinated}
+                              onUpdate={onUpdateItem}
+                              onDelete={onDeleteItem}
+                              onEditName={onEditName}
+                              onEditNotes={onEditNotes}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </>
           )}
         </div>
       )}

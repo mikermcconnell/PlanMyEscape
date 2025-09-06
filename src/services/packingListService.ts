@@ -146,6 +146,148 @@ export class PackingListService {
     }
   }
 
+  static sortItemsIntelligently(items: PackingItem[]): PackingItem[] {
+    return [...items].sort((a, b) => {
+      // First sort by packed status (unpacked items first)
+      if (a.isPacked !== b.isPacked) {
+        return a.isPacked ? 1 : -1;
+      }
+
+      // Then by intelligent grouping within the same category
+      const groupOrderA = this.getItemGroupOrder(a);
+      const groupOrderB = this.getItemGroupOrder(b);
+      
+      if (groupOrderA !== groupOrderB) {
+        return groupOrderA - groupOrderB;
+      }
+
+      // Finally by name within the same group
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  private static getItemGroupOrder(item: PackingItem): number {
+    const category = (item.category || 'Other').toLowerCase();
+    const name = item.name.toLowerCase();
+
+    switch (category) {
+      case 'kitchen':
+        // Cooking heat source
+        if (this.matchesKeywords(name, ['stove', 'fuel', 'propane', 'butane', 'lighter', 'matches'])) return 1;
+        // Cooking vessels
+        if (this.matchesKeywords(name, ['pot', 'pan', 'kettle', 'dutch oven', 'skillet', 'frying'])) return 2;
+        // Eating/drinking vessels
+        if (this.matchesKeywords(name, ['plate', 'bowl', 'cup', 'mug', 'glass', 'tumbler'])) return 3;
+        // Utensils
+        if (this.matchesKeywords(name, ['fork', 'knife', 'spoon', 'spatula', 'tongs', 'ladle', 'utensils'])) return 4;
+        // Food prep tools
+        if (this.matchesKeywords(name, ['cutting board', 'can opener', 'bottle opener', 'peeler', 'grater'])) return 5;
+        // Cleaning supplies
+        if (this.matchesKeywords(name, ['dish soap', 'sponge', 'towel', 'wash', 'scrub', 'clean'])) return 6;
+        // Storage
+        if (this.matchesKeywords(name, ['cooler', 'container', 'bag', 'storage', 'thermos'])) return 7;
+        return 8;
+
+      case 'shelter':
+        // Tent system
+        if (this.matchesKeywords(name, ['tent', 'stakes', 'footprint', 'rainfly', 'guy line', 'pole'])) return 1;
+        // Sleep system  
+        if (this.matchesKeywords(name, ['sleeping bag', 'sleeping pad', 'pillow', 'blanket', 'sheet', 'mattress'])) return 2;
+        // Weather protection
+        if (this.matchesKeywords(name, ['tarp', 'rope', 'cord', 'canopy', 'shelter'])) return 3;
+        return 4;
+
+      case 'clothing':
+        // Base layers
+        if (this.matchesKeywords(name, ['base layer', 'thermal', 'underwear', 'long underwear', 'merino'])) return 1;
+        // Insulation layers
+        if (this.matchesKeywords(name, ['fleece', 'jacket', 'vest', 'sweater', 'hoodie', 'insulation', 'puffy'])) return 2;
+        // Shell layers
+        if (this.matchesKeywords(name, ['rain jacket', 'rain pants', 'shell', 'windbreaker', 'poncho'])) return 3;
+        // Regular clothing
+        if (this.matchesKeywords(name, ['shirt', 'pants', 'shorts', 'dress', 'skirt'])) return 4;
+        // Undergarments
+        if (this.matchesKeywords(name, ['socks', 'underwear', 'bra', 'boxers', 'briefs'])) return 5;
+        // Footwear
+        if (this.matchesKeywords(name, ['boots', 'shoes', 'sandals', 'slippers', 'footwear'])) return 6;
+        // Accessories
+        if (this.matchesKeywords(name, ['hat', 'cap', 'gloves', 'mittens', 'scarf', 'belt'])) return 7;
+        return 8;
+
+      case 'personal':
+        // Toiletries
+        if (this.matchesKeywords(name, ['toothbrush', 'toothpaste', 'soap', 'shampoo', 'deodorant', 'lotion', 'sunscreen'])) return 1;
+        // Medications
+        if (this.matchesKeywords(name, ['medication', 'pills', 'prescription', 'vitamins', 'aspirin', 'ibuprofen'])) return 2;
+        // Electronics
+        if (this.matchesKeywords(name, ['phone', 'charger', 'headlamp', 'flashlight', 'battery', 'camera', 'gps'])) return 3;
+        // Documents/money
+        if (this.matchesKeywords(name, ['wallet', 'id', 'license', 'passport', 'cash', 'cards'])) return 4;
+        return 5;
+
+      case 'tools':
+        // Cutting tools
+        if (this.matchesKeywords(name, ['knife', 'multi-tool', 'axe', 'hatchet', 'saw', 'machete'])) return 1;
+        // Fire starting
+        if (this.matchesKeywords(name, ['lighter', 'matches', 'fire starter', 'tinder', 'kindling'])) return 2;
+        // Repair items
+        if (this.matchesKeywords(name, ['duct tape', 'tape', 'patch', 'repair', 'glue', 'zip tie'])) return 3;
+        // Maintenance
+        if (this.matchesKeywords(name, ['oil', 'grease', 'cleaner', 'lubricant', 'polish'])) return 4;
+        return 5;
+
+      case 'safety':
+        // First aid
+        if (this.matchesKeywords(name, ['first aid', 'bandage', 'antiseptic', 'gauze', 'medical'])) return 1;
+        // Emergency items
+        if (this.matchesKeywords(name, ['whistle', 'mirror', 'emergency', 'signal', 'flare'])) return 2;
+        // Navigation
+        if (this.matchesKeywords(name, ['map', 'compass', 'gps', 'navigation'])) return 3;
+        return 4;
+
+      case 'sleep':
+        // Sleep system core
+        if (this.matchesKeywords(name, ['sleeping bag', 'sleeping pad', 'mattress'])) return 1;
+        // Sleep comfort
+        if (this.matchesKeywords(name, ['pillow', 'blanket', 'sheet', 'liner'])) return 2;
+        return 3;
+
+      case 'comfort':
+        // Seating
+        if (this.matchesKeywords(name, ['chair', 'seat', 'cushion', 'pad'])) return 1;
+        // Lighting
+        if (this.matchesKeywords(name, ['lantern', 'light', 'lamp', 'candle'])) return 2;
+        return 3;
+
+      case 'pack':
+        // Main carrying
+        if (this.matchesKeywords(name, ['backpack', 'pack', 'bag', 'duffel'])) return 1;
+        // Organization
+        if (this.matchesKeywords(name, ['stuff sack', 'packing cube', 'dry bag', 'organizer'])) return 2;
+        return 3;
+
+      case 'transportation':
+        // Vehicle items
+        if (this.matchesKeywords(name, ['car', 'keys', 'charger', 'mount'])) return 1;
+        return 2;
+
+      case 'fun and games':
+        // Games
+        if (this.matchesKeywords(name, ['cards', 'game', 'puzzle', 'book'])) return 1;
+        // Activities
+        if (this.matchesKeywords(name, ['frisbee', 'ball', 'kite', 'music'])) return 2;
+        return 3;
+
+      default:
+        return 999; // Unknown items go to the end
+    }
+  }
+
+  private static matchesKeywords(itemName: string, keywords: string[]): boolean {
+    const name = itemName.toLowerCase();
+    return keywords.some(keyword => name.includes(keyword.toLowerCase()));
+  }
+
   static getItemStatusIcon(item: PackingItem): string {
     if (item.isPacked) return '✅';
     if (item.isOwned) return '✓';

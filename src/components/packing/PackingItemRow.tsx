@@ -121,7 +121,9 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-1 flex-1 min-w-0">
-              <span className="font-medium text-gray-800 text-sm truncate">
+              <span className={`font-medium text-sm truncate ${
+                item.isPacked ? 'line-through text-gray-500' : 'text-gray-800'
+              }`}>
                 {item.name}
               </span>
               <button onClick={() => setIsEditingName(true)} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
@@ -175,7 +177,36 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
                 name={`mobile-group-${item.id}`}
                 value="shared"
                 checked={!item.assignedGroupId}
-                onChange={() => onUpdate(item.id, { assignedGroupId: undefined })}
+                ref={(input) => {
+                  // CRITICAL DEBUG: Log shared radio button state for Map item specifically
+                  if (item.name.includes('Map') && input) {
+                    console.log(`📻 [PackingItemRow-Mobile] SHARED radio button for "${item.name}":`, {
+                      itemAssignedGroupId: item.assignedGroupId,
+                      itemAssignedGroupIdType: typeof item.assignedGroupId,
+                      hasAssignedGroupId: !!item.assignedGroupId,
+                      notAssignedGroupId: !item.assignedGroupId,
+                      checked: input.checked,
+                      shouldBeChecked: !item.assignedGroupId
+                    });
+                  }
+                }}
+                onChange={() => {
+                  console.log(`📝 [PackingItemRow-Mobile] Setting item "${item.name}" to SHARED`);
+                  
+                  // Debug persistence across reloads - universal tracking for ALL items
+                  const debugInfo = {
+                    timestamp: Date.now(),
+                    itemId: item.id,
+                    itemName: item.name,
+                    previousGroupId: item.assignedGroupId,
+                    newGroupId: undefined,
+                    groupName: 'Shared',
+                    action: 'mobile_assignment_shared'
+                  };
+                  localStorage.setItem('debug_group_assignment_' + item.id, JSON.stringify(debugInfo));
+                  
+                  onUpdate(item.id, { assignedGroupId: undefined });
+                }}
                 className="h-5 w-5 text-blue-600 focus:ring-blue-500 cursor-pointer"
               />
               <span>Shared</span>
@@ -187,7 +218,37 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
                   name={`mobile-group-${item.id}`}
                   value={group.id}
                   checked={item.assignedGroupId === group.id}
-                  onChange={() => onUpdate(item.id, { assignedGroupId: group.id })}
+                  ref={(input) => {
+                    // CRITICAL DEBUG: Log radio button state for Map item specifically
+                    if (item.name.includes('Map') && input) {
+                      console.log(`📻 [PackingItemRow-Mobile] Radio button for "${item.name}" -> group "${group.name}":`, {
+                        itemAssignedGroupId: item.assignedGroupId,
+                        itemAssignedGroupIdType: typeof item.assignedGroupId,
+                        groupId: group.id,
+                        groupIdType: typeof group.id,
+                        equality: item.assignedGroupId === group.id,
+                        checked: input.checked,
+                        shouldBeChecked: item.assignedGroupId === group.id
+                      });
+                    }
+                  }}
+                  onChange={() => {
+                    console.log(`📝 [PackingItemRow-Mobile] Setting item "${item.name}" to group "${group.name}" (id: ${group.id})`);
+                    
+                    // Debug persistence across reloads - universal tracking for ALL items (template + user-added)
+                    const debugInfo = {
+                      timestamp: Date.now(),
+                      itemId: item.id,
+                      itemName: item.name,
+                      previousGroupId: item.assignedGroupId,
+                      newGroupId: group.id,
+                      groupName: group.name,
+                      action: 'mobile_assignment_group'
+                    };
+                    localStorage.setItem('debug_group_assignment_' + item.id, JSON.stringify(debugInfo));
+                    
+                    onUpdate(item.id, { assignedGroupId: group.id });
+                  }}
                   className="h-5 w-5 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   style={group.color ? { accentColor: group.color } : {}}
                 />
@@ -253,7 +314,9 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
             </div>
           ) : (
             <div className="flex items-center space-x-1 flex-1 min-w-0">
-              <span className="font-medium text-gray-800">
+              <span className={`font-medium ${
+                item.isPacked ? 'line-through text-gray-500' : 'text-gray-800'
+              }`}>
                 {item.name}
               </span>
               <button onClick={() => setIsEditingName(true)} className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-1">

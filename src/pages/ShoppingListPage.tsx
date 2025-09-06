@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { toast, ToastContainer } from 'react-toastify';
@@ -18,6 +18,27 @@ const ShoppingListPage: React.FC = () => {
   const [allItems, setAllItems] = useState<ShoppingItem[]>([]);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const [groupByAssignment, setGroupByAssignment] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
+
+  // Filter items based on selected group
+  const filteredItems = useMemo(() => {
+    const itemsToFilter = allItems.filter(item => item.needsToBuy);
+    
+    if (selectedGroupId === 'all') {
+      return itemsToFilter;
+    } else if (selectedGroupId === 'shared') {
+      return itemsToFilter.filter(item => !item.assignedGroupId);
+    } else {
+      return itemsToFilter.filter(item => item.assignedGroupId === selectedGroupId);
+    }
+  }, [allItems, selectedGroupId]);
+
+  // Group options similar to PackingList
+  const groupOptions = [
+    { id: 'all', name: 'All Groups' as const },
+    { id: 'shared', name: 'Shared Items' as const },
+    ...trip.groups.map(g => ({ ...g, name: `${g.name}` }))
+  ];
 
   useEffect(() => {
     const load = async () => {
@@ -39,13 +60,18 @@ const ShoppingListPage: React.FC = () => {
     const doc = new jsPDF();
 
     doc.setFontSize(18);
-    doc.text('Shopping List', 14, 20);
+    const title = selectedGroupId === 'all' 
+      ? 'Shopping List' 
+      : selectedGroupId === 'shared'
+      ? 'Shopping List - Shared Items'
+      : `Shopping List - ${trip.groups.find(g => g.id === selectedGroupId)?.name}`;
+    
+    doc.text(title, 14, 20);
 
     doc.setFontSize(12);
     let y = 30;
-    const needToBuy = allItems.filter(i => i.needsToBuy);
 
-    needToBuy.forEach(item => {
+    filteredItems.forEach(item => {
       const line = `${item.name}${item.quantity && item.quantity > 1 ? ` ×${item.quantity}` : ''}`;
       doc.rect(14, y - 4, 6, 6); // empty checkbox
       doc.text(line, 22, y);
@@ -56,7 +82,13 @@ const ShoppingListPage: React.FC = () => {
       }
     });
 
-    doc.save('shopping-list.pdf');
+    const fileName = selectedGroupId === 'all' 
+      ? 'shopping-list.pdf'
+      : selectedGroupId === 'shared'
+      ? 'shopping-list-shared.pdf'
+      : `shopping-list-${trip.groups.find(g => g.id === selectedGroupId)?.name?.toLowerCase().replace(/\s+/g, '-')}.pdf`;
+
+    doc.save(fileName);
   };
 
   const exportGroupPDF = (group: Group) => {
@@ -132,16 +164,14 @@ const ShoppingListPage: React.FC = () => {
   const toggleBought = async (itemId: string) => {
     const updated = allItems.map(it => it.id === itemId ? { ...it, isChecked: !it.isChecked } : it);
     setAllItems(updated);
-    await hybridDataService.saveShoppingItems(tripId, updated);
-
-    // Force refresh from storage to ensure UI is in sync
-    const refreshed = await hybridDataService.getShoppingItems(tripId);
-    setAllItems(refreshed);
-
+    
     const toggled = updated.find(i => i.id === itemId);
     if (toggled?.isChecked) {
       toast.success(`Great! You bought ${toggled.name}.`, { autoClose: 2000 });
     }
+    
+    // Save to storage after showing the toast to avoid race condition
+    await hybridDataService.saveShoppingItems(tripId, updated);
   };
 
   const updateItemGroup = async (itemId: string, groupId: string | undefined) => {
@@ -150,10 +180,6 @@ const ShoppingListPage: React.FC = () => {
     );
     setAllItems(updated);
     await hybridDataService.saveShoppingItems(tripId, updated);
-
-    // Force refresh from storage to ensure UI is in sync
-    const refreshed = await hybridDataService.getShoppingItems(tripId);
-    setAllItems(refreshed);
   };
 
 
@@ -231,11 +257,43 @@ const ShoppingListPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Group Filter Buttons */}
+      {trip.groups.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Filter by Group</h3>
+            {selectedGroupId !== 'all' && (
+              <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                Viewing: {
+                  selectedGroupId === 'shared' 
+                    ? 'Shared Items Only' 
+                    : `${trip.groups.find(g => g.id === selectedGroupId)?.name}'s Items`
+                }
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {groupOptions.map(option => (
+              <button
+                key={option.id}
+                onClick={() => setSelectedGroupId(option.id)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedGroupId === option.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                {option.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       {(() => {
-        const needToBuy = allItems.filter(i => i.needsToBuy);
-        const total = needToBuy.length;
-        const bought = needToBuy.filter(i => i.isChecked).length;
+        const total = filteredItems.length;
+        const bought = filteredItems.filter(i => i.isChecked).length;
         const remaining = total - bought;
         return (
           <div className="grid grid-cols-3 md:grid-cols-3 gap-4 mb-6 max-w-md">
@@ -268,12 +326,14 @@ const ShoppingListPage: React.FC = () => {
       </div>
 
       {/* Shopping List Items */}
-      {allItems.filter(i => i.needsToBuy).length === 0 ? (
-        <div className="text-gray-500 dark:text-gray-400">No items marked as need to buy.</div>
+      {filteredItems.length === 0 ? (
+        <div className="text-gray-500 dark:text-gray-400">
+          {selectedGroupId === 'all' ? 'No items marked as need to buy.' : 'No items for this group.'}
+        </div>
       ) : (
         <div className="space-y-6 max-w-4xl">
           {(() => {
-            const itemsToBuy = allItems.filter(i => i.needsToBuy);
+            const itemsToBuy = filteredItems;
             
             // Sort items: unpurchased first, then purchased (moved to bottom)
             // Within each group, sort by category (packing items first, then ingredients)
