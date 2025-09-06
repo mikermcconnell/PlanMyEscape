@@ -191,19 +191,9 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
                   }
                 }}
                 onChange={() => {
-                  console.log(`📝 [PackingItemRow-Mobile] Setting item "${item.name}" to SHARED`);
+                  console.log(`📝 [PackingItemRow-Mobile] Setting item to SHARED`);
                   
-                  // Debug persistence across reloads - universal tracking for ALL items
-                  const debugInfo = {
-                    timestamp: Date.now(),
-                    itemId: item.id,
-                    itemName: item.name,
-                    previousGroupId: item.assignedGroupId,
-                    newGroupId: undefined,
-                    groupName: 'Shared',
-                    action: 'mobile_assignment_shared'
-                  };
-                  localStorage.setItem('debug_group_assignment_' + item.id, JSON.stringify(debugInfo));
+                  // Assign item to shared (no group)
                   
                   onUpdate(item.id, { assignedGroupId: undefined });
                 }}
@@ -233,19 +223,9 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
                     }
                   }}
                   onChange={() => {
-                    console.log(`📝 [PackingItemRow-Mobile] Setting item "${item.name}" to group "${group.name}" (id: ${group.id})`);
+                    console.log(`📝 [PackingItemRow-Mobile] Setting item to group (id: ${group.id})`);
                     
-                    // Debug persistence across reloads - universal tracking for ALL items (template + user-added)
-                    const debugInfo = {
-                      timestamp: Date.now(),
-                      itemId: item.id,
-                      itemName: item.name,
-                      previousGroupId: item.assignedGroupId,
-                      newGroupId: group.id,
-                      groupName: group.name,
-                      action: 'mobile_assignment_group'
-                    };
-                    localStorage.setItem('debug_group_assignment_' + item.id, JSON.stringify(debugInfo));
+                    // Assign item to selected group
                     
                     onUpdate(item.id, { assignedGroupId: group.id });
                   }}
@@ -358,17 +338,7 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
                     console.log(`📝 [PackingItemRow] Setting item "${item.name}" to shared (undefined)`);
                     console.trace('📍 [PackingItemRow] Shared assignment call stack');
                     
-                    // Debug persistence across reloads
-                    const debugInfo = {
-                      timestamp: Date.now(),
-                      itemId: item.id,
-                      itemName: item.name,
-                      previousGroupId: item.assignedGroupId,
-                      newGroupId: undefined,
-                      groupName: 'Shared',
-                      action: 'shared_assignment'
-                    };
-                    localStorage.setItem('debug_group_assignment_' + item.id, JSON.stringify(debugInfo));
+                    // Assign item to shared (no group)
                     
                     onUpdate(item.id, { assignedGroupId: undefined });
                   }}
@@ -384,20 +354,10 @@ export const PackingItemRow: React.FC<PackingItemRowProps> = ({
                     value={group.id}
                     checked={item.assignedGroupId === group.id}
                     onChange={() => {
-                      console.log(`📝 [PackingItemRow] Setting item "${item.name}" to group "${group.name}" (id: ${group.id}, type: ${typeof group.id})`);
+                      console.log(`📝 [PackingItemRow] Setting item to group (id: ${group.id}, type: ${typeof group.id})`);
                       console.trace('📍 [PackingItemRow] Group assignment call stack');
                       
-                      // Debug persistence across reloads
-                      const debugInfo = {
-                        timestamp: Date.now(),
-                        itemId: item.id,
-                        itemName: item.name,
-                        previousGroupId: item.assignedGroupId,
-                        newGroupId: group.id,
-                        groupName: group.name,
-                        action: 'assignment'
-                      };
-                      localStorage.setItem('debug_group_assignment_' + item.id, JSON.stringify(debugInfo));
+                      // Assign item to selected group
                       
                       onUpdate(item.id, { assignedGroupId: group.id });
                     }}

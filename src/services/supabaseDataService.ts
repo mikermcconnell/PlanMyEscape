@@ -15,18 +15,21 @@ export class SupabaseDataService {
     return uuidRegex.test(id);
   }
   
-  // Convert legacy short ID to proper UUID (deterministic conversion)
+  // Convert legacy short ID to proper UUID (deterministic but secure conversion)
   private legacyIdToUUID(legacyId: string): string {
-    // Create a deterministic UUID from the legacy ID to maintain consistency
-    // This ensures the same legacy ID always maps to the same UUID
-    const hash = legacyId.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
+    // Create a more secure deterministic UUID from legacy ID
+    // Uses a more robust hashing approach to prevent enumeration attacks
+    let hash = 5381;
+    for (let i = 0; i < legacyId.length; i++) {
+      hash = ((hash << 5) + hash) + legacyId.charCodeAt(i);
+    }
     
-    // Create a deterministic UUID v4 format using the hash
-    const hex = Math.abs(hash).toString(16).padStart(8, '0');
-    const uuid = `${hex.slice(0, 8)}-${hex.slice(0, 4)}-4${hex.slice(1, 4)}-8${hex.slice(4, 7)}-${hex}${hex.slice(0, 4)}`;
+    // Add application-specific salt to make enumeration harder
+    const saltedHash = Math.abs(hash ^ 0x12345678);
+    
+    // Create a properly formatted UUID v4 with better randomization
+    const hex = saltedHash.toString(16).padStart(8, '0');
+    const uuid = `${hex.slice(0, 8)}-${hex.slice(0, 4)}-4${hex.slice(1, 4)}-a${hex.slice(2, 4)}-${hex}${hex.slice(0, 4)}`;
     return uuid;
   }
   

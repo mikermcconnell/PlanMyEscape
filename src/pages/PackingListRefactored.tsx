@@ -122,18 +122,9 @@ const PackingListRefactored: React.FC = () => {
     
     console.log(`🆕 [PackingListRefactored] Created item:`, newItem);
     
-    // Track user-added items separately for debugging
+    // Log item creation (without storing debug data)
     if (assignedGroupId) {
-      const debugInfo = {
-        timestamp: Date.now(),
-        itemId: newItem.id,
-        itemName: newItem.name,
-        assignedGroupId: assignedGroupId,
-        action: 'user_created_with_group',
-        category: newItem.category
-      };
-      localStorage.setItem('debug_user_added_' + newItem.id, JSON.stringify(debugInfo));
-      console.log(`🆕 [PackingListRefactored] Saved debug info for user-added item: ${newItem.name}`);
+      console.log(`🆕 [PackingListRefactored] User added item with group assignment`);
     }
     
     updateItems([...items, newItem], true);
@@ -241,7 +232,7 @@ const PackingListRefactored: React.FC = () => {
     const newItems = applyTemplate(template, trip.id, trip);
     console.log(`🔄 [PackingListRefactored] Template applied, new items with group assignments: ${newItems.filter(i => i.assignedGroupId).length}`);
     
-    // ENHANCED PRESERVATION: Use both current items AND localStorage debug keys to preserve assignments
+    // PRESERVATION: Use existing items to preserve user assignments
     const preservedItems = newItems.map(newItem => {
       // Try to find existing item by name and category
       const existingItem = items.find(existing => existing.name === newItem.name && existing.category === newItem.category);
@@ -251,28 +242,8 @@ const PackingListRefactored: React.FC = () => {
         return { ...newItem, assignedGroupId: existingItem.assignedGroupId };
       }
       
-      // ENHANCED: Also check for any previous group assignments via debug keys
-      // This handles cases where items exist but lost their assignments during template operations
-      const groupAssignmentKey = 'debug_group_assignment_' + newItem.id;
-      const groupDebug = localStorage.getItem(groupAssignmentKey);
-      if (groupDebug) {
-        const debugData = JSON.parse(groupDebug);
-        if (debugData.newGroupId) {
-          console.log(`🔄 [PackingListRefactored] RESTORED group assignment from localStorage for "${newItem.name}": ${debugData.newGroupId} (assigned to ${debugData.groupName})`);
-          return { ...newItem, assignedGroupId: debugData.newGroupId };
-        }
-      }
-      
-      // Also check legacy user-added debug keys
-      const userAddedKey = 'debug_user_added_' + newItem.id;
-      const userDebug = localStorage.getItem(userAddedKey);
-      if (userDebug) {
-        const debugData = JSON.parse(userDebug);
-        if (debugData.assignedGroupId) {
-          console.log(`🔄 [PackingListRefactored] RESTORED user-added group assignment for "${newItem.name}": ${debugData.assignedGroupId}`);
-          return { ...newItem, assignedGroupId: debugData.assignedGroupId };
-        }
-      }
+      // Note: Group assignments are preserved through normal data persistence
+      // No need for additional localStorage-based restoration
       
       return newItem;
     });

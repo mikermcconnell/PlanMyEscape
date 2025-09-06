@@ -102,9 +102,9 @@ const MealPlanner = () => {
         // Debug: Check if assignedGroupId is being loaded
         savedMeals.forEach(meal => {
           if (meal.assignedGroupId) {
-            console.log(`🎯 [MealPlanner] Meal "${meal.name}" has assignedGroupId: ${meal.assignedGroupId}`);
+            console.log(`🎯 [MealPlanner] Meal has assignedGroupId: ${meal.assignedGroupId}`);
           } else {
-            console.log(`⚠️ [MealPlanner] Meal "${meal.name}" has NO assignedGroupId (will show as shared)`);
+            console.log(`⚠️ [MealPlanner] Meal has NO assignedGroupId (will show as shared)`);
           }
         });
         setMeals(savedMeals);
@@ -259,7 +259,7 @@ const MealPlanner = () => {
 
   const deleteMeal = async (mealId: string) => {
     const mealToDelete = meals.find(meal => meal.id === mealId);
-    console.log(`🗑️ [MealPlanner] Deleting meal: ${mealToDelete?.name} (ID: ${mealId})`);
+    console.log(`🗑️ [MealPlanner] Deleting meal (ID: ${mealId})`);
     console.log(`📊 [MealPlanner] Before deletion - Total meals: ${meals.length}`);
     
     const updatedMeals = meals.filter(meal => meal.id !== mealId);
@@ -308,7 +308,7 @@ const MealPlanner = () => {
       lastModifiedAt: new Date().toISOString()
     };
 
-    console.log(`🔧 [MealPlanner] Saving edited meal "${updatedMeal.name}" with assignedGroupId: ${updatedMeal.assignedGroupId || 'undefined (shared)'}`);
+    console.log(`🔧 [MealPlanner] Saving edited meal with assignedGroupId: ${updatedMeal.assignedGroupId || 'undefined (shared)'}`);
 
     const updatedMeals = meals.map(meal =>
       meal.id === editingMeal.id ? updatedMeal : meal

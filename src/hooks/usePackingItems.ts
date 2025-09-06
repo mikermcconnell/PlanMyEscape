@@ -70,38 +70,11 @@ export const usePackingItems = (tripId: string): UsePackingItemsReturn => {
         setIsLoading(true);
         const data = await hybridDataService.getPackingItems(tripId);
         
-        // Debug group assignments on initial load
+        // Log loading statistics (without exposing user data)
+        console.log(`🚀 [usePackingItems] Loaded ${data?.length || 0} items from data service`);
         const itemsWithGroups = (data || []).filter(item => item.assignedGroupId);
-        console.log(`🚀 [usePackingItems] LOADED ${data?.length || 0} items from data service`);
         if (itemsWithGroups.length > 0) {
-          console.log(`👥 [usePackingItems] ${itemsWithGroups.length} items have group assignments on LOAD:`);
-          itemsWithGroups.forEach(item => {
-            console.log(`  - "${item.name}": assignedGroupId = ${item.assignedGroupId}`);
-            
-            // Check if this matches previous assignment attempts
-            const debugKey = 'debug_group_assignment_' + item.id;
-            const savedDebug = localStorage.getItem(debugKey);
-            if (savedDebug) {
-              const debugData = JSON.parse(savedDebug);
-              console.log(`  🔍 Previous assignment attempt: ${debugData.groupName || debugData.assignedGroupId} at ${new Date(debugData.timestamp).toLocaleTimeString()}`);
-              if (debugData.newGroupId !== item.assignedGroupId) {
-                console.error(`  ❌ ASSIGNMENT LOST! Expected: ${debugData.newGroupId}, Got: ${item.assignedGroupId}`);
-              }
-            }
-            
-            // Check if this was a user-added item
-            const userAddedDebugKey = 'debug_user_added_' + item.id;
-            const userAddedDebug = localStorage.getItem(userAddedDebugKey);
-            if (userAddedDebug) {
-              const userDebugData = JSON.parse(userAddedDebug);
-              console.log(`  🆕 User-added item "${item.name}" was created with group: ${userDebugData.assignedGroupId} at ${new Date(userDebugData.timestamp).toLocaleTimeString()}`);
-              if (userDebugData.assignedGroupId !== item.assignedGroupId) {
-                console.error(`  🚨 USER-ADDED ITEM GROUP LOST! "${item.name}" was created with group ${userDebugData.assignedGroupId}, now has: ${item.assignedGroupId}`);
-              }
-            }
-          });
-        } else {
-          console.log(`⚠️ [usePackingItems] No items with group assignments found on load`);
+          console.log(`👥 [usePackingItems] ${itemsWithGroups.length} items have group assignments`);
         }
         
         setItems(data || []);
