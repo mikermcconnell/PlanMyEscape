@@ -69,16 +69,16 @@ const PackingListRefactored: React.FC = () => {
   ];
 
   useEffect(() => {
-    if (trip.tripType) {
-      console.log(`🎯 [PackingListRefactored] Template loading effect triggered for trip type: ${trip.tripType}`);
+    if (trip.tripType && loadedTemplateName === '') {
+      console.log(`🎯 [PackingListRefactored] Initial template loading for trip type: ${trip.tripType}`);
       console.log(`🎯 [PackingListRefactored] Current items count: ${items.length}, items with groups: ${items.filter(i => i.assignedGroupId).length}`);
       
       const defaultDescription = getPackingListDescription(trip.tripType);
       setLoadedTemplateName(defaultDescription);
       
-      console.log(`🎯 [PackingListRefactored] Set template name to: ${defaultDescription}`);
+      console.log(`🎯 [PackingListRefactored] Set initial template name to: ${defaultDescription}`);
     }
-  }, [trip.tripType, setLoadedTemplateName, items.length]);
+  }, [trip.tripType, setLoadedTemplateName, loadedTemplateName]);
 
   useEffect(() => {
     const allCategories = new Set(PACKING_CATEGORIES);
@@ -110,6 +110,8 @@ const PackingListRefactored: React.FC = () => {
     assignedGroupId?: string, 
     isPersonal?: boolean
   ) => {
+    console.log(`🆕 [PackingListRefactored] Creating new item "${name}" with group assignment: ${assignedGroupId}`);
+    
     const newItem = PackingListService.createNewItem(
       name, 
       category, 
@@ -117,6 +119,23 @@ const PackingListRefactored: React.FC = () => {
       assignedGroupId, 
       isPersonal
     );
+    
+    console.log(`🆕 [PackingListRefactored] Created item:`, newItem);
+    
+    // Track user-added items separately for debugging
+    if (assignedGroupId) {
+      const debugInfo = {
+        timestamp: Date.now(),
+        itemId: newItem.id,
+        itemName: newItem.name,
+        assignedGroupId: assignedGroupId,
+        action: 'user_created_with_group',
+        category: newItem.category
+      };
+      localStorage.setItem('debug_user_added_' + newItem.id, JSON.stringify(debugInfo));
+      console.log(`🆕 [PackingListRefactored] Saved debug info for user-added item: ${newItem.name}`);
+    }
+    
     updateItems([...items, newItem], true);
   }, [items, updateItems]);
 
@@ -222,13 +241,39 @@ const PackingListRefactored: React.FC = () => {
     const newItems = applyTemplate(template, trip.id, trip);
     console.log(`🔄 [PackingListRefactored] Template applied, new items with group assignments: ${newItems.filter(i => i.assignedGroupId).length}`);
     
-    // Preserve existing group assignments from current items
+    // ENHANCED PRESERVATION: Use both current items AND localStorage debug keys to preserve assignments
     const preservedItems = newItems.map(newItem => {
+      // Try to find existing item by name and category
       const existingItem = items.find(existing => existing.name === newItem.name && existing.category === newItem.category);
+      
       if (existingItem && existingItem.assignedGroupId) {
-        console.log(`🔄 [PackingListRefactored] Preserving group assignment for "${newItem.name}": ${existingItem.assignedGroupId}`);
+        console.log(`🔄 [PackingListRefactored] Preserving group assignment from existing item "${newItem.name}": ${existingItem.assignedGroupId}`);
         return { ...newItem, assignedGroupId: existingItem.assignedGroupId };
       }
+      
+      // ENHANCED: Also check for any previous group assignments via debug keys
+      // This handles cases where items exist but lost their assignments during template operations
+      const groupAssignmentKey = 'debug_group_assignment_' + newItem.id;
+      const groupDebug = localStorage.getItem(groupAssignmentKey);
+      if (groupDebug) {
+        const debugData = JSON.parse(groupDebug);
+        if (debugData.newGroupId) {
+          console.log(`🔄 [PackingListRefactored] RESTORED group assignment from localStorage for "${newItem.name}": ${debugData.newGroupId} (assigned to ${debugData.groupName})`);
+          return { ...newItem, assignedGroupId: debugData.newGroupId };
+        }
+      }
+      
+      // Also check legacy user-added debug keys
+      const userAddedKey = 'debug_user_added_' + newItem.id;
+      const userDebug = localStorage.getItem(userAddedKey);
+      if (userDebug) {
+        const debugData = JSON.parse(userDebug);
+        if (debugData.assignedGroupId) {
+          console.log(`🔄 [PackingListRefactored] RESTORED user-added group assignment for "${newItem.name}": ${debugData.assignedGroupId}`);
+          return { ...newItem, assignedGroupId: debugData.assignedGroupId };
+        }
+      }
+      
       return newItem;
     });
     

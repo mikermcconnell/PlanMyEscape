@@ -99,6 +99,14 @@ const MealPlanner = () => {
       console.log(`📊 [MealPlanner] Loaded ${savedMeals?.length || 0} meals from database`);
       if (savedMeals && savedMeals.length > 0) {
         console.log(`📝 [MealPlanner] Setting ${savedMeals.length} meals in component state:`, savedMeals.map(m => m.name));
+        // Debug: Check if assignedGroupId is being loaded
+        savedMeals.forEach(meal => {
+          if (meal.assignedGroupId) {
+            console.log(`🎯 [MealPlanner] Meal "${meal.name}" has assignedGroupId: ${meal.assignedGroupId}`);
+          } else {
+            console.log(`⚠️ [MealPlanner] Meal "${meal.name}" has NO assignedGroupId (will show as shared)`);
+          }
+        });
         setMeals(savedMeals);
       } else {
         console.log(`📝 [MealPlanner] No meals found, keeping current state (${meals.length} meals)`);
@@ -292,23 +300,34 @@ const MealPlanner = () => {
   const saveEditedMeal = async () => {
     if (!editingMeal || !customMealName.trim() || selectedIngredients.length === 0) return;
 
+    const updatedMeal = {
+      ...editingMeal,
+      name: customMealName.trim(),
+      ingredients: selectedIngredients,
+      assignedGroupId: selectedGroupId || undefined, // Ensure undefined if not selected
+      lastModifiedAt: new Date().toISOString()
+    };
+
+    console.log(`🔧 [MealPlanner] Saving edited meal "${updatedMeal.name}" with assignedGroupId: ${updatedMeal.assignedGroupId || 'undefined (shared)'}`);
+
     const updatedMeals = meals.map(meal =>
-      meal.id === editingMeal.id
-        ? {
-            ...meal,
-            name: customMealName.trim(),
-            ingredients: selectedIngredients,
-            assignedGroupId: selectedGroupId || undefined, // Ensure undefined if not selected
-            lastModifiedAt: new Date().toISOString()
-          }
-        : meal
+      meal.id === editingMeal.id ? updatedMeal : meal
     );
 
     setMeals(updatedMeals);
     try {
       // Save immediately for edit operations
       await hybridDataService.saveMeals(tripId, updatedMeals);
-      console.log('MealPlanner: Meal edited and saved immediately');
+      console.log('✅ [MealPlanner] Meal edited and saved immediately');
+      
+      // Refresh shopping list to reflect group assignment changes
+      console.log('🛒 [MealPlanner] Refreshing shopping list with updated meal group assignments...');
+      const refreshedShoppingItems = await hybridDataService.getShoppingItemsWithMeals(tripId, updatedMeals);
+      const mealRelatedItems = refreshedShoppingItems.filter(item => 
+        !item.sourceItemId && item.category === 'food'
+      );
+      setShoppingItems(mealRelatedItems);
+      console.log(`✅ [MealPlanner] Shopping list refreshed with ${mealRelatedItems.length} meal-related items`);
     } catch (error) {
       console.error('Failed to save edited meal:', error);
       setConfirmation('Failed to save meal. Please try again.');
@@ -436,6 +455,15 @@ const MealPlanner = () => {
         // Save immediately for add operations
         await hybridDataService.saveMeals(tripId, updatedMeals);
         console.log('MealPlanner: Meal added and saved immediately');
+        
+        // Refresh shopping list to include new meal ingredients with group assignment
+        console.log('🛒 [MealPlanner] Refreshing shopping list with new meal ingredients...');
+        const refreshedShoppingItems = await hybridDataService.getShoppingItemsWithMeals(tripId, updatedMeals);
+        const mealRelatedItems = refreshedShoppingItems.filter(item => 
+          !item.sourceItemId && item.category === 'food'
+        );
+        setShoppingItems(mealRelatedItems);
+        console.log(`✅ [MealPlanner] Shopping list refreshed with ${mealRelatedItems.length} meal-related items`);
       } catch (error) {
         console.error('Failed to add custom meal:', error);
         setConfirmation('Failed to add meal. Please try again.');

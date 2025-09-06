@@ -58,6 +58,41 @@ TRIGGER: "Test-Driven Development: [feature description]"
 BENEFITS: Higher quality code, better test coverage, fewer bugs, living documentation
 ```
 
+## 🎯 RECOMMENDED APPROACH (Automatic Methodology Selection)
+```
+WHEN TO USE: User says "Use the recommended approach" for any task
+TRIGGER: "Use the recommended approach: [task description]"
+BENEFITS: Optimal methodology selection, best practices applied automatically
+```
+
+### Automatic Approach Selection
+When you say "use the recommended approach", Claude will analyze your task and select:
+
+| Task Type | Selected Approach | Why |
+|-----------|------------------|-----|
+| **New features** | Test-Driven Development | Ensures quality and clear requirements |
+| **Complex refactoring** | Task Think | Requires deep analysis and planning |
+| **Bug fixes** | Test-Driven Development | Prevents regression, verifies fix |
+| **Multi-file changes** | Task Think | Needs context awareness across files |
+| **Unknown scope** | Task Router Agent | Optimal agent selection for ambiguous tasks |
+| **Performance issues** | Task Think + Performance Agent | Analysis + specialized optimization |
+| **Security concerns** | TDD + Security Specialist | Quality assurance + vulnerability prevention |
+| **UI/UX changes** | Task Think + UI Engineer | Planning + specialized frontend expertise |
+| **Data migrations** | Task Think + TDD | Careful planning + verification |
+
+### Command Pattern
+```bash
+# Let Claude choose the best approach
+"Use the recommended approach: Add user profile editing with avatar upload"
+→ Claude analyzes and selects TDD for new feature
+
+"Use the recommended approach: Refactor authentication to support OAuth"  
+→ Claude analyzes and selects Task Think for complex refactoring
+
+"Use the recommended approach: Fix shopping list not saving"
+→ Claude analyzes and selects TDD for bug fix
+```
+
 ### The Five-Phase TDD Pattern
 | Phase | Action | Tools/Agents |
 |-------|--------|--------------|

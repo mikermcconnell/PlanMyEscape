@@ -83,9 +83,20 @@ export const usePackingItems = (tripId: string): UsePackingItemsReturn => {
             const savedDebug = localStorage.getItem(debugKey);
             if (savedDebug) {
               const debugData = JSON.parse(savedDebug);
-              console.log(`  🔍 Previous assignment attempt: ${debugData.groupName} at ${new Date(debugData.timestamp).toLocaleTimeString()}`);
+              console.log(`  🔍 Previous assignment attempt: ${debugData.groupName || debugData.assignedGroupId} at ${new Date(debugData.timestamp).toLocaleTimeString()}`);
               if (debugData.newGroupId !== item.assignedGroupId) {
                 console.error(`  ❌ ASSIGNMENT LOST! Expected: ${debugData.newGroupId}, Got: ${item.assignedGroupId}`);
+              }
+            }
+            
+            // Check if this was a user-added item
+            const userAddedDebugKey = 'debug_user_added_' + item.id;
+            const userAddedDebug = localStorage.getItem(userAddedDebugKey);
+            if (userAddedDebug) {
+              const userDebugData = JSON.parse(userAddedDebug);
+              console.log(`  🆕 User-added item "${item.name}" was created with group: ${userDebugData.assignedGroupId} at ${new Date(userDebugData.timestamp).toLocaleTimeString()}`);
+              if (userDebugData.assignedGroupId !== item.assignedGroupId) {
+                console.error(`  🚨 USER-ADDED ITEM GROUP LOST! "${item.name}" was created with group ${userDebugData.assignedGroupId}, now has: ${item.assignedGroupId}`);
               }
             }
           });

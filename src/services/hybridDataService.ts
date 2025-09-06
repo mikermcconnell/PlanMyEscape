@@ -138,15 +138,72 @@ export class HybridDataService {
   async savePackingItems(tripId: string, items: PackingItem[]): Promise<void> {
     console.log(`🎒 [HybridDataService] Saving ${items.length} packing items for trip ${tripId}`);
     
-    // Debug group assignments
+    // Debug group assignments and protect user-added items
     const itemsWithGroups = items.filter(i => i.assignedGroupId);
     if (itemsWithGroups.length > 0) {
       console.log(`👥 [HybridDataService] ${itemsWithGroups.length} items have group assignments:`);
       itemsWithGroups.forEach(item => {
         console.log(`  - ${item.name}: assignedGroupId = ${item.assignedGroupId}`);
+        
+        // Check if this item has any group assignment tracking (user-added OR template items)
+        const groupAssignmentKey = 'debug_group_assignment_' + item.id;
+        const userAddedKey = 'debug_user_added_' + item.id;
+        
+        // Check universal group assignment debug key (for ALL items)
+        const groupAssignmentDebug = localStorage.getItem(groupAssignmentKey);
+        if (groupAssignmentDebug) {
+          const debugData = JSON.parse(groupAssignmentDebug);
+          console.log(`🎯 [HybridDataService] Item "${item.name}" has group assignment tracking - intended group: ${debugData.newGroupId || 'shared'}`);
+          if (debugData.newGroupId !== item.assignedGroupId) {
+            console.error(`🚨 [HybridDataService] GROUP ASSIGNMENT MISMATCH! "${item.name}" should have group ${debugData.newGroupId || 'shared'}, but has ${item.assignedGroupId || 'shared'}`);
+            // Auto-correct the assignment based on user intent
+            item.assignedGroupId = debugData.newGroupId;
+            console.log(`✅ [HybridDataService] Auto-corrected "${item.name}" group assignment to: ${debugData.newGroupId || 'shared'}`);
+          }
+        }
+        
+        // Also check legacy user-added item debug key for backward compatibility
+        const userAddedDebug = localStorage.getItem(userAddedKey);
+        if (userAddedDebug) {
+          const debugData = JSON.parse(userAddedDebug);
+          console.log(`🆕 [HybridDataService] User-added item "${item.name}" detected with intended group: ${debugData.assignedGroupId}`);
+          if (debugData.assignedGroupId !== item.assignedGroupId) {
+            console.error(`🚨 [HybridDataService] USER-ADDED ITEM GROUP MISMATCH! "${item.name}" should have group ${debugData.assignedGroupId}, but has ${item.assignedGroupId}`);
+            // Auto-correct the assignment based on user intent
+            item.assignedGroupId = debugData.assignedGroupId;
+            console.log(`✅ [HybridDataService] Auto-corrected "${item.name}" group assignment to: ${debugData.assignedGroupId}`);
+          }
+        }
       });
     } else {
       console.log(`👥 [HybridDataService] No items have group assignments`);
+      
+      // Check for ANY items that might have lost their group assignments (template + user-added)
+      items.forEach(item => {
+        // Check universal group assignment debug key first
+        const groupAssignmentKey = 'debug_group_assignment_' + item.id;
+        const groupAssignmentDebug = localStorage.getItem(groupAssignmentKey);
+        if (groupAssignmentDebug) {
+          const debugData = JSON.parse(groupAssignmentDebug);
+          if (debugData.newGroupId && !item.assignedGroupId) {
+            console.error(`🚨 [HybridDataService] ITEM LOST GROUP ASSIGNMENT! "${item.name}" should have group ${debugData.newGroupId || 'shared'}, now has: ${item.assignedGroupId || 'shared'}`);
+            // Restore the intended group assignment
+            item.assignedGroupId = debugData.newGroupId;
+            console.log(`✅ [HybridDataService] Restored "${item.name}" group assignment to: ${debugData.newGroupId}`);
+          }
+        }
+        
+        // Also check legacy user-added item debug key for backward compatibility
+        const userAddedKey = 'debug_user_added_' + item.id;
+        const userAddedDebug = localStorage.getItem(userAddedKey);
+        if (userAddedDebug) {
+          const debugData = JSON.parse(userAddedDebug);
+          console.error(`🚨 [HybridDataService] USER-ADDED ITEM LOST GROUP! "${item.name}" was created with group ${debugData.assignedGroupId}, now has: ${item.assignedGroupId || 'none'}`);
+          // Restore the intended group assignment
+          item.assignedGroupId = debugData.assignedGroupId;
+          console.log(`✅ [HybridDataService] Restored "${item.name}" group assignment to: ${debugData.assignedGroupId}`);
+        }
+      });
     }
     
     // DUPLICATE PREVENTION: Check for obvious duplicates before saving
@@ -183,6 +240,71 @@ export class HybridDataService {
           if (savedWithGroups.length !== itemsWithGroups.length) {
             console.error(`❌ [HybridDataService] GROUP ASSIGNMENT SAVE FAILURE!`);
             console.error(`❌ Expected ${itemsWithGroups.length} items with groups, got ${savedWithGroups.length}`);
+            console.error(`🚨 [HybridDataService] STARTING EMERGENCY RECOVERY...`);
+            
+            try {
+              // EMERGENCY: Find which items lost their assignments and restore them
+              const lostItems = itemsWithGroups.filter(originalItem => 
+                !savedWithGroups.find(savedItem => 
+                  savedItem.id === originalItem.id && savedItem.assignedGroupId === originalItem.assignedGroupId
+                )
+              );
+              
+              console.error(`🚨 [HybridDataService] ITEMS THAT LOST GROUPS:`, lostItems.map(item => ({
+                id: item.id,
+                name: item.name,
+                expectedGroupId: item.assignedGroupId,
+                actualGroupId: savedItems.find(s => s.id === item.id)?.assignedGroupId
+              })));
+              
+              // Also check for items that got WRONG group assignments (group swaps)
+              const itemsWithWrongGroups = savedItems.filter(savedItem => {
+                if (!savedItem.assignedGroupId) return false;
+                const originalItem = itemsWithGroups.find(orig => orig.id === savedItem.id);
+                return originalItem && originalItem.assignedGroupId && originalItem.assignedGroupId !== savedItem.assignedGroupId;
+              });
+              
+              if (itemsWithWrongGroups.length > 0) {
+                console.error(`🔄 [HybridDataService] ITEMS WITH WRONG GROUP ASSIGNMENTS:`, itemsWithWrongGroups.map(item => ({
+                  id: item.id,
+                  name: item.name,
+                  expectedGroupId: itemsWithGroups.find(orig => orig.id === item.id)?.assignedGroupId,
+                  actualGroupId: item.assignedGroupId
+                })));
+              }
+              
+              // EMERGENCY RECOVERY: Re-save with correct assignments (fix both lost AND wrong assignments)
+              const correctedItems = savedItems.map(savedItem => {
+                const originalItem = itemsWithGroups.find(orig => orig.id === savedItem.id);
+                if (originalItem) {
+                  // Case 1: Item lost its group assignment
+                  if (originalItem.assignedGroupId && !savedItem.assignedGroupId) {
+                    console.log(`🔧 [HybridDataService] RESTORE LOST: "${savedItem.name}" group assignment: ${originalItem.assignedGroupId}`);
+                    return { ...savedItem, assignedGroupId: originalItem.assignedGroupId };
+                  }
+                  // Case 2: Item got wrong group assignment
+                  if (originalItem.assignedGroupId && savedItem.assignedGroupId && originalItem.assignedGroupId !== savedItem.assignedGroupId) {
+                    console.log(`🔧 [HybridDataService] FIX WRONG: "${savedItem.name}" group assignment: ${savedItem.assignedGroupId} → ${originalItem.assignedGroupId}`);
+                    return { ...savedItem, assignedGroupId: originalItem.assignedGroupId };
+                  }
+                  // Case 3: Item shouldn't have group assignment but does
+                  if (!originalItem.assignedGroupId && savedItem.assignedGroupId) {
+                    console.log(`🔧 [HybridDataService] REMOVE WRONG: "${savedItem.name}" removing incorrect group assignment: ${savedItem.assignedGroupId}`);
+                    return { ...savedItem, assignedGroupId: undefined };
+                  }
+                }
+                return savedItem;
+              });
+              
+              // Re-save the corrected data
+              console.log(`🚑 [HybridDataService] Re-saving with corrected assignments...`);
+              await supabaseDataService.savePackingItems(tripId, correctedItems);
+              console.log(`✅ [HybridDataService] Emergency recovery completed successfully!`);
+              
+            } catch (recoveryError) {
+              console.error(`💥 [HybridDataService] Emergency recovery failed:`, recoveryError);
+            }
+            
           } else {
             console.log(`✅ [HybridDataService] Verified ${savedWithGroups.length} group assignments saved successfully`);
           }
@@ -220,19 +342,25 @@ export class HybridDataService {
         
         // Count the amount of user data each item has
         // Group assignments are CRITICAL - weight them extremely high to prevent loss
+        // Items with group assignment tracking get extra protection against being replaced
+        const itemHasGroupTracking = localStorage.getItem('debug_group_assignment_' + item.id) !== null || localStorage.getItem('debug_user_added_' + item.id) !== null;
+        const existingHasGroupTracking = localStorage.getItem('debug_group_assignment_' + existing.id) !== null || localStorage.getItem('debug_user_added_' + existing.id) !== null;
+        
         const itemDataScore = 
           (item.isOwned ? 1 : 0) + 
           (item.isPacked ? 1 : 0) + 
           (item.needsToBuy ? 1 : 0) + 
           (item.notes ? 1 : 0) + 
-          (item.assignedGroupId ? 100 : 0); // MASSIVELY weight group assignments
+          (item.assignedGroupId ? 100 : 0) + // MASSIVELY weight group assignments
+          (itemHasGroupTracking ? 50 : 0); // Extra protection for items with group assignment tracking
         
         const existingDataScore = 
           (existing.isOwned ? 1 : 0) + 
           (existing.isPacked ? 1 : 0) + 
           (existing.needsToBuy ? 1 : 0) + 
           (existing.notes ? 1 : 0) + 
-          (existing.assignedGroupId ? 100 : 0); // MASSIVELY weight group assignments
+          (existing.assignedGroupId ? 100 : 0) + // MASSIVELY weight group assignments
+          (existingHasGroupTracking ? 50 : 0); // Extra protection for items with group assignment tracking
         
         // CRITICAL: Never replace an item that has a group assignment with one that doesn't
         if (existing.assignedGroupId && !item.assignedGroupId) {

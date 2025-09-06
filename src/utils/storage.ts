@@ -133,6 +133,12 @@ export const getPackingList = async (tripId: string): Promise<PackingItem[]> => 
 };
 
 export const savePackingList = async (tripId: string, items: PackingItem[]): Promise<boolean> => {
+  console.log(`💾 [LocalStorage] SAVING to LOCAL STORAGE ONLY (not Supabase) for trip ${tripId}`);
+  const itemsWithGroups = items.filter(i => i.assignedGroupId);
+  if (itemsWithGroups.length > 0) {
+    console.log(`💾 [LocalStorage] ${itemsWithGroups.length} items have group assignments being saved to LOCAL STORAGE`);
+  }
+  
   try {
     for (const item of items) {
       const validation = validateData(PackingItemSchema, item);

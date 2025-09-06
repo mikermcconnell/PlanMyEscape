@@ -130,6 +130,8 @@ export class SupabaseDataService {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) throw new Error('Not signed in');
     
+    console.log(`📥 [SupabaseDataService] LOADING from SUPABASE DATABASE for trip ${tripId}, user ${user.id}`);
+    
     const { data, error } = await supabase
       .from('packing_items')
       .select('*')
@@ -137,6 +139,18 @@ export class SupabaseDataService {
       .eq('user_id', user.id);
     
     if (error) throw error;
+    
+    // Log items with group assignments loaded from Supabase
+    const itemsWithGroups = (data || []).filter(item => item.assigned_group_id);
+    if (itemsWithGroups.length > 0) {
+      console.log(`✅ [SupabaseDataService] LOADED ${itemsWithGroups.length} items WITH group assignments FROM SUPABASE DATABASE:`);
+      itemsWithGroups.slice(0, 3).forEach(item => {
+        console.log(`  - ${item.name}: assigned_group_id = ${item.assigned_group_id}`);
+      });
+    } else {
+      console.log(`⚠️ [SupabaseDataService] No items with group assignments found in SUPABASE DATABASE`);
+    }
+    
     return (data || []).map(item => this.mapPackingItemFromDB(item));
   }
   
@@ -163,6 +177,17 @@ export class SupabaseDataService {
     const dbItems = items.map(item => this.mapPackingItemToDB(item, tripId, user.id));
     console.log(`📝 [SupabaseDataService] Mapped ${dbItems.length} items for database:`, dbItems[0] ? dbItems[0] : 'No items');
     
+    // Log items with group assignments that will be saved to Supabase
+    const itemsWithGroups = dbItems.filter(item => item.assigned_group_id);
+    if (itemsWithGroups.length > 0) {
+      console.log(`🚀 [SupabaseDataService] Sending ${itemsWithGroups.length} items WITH group assignments to Supabase:`);
+      itemsWithGroups.slice(0, 3).forEach(item => {
+        console.log(`  - ${item.name}: assigned_group_id = ${item.assigned_group_id}`);
+      });
+    } else {
+      console.log(`🚀 [SupabaseDataService] No items have group assignments in this save`);
+    }
+    
     const { error } = await supabase
       .from('packing_items')
       .upsert(dbItems, { 
@@ -176,7 +201,7 @@ export class SupabaseDataService {
       console.error('❌ [SupabaseDataService] Attempted to save items:', dbItems);
       throw error;
     }
-    console.log('✅ [SupabaseDataService] Packing items upsert successful');
+    console.log('✅ [SupabaseDataService] Packing items upsert successful to SUPABASE DATABASE');
     
     // Remove items that are no longer in the current list
     const currentItemIds = items.map(item => item.id);
@@ -221,6 +246,11 @@ export class SupabaseDataService {
       // Create a deterministic UUID from the legacy ID to maintain consistency
       validId = this.legacyIdToUUID(item.id);
       console.log(`🔄 Converting legacy ID "${item.id}" to UUID "${validId}"`);
+    }
+    
+    // Debug group ID mapping
+    if (item.assignedGroupId) {
+      console.log(`🏷️ [SupabaseDataService] Mapping item "${item.name}" with assignedGroupId: "${item.assignedGroupId}" (length: ${item.assignedGroupId.length})`);
     }
     
     return {
