@@ -196,6 +196,16 @@ Automatically analyze tasks and assign them to the most appropriate specialized 
 - **Deliverable focus**: Each phase should produce clear, measurable outcomes
 
 ---
+ 
+ ## 🛡️ Security Protocols
+ 
+ ### **Git Push Safety**
+ **CRITICAL RULE**: Before any git push, you MUST:
+ 1.  **Scan for Secrets**: Check all files staged for commit for API keys, tokens, passwords, or PII.
+ 2.  **Verify .gitignore**: Ensure sensitive files (like `.env`, keystores) are properly ignored.
+ 3.  **Review Diff**: Manually review the `git diff` for accidental inclusions.
+ 
+ ---
 
 ## 🚀 Success Metrics
 
