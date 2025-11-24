@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle, Circle, Mountain, Waves, GamepadIcon, X } from 'lucide-react';
 import { Activity, TripType, PackingItem } from '../types';
 import { getEquipmentSuggestions, detectActivityType } from '../data/activityEquipment';
-import { getPackingList, savePackingList } from '../utils/storage';
+import { hybridDataService } from '../services/hybridDataService';
 
 interface ActivitiesPlannerProps {
   activities: Activity[];
@@ -19,6 +19,13 @@ const TIME_SLOTS = [
   { key: 'evening', label: 'Evening' },
   { key: 'night', label: 'Night' }
 ];
+const TIME_OF_DAY_LABELS: Record<string, string> = {
+  morning: 'Morning',
+  afternoon: 'Afternoon',
+  evening: 'Evening',
+  night: 'Night'
+};
+
 
 function getScheduleOptions(tripDays: number) {
   const options = [];
@@ -143,6 +150,17 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
         { name: 'High Altitude Cooking', type: 'outdoor' as const, equipment: ['Lightweight stove', 'High-altitude fuel'] },
         { name: 'Weather Observation', type: 'outdoor' as const, equipment: ['Barometer', 'Thermometer', 'Journal'] },
         { name: 'Minimal Impact Camping', type: 'outdoor' as const, equipment: ['Trowel', 'Leave No Trace principles'] }
+      ],
+      'day hike': [
+        { name: 'Hiking', type: 'outdoor' as const, equipment: ['Hiking boots', 'Day pack', 'Water bottle'] },
+        { name: 'Nature Photography', type: 'outdoor' as const, equipment: ['Camera'] },
+        { name: 'Bird Watching', type: 'outdoor' as const, equipment: ['Binoculars'] },
+        { name: 'Picnic', type: 'outdoor' as const, equipment: ['Blanket', 'Food'] }
+      ],
+      'backcountry': [
+        { name: 'Backpacking', type: 'outdoor' as const, equipment: ['Backpack', 'Tent', 'Sleeping bag'] },
+        { name: 'Camp Cooking', type: 'outdoor' as const, equipment: ['Stove', 'Fuel', 'Pot'] },
+        { name: 'Water Filtration', type: 'outdoor' as const, equipment: ['Filter', 'Tablets'] }
       ]
     };
     return baseActivities[tripType] || [];
@@ -199,17 +217,65 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
 
   const toggleCompleted = (activityId: string) => {
     const updated = activities.map(activity =>
-      activity.id === activityId 
+      activity.id === activityId
         ? { ...activity, isCompleted: !activity.isCompleted }
         : activity
     );
     onActivitiesChange(updated);
   };
 
-  const deleteActivity = (activityId: string) => {
-    onActivitiesChange(activities.filter(a => a.id !== activityId));
-  };
+  const deleteActivity = async (activityId: string) => {
+    const remainingActivities = activities.filter(a => a.id !== activityId);
+    const removedActivity = activities.find(a => a.id === activityId);
+    onActivitiesChange(remainingActivities);
 
+    try {
+      const existingPackingList = await hybridDataService.getPackingItems(tripId);
+      let hasChanges = false;
+
+      const updatedItems = existingPackingList.reduce<PackingItem[]>((acc, item) => {
+        if (!item.sourceActivityIds || !item.sourceActivityIds.includes(activityId)) {
+          acc.push(item);
+          return acc;
+        }
+
+        const remainingSources = item.sourceActivityIds.filter(id => id !== activityId);
+
+        if (remainingSources.length === 0) {
+          if (item.category === 'Activities') {
+            hasChanges = true;
+            return acc;
+          }
+
+          const noteMatch = !!(removedActivity && item.notes?.includes(`Activity: ${removedActivity.name}`));
+          if (noteMatch) {
+            hasChanges = true;
+            return acc;
+          }
+
+          acc.push({
+            ...item,
+            sourceActivityIds: undefined,
+          });
+          hasChanges = true;
+          return acc;
+        }
+
+        acc.push({
+          ...item,
+          sourceActivityIds: remainingSources,
+        });
+        hasChanges = true;
+        return acc;
+      }, []);
+
+      if (hasChanges) {
+        await hybridDataService.savePackingItems(tripId, updatedItems);
+      }
+    } catch (error) {
+      console.error('Failed to remove activity items from packing list', error);
+    }
+  };
   const suggestions = getActivitySuggestions(tripType);
   const suggestedNotAdded = suggestions.filter(
     suggestion => !activities.some(activity => activity.name === suggestion.name)
@@ -237,48 +303,133 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
 
   const confirmAddToPackingList = async () => {
     if (!modalActivity) return;
+
+    const trimmedEquipment = modalEquipment.filter(e => e.name.trim());
+    const activityId = crypto.randomUUID();
     const activity: Activity = {
       ...modalActivity,
-      id: crypto.randomUUID(),
-      equipment: modalEquipment.filter(e => e.name.trim()).map(e => e.name),
+      id: activityId,
+      equipment: trimmedEquipment.map(e => e.name.trim()),
       isCompleted: false,
       schedules: modalActivity.schedules,
     };
-    onActivitiesChange([...activities, activity]);
-    // Add packing items
-    const existingPackingList = await getPackingList(tripId);
-    // Get proper category suggestions for each equipment item
-    const suggestions = getEquipmentSuggestions(modalActivity.name);
-    const newPackingItems: PackingItem[] = modalEquipment.filter(e => e.name.trim()).map(e => {
-      // Find the matching suggestion to get the proper category
-      const suggestion = suggestions.find(s => s.name.toLowerCase() === e.name.toLowerCase());
-      return {
+
+    const scheduleNote = activity.schedules && activity.schedules.length > 0
+      ? `Scheduled: ${activity.schedules
+        .map(s => `Day ${s.day} ${TIME_OF_DAY_LABELS[s.timeOfDay] ?? s.timeOfDay}`)
+        .join(', ')}`
+      : undefined;
+
+    try {
+      const existingPackingList = await hybridDataService.getPackingItems(tripId);
+      const itemsToPersist = existingPackingList.map(item => ({ ...item }));
+      const indexByKey = new Map<string, number>();
+
+      const buildKey = (name: string, category?: string) => `${name.trim().toLowerCase()}__${(category ?? '').trim().toLowerCase()}`;
+
+      itemsToPersist.forEach((item, index) => {
+        indexByKey.set(buildKey(item.name, item.category), index);
+      });
+
+      const ensureSourceIds = (ids: string[] | undefined): string[] => {
+        const next = new Set(ids ?? []);
+        next.add(activityId);
+        return Array.from(next);
+      };
+
+      const activityItem: PackingItem = {
         id: crypto.randomUUID(),
-        name: e.name,
-        category: suggestion?.category || 'Fun and games', // Default to Fun and games if no specific category found
-        quantity: e.quantity,
-        isChecked: false,
+        name: activity.name,
+        category: 'Activities',
+        quantity: 1,
         weight: undefined,
         isOwned: false,
         needsToBuy: false,
         isPacked: false,
         required: false,
         assignedGroupId: undefined,
-        isPersonal: false
+        assignedGroupIds: [],
+        isPersonal: false,
+        notes: scheduleNote,
+        sourceActivityIds: [activityId]
       };
-    });
-    // Avoid duplicates
-    const filteredItems = newPackingItems.filter(newItem =>
-      !existingPackingList.some(existingItem =>
-        existingItem.name.toLowerCase() === newItem.name.toLowerCase()
-      )
-    );
-    if (filteredItems.length > 0) {
-      await savePackingList(tripId, [...existingPackingList, ...filteredItems]);
+
+      const activityKey = buildKey(activityItem.name, activityItem.category);
+      if (indexByKey.has(activityKey)) {
+        const existingIndex = indexByKey.get(activityKey);
+        if (existingIndex !== undefined) {
+          const existingItem = itemsToPersist[existingIndex];
+          if (existingItem) {
+            const mergedNotes = scheduleNote
+              ? Array.from(new Set([existingItem.notes, scheduleNote].filter(Boolean))).join('; ')
+              : existingItem.notes;
+            itemsToPersist[existingIndex] = {
+              ...existingItem,
+              notes: mergedNotes || undefined,
+              sourceActivityIds: ensureSourceIds(existingItem.sourceActivityIds)
+            };
+          } else {
+            itemsToPersist[existingIndex] = activityItem;
+          }
+        }
+      } else {
+        itemsToPersist.push(activityItem);
+        indexByKey.set(activityKey, itemsToPersist.length - 1);
+      }
+
+      const suggestions = getEquipmentSuggestions(modalActivity.name);
+
+      trimmedEquipment.forEach(equipment => {
+        const suggestion = suggestions.find(s => s.name.toLowerCase() === equipment.name.toLowerCase());
+        const equipmentItem: PackingItem = {
+          id: crypto.randomUUID(),
+          name: equipment.name.trim(),
+          category: suggestion?.category || 'Fun and games',
+          quantity: equipment.quantity || 1,
+          weight: undefined,
+          isOwned: false,
+          needsToBuy: false,
+          isPacked: false,
+          required: suggestion?.required ?? false,
+          assignedGroupId: undefined,
+          assignedGroupIds: [],
+          isPersonal: false,
+          notes: `Activity: ${activity.name}`,
+          sourceActivityIds: [activityId]
+        };
+
+        const key = buildKey(equipmentItem.name, equipmentItem.category);
+        if (indexByKey.has(key)) {
+          const existingIndex = indexByKey.get(key);
+          if (existingIndex !== undefined) {
+            const existingItem = itemsToPersist[existingIndex];
+            if (existingItem) {
+              itemsToPersist[existingIndex] = {
+                ...existingItem,
+                quantity: Math.max(existingItem.quantity ?? 1, equipmentItem.quantity ?? 1),
+                sourceActivityIds: ensureSourceIds(existingItem.sourceActivityIds)
+              };
+            } else {
+              itemsToPersist[existingIndex] = equipmentItem;
+            }
+          }
+        } else {
+          itemsToPersist.push(equipmentItem);
+          indexByKey.set(key, itemsToPersist.length - 1);
+        }
+      });
+
+      await hybridDataService.savePackingItems(tripId, itemsToPersist);
+
+      onActivitiesChange([...activities, activity]);
+      setShowEquipmentModal(false);
+      setConfirmation('Added to packing list!');
+      setTimeout(() => setConfirmation(null), 2000);
+    } catch (error) {
+      console.error('Failed to add activity items to packing list', error);
+      setConfirmation('Could not update packing list.');
+      setTimeout(() => setConfirmation(null), 2500);
     }
-    setShowEquipmentModal(false);
-    setConfirmation('Added to packing list!');
-    setTimeout(() => setConfirmation(null), 2000);
   };
 
   return (
@@ -296,7 +447,7 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
             Add Activity
           </button>
         </div>
-        
+
       </div>
 
       {/* Quick Suggestions */}
@@ -331,7 +482,7 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
               <input
                 type="text"
                 value={newActivity.name}
-                onChange={(e) => setNewActivity({...newActivity, name: e.target.value})}
+                onChange={(e) => setNewActivity({ ...newActivity, name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
                 placeholder="e.g., Fishing, Hiking, Board Games, Swimming"
               />
@@ -346,7 +497,7 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
               <input
                 type="text"
                 value={newActivity.equipment.join(', ')}
-                onChange={(e) => setNewActivity({...newActivity, equipment: e.target.value.split(',').map(s => s.trim())})}
+                onChange={(e) => setNewActivity({ ...newActivity, equipment: e.target.value.split(',').map(s => s.trim()) })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
                 placeholder="Any specific equipment beyond our suggestions"
               />
@@ -357,7 +508,7 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
               </label>
               <textarea
                 value={newActivity.notes}
-                onChange={(e) => setNewActivity({...newActivity, notes: e.target.value})}
+                onChange={(e) => setNewActivity({ ...newActivity, notes: e.target.value })}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
                 placeholder="Any specific notes about this activity"
@@ -380,9 +531,9 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
                           if (e.target.checked) {
                             setNewActivity({ ...newActivity, schedules: [...newActivity.schedules, schedule] });
                           } else {
-                            setNewActivity({ 
-                              ...newActivity, 
-                              schedules: newActivity.schedules.filter(s => JSON.stringify(s) !== opt.value) 
+                            setNewActivity({
+                              ...newActivity,
+                              schedules: newActivity.schedules.filter(s => JSON.stringify(s) !== opt.value)
                             });
                           }
                         }}
@@ -460,14 +611,14 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
                           if (!modalActivity) return;
                           const schedule = JSON.parse(opt.value);
                           if (e.target.checked) {
-                            setModalActivity({ 
-                              ...modalActivity, 
-                              schedules: [...(modalActivity.schedules || []), schedule] 
+                            setModalActivity({
+                              ...modalActivity,
+                              schedules: [...(modalActivity.schedules || []), schedule]
                             });
                           } else {
-                            setModalActivity({ 
-                              ...modalActivity, 
-                              schedules: (modalActivity.schedules || []).filter(s => JSON.stringify(s) !== opt.value) 
+                            setModalActivity({
+                              ...modalActivity,
+                              schedules: (modalActivity.schedules || []).filter(s => JSON.stringify(s) !== opt.value)
                             });
                           }
                         }}
@@ -506,11 +657,10 @@ const ActivitiesPlanner: React.FC<ActivitiesPlannerProps> = ({
           activities.map((activity) => (
             <div
               key={activity.id}
-              className={`border rounded-lg p-4 transition-colors ${
-                activity.isCompleted 
-                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-              }`}
+              className={`border rounded-lg p-4 transition-colors ${activity.isCompleted
+                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-3 flex-1">

@@ -1,420 +1,431 @@
-import React, { useState } from 'react';
-import { Check, Trash2, Edit3, X, ShoppingCart, CheckCircle, StickyNote } from 'lucide-react';
-import { PackingItem, Group } from '../../types';
-import { PackingListService } from '../../services/packingListService';
+import React from 'react';
+import { Check, Trash2, Edit3, X, CheckCircle, StickyNote } from 'lucide-react';
+import { PackingItem, Trip } from '../../types';
 
 interface PackingItemRowProps {
   item: PackingItem;
-  groups: Group[];
-  isCoordinated: boolean;
-  onUpdate: (itemId: string, updates: Partial<PackingItem>) => void;
-  onDelete: (itemId: string) => void;
-  onEditName: (itemId: string, newName: string) => void;
-  onEditNotes: (itemId: string, notes: string) => void;
+  trip: Trip;
+  editingItem: string | null;
+  setEditingItem: (id: string | null) => void;
+  editingNotes: string | null;
+  notesText: string;
+  setNotesText: (text: string) => void;
+  toggleOwned: (id: string) => void;
+  togglePacked: (id: string) => void;
+  updateItem: (id: string, updates: Partial<PackingItem>) => void;
+  updateItemQuantity: (id: string, quantity: number) => void;
+  deleteItem: (id: string) => void;
+  startEditingNotes: (id: string, notes?: string) => void;
+  saveNotes: (id: string) => void;
+  cancelEditingNotes: () => void;
+  toggleGroupAssignment: (id: string, groupId: string | null) => void;
 }
 
 export const PackingItemRow: React.FC<PackingItemRowProps> = ({
   item,
-  groups,
-  isCoordinated,
-  onUpdate,
-  onDelete,
-  onEditName,
-  onEditNotes
+  trip,
+  editingItem,
+  setEditingItem,
+  editingNotes,
+  notesText,
+  setNotesText,
+  toggleOwned,
+  togglePacked,
+  updateItem,
+  updateItemQuantity,
+  deleteItem,
+  startEditingNotes,
+  saveNotes,
+  cancelEditingNotes,
+  toggleGroupAssignment
 }) => {
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [isEditingNotes, setIsEditingNotes] = useState(false);
-  const [editedName, setEditedName] = useState(item.name);
-  const [editedNotes, setEditedNotes] = useState(item.notes || '');
-  const [editedQuantity, setEditedQuantity] = useState(item.quantity.toString());
-
-  const handleSaveName = () => {
-    const validation = PackingListService.validateItemName(editedName);
-    if (validation.isValid) {
-      onEditName(item.id, editedName);
-      setIsEditingName(false);
-    }
-  };
-
-  const handleSaveNotes = () => {
-    const validation = PackingListService.validateNotes(editedNotes);
-    if (validation.isValid) {
-      onEditNotes(item.id, editedNotes);
-      setIsEditingNotes(false);
-    }
-  };
-
-  const handleQuantityChange = (value: string) => {
-    const quantity = parseInt(value, 10);
-    if (!isNaN(quantity) && quantity > 0) {
-      onUpdate(item.id, { quantity });
-    }
-  };
-
-  const getGroupColor = (groupId?: string) => {
-    if (!groupId || !isCoordinated) return '';
-    const group = groups.find(g => g.id === groupId);
-    return group?.color || '#808080';
-  };
-
-  const statusClass = PackingListService.getItemStatusClass(item);
-  const groupColor = getGroupColor(item.assignedGroupId);
-
   return (
-    <div className={`p-3 sm:p-4 rounded-lg ${statusClass} transition-all`}
-         style={groupColor ? { borderLeftWidth: '4px', borderLeftColor: groupColor } : {}}>
-      
-      {/* Mobile Layout - Stacked */}
-      <div className="sm:hidden space-y-2">
-        {/* First Row - Status icons and item name */}
-        <div className="flex items-center gap-2 overflow-hidden">
-          {/* Status icons */}
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={() => onUpdate(item.id, { needsToBuy: !item.needsToBuy })}
-              className={`p-1.5 rounded transition-colors ${
-                item.needsToBuy ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400 hover:text-gray-600'
-              }`}
-              title={item.needsToBuy ? 'Need to buy' : 'Mark as need to buy'}
-            >
-              <ShoppingCart className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={() => onUpdate(item.id, { isOwned: !item.isOwned })}
-              className={`p-1.5 rounded transition-colors ${
-                item.isOwned ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:text-gray-600'
-              }`}
-              title={item.isOwned ? 'Owned' : 'Mark as owned'}
-            >
-              <Check className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={() => onUpdate(item.id, { isPacked: !item.isPacked })}
-              className={`p-1.5 rounded transition-colors ${
-                item.isPacked ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400 hover:text-gray-600'
-              }`}
-              title={item.isPacked ? 'Packed' : 'Mark as packed'}
-            >
-              <CheckCircle className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Item name */}
-          {isEditingName ? (
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-              <input
-                type="text"
-                value={editedName}
-                onChange={(e) => setEditedName(e.target.value)}
-                className="px-1.5 py-0.5 border rounded text-sm min-w-0"
-                style={{ fontSize: '0.875rem', height: '28px', maxWidth: 'calc(100% - 60px)' }}
-                autoFocus
-              />
-              <button onClick={handleSaveName} className="text-green-600 p-1 flex-shrink-0">
+    <div className="px-3 sm:px-6 py-4">
+      {/* Mobile Layout */}
+      <div className="block sm:hidden">
+        <div className="space-y-3">
+          {/* Top row: Status buttons and item name */}
+          <div className="flex items-center space-x-2">
+            {/* Status Buttons */}
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => toggleOwned(item.id)}
+                className={`p-1 rounded-full transition-colors ${item.isOwned
+                  ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400'
+                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                  }`}
+                title={item.isOwned ? "I have this item" : "Mark as 'I have it'"}
+              >
+                <CheckCircle className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => togglePacked(item.id)}
+                className={`p-1 rounded-full transition-colors ${item.isPacked
+                  ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
+                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                  }`}
+                title={item.isPacked ? "Item is packed" : "Mark as packed"}
+              >
                 <Check className="h-4 w-4" />
               </button>
-              <button onClick={() => setIsEditingName(false)} className="text-red-600 p-1 flex-shrink-0">
-                <X className="h-4 w-4" />
-              </button>
             </div>
-          ) : (
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-              <span className={`font-medium text-sm truncate ${
-                item.isPacked ? 'line-through text-gray-500' : 'text-gray-800'
-              }`}>
-                {item.name}
-              </span>
-              <button onClick={() => setIsEditingName(true)} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
-                <Edit3 className="h-3 w-3" />
-              </button>
+
+            {/* Item name and details */}
+            {editingItem === item.id ? (
+              <div className="flex items-center space-x-2 flex-1">
+                <input
+                  type="text"
+                  value={item.name}
+                  onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0 text-sm"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  value={item.quantity}
+                  onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
+                  className="w-12 px-1 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 text-sm"
+                />
+                <button
+                  onClick={() => setEditingItem(null)}
+                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => setEditingItem(item.id)}
+                className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-2 rounded flex items-center justify-center"
+              >
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className={`${item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                      } text-sm break-words`}>
+                      {item.name}
+                    </span>
+                  </div>
+                  {item.quantity > 1 && (
+                    <span className="text-xs text-gray-500 bg-transparent ml-2">×{item.quantity}</span>
+                  )}
+                  {item.weight && (
+                    <span className="text-xs text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Edit, Notes, and Delete buttons */}
+            {editingItem !== item.id && (
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={() => setEditingItem(item.id)}
+                  className="text-gray-400 hover:text-blue-600 p-1"
+                >
+                  <Edit3 className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEditingNotes(item.id, item.notes);
+                  }}
+                  className={`p-1 ${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
+                >
+                  <StickyNote className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteItem(item.id);
+                  }}
+                  className="text-gray-400 hover:text-red-600 p-1"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Notes editing section */}
+          {editingNotes === item.id && (
+            <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+              <div className="flex items-center gap-2 mb-2">
+                <StickyNote className="h-4 w-4 text-blue-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
+              </div>
+              <textarea
+                value={notesText}
+                onChange={(e) => setNotesText(e.target.value)}
+                placeholder="Add notes about this item..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
+                rows={3}
+                autoFocus
+              />
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  onClick={() => saveNotes(item.id)}
+                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={cancelEditingNotes}
+                  className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
-        </div>
 
-        {/* Second Row - Quantity and action buttons */}
+          {/* Display existing notes */}
+          {item.notes && editingNotes !== item.id && (
+            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-2">
+                <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom row: Group assignment and status badges */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              {/* Group Assignment */}
+              {trip.isCoordinated && (
+                <div className="flex items-center space-x-2 text-xs">
+                  {/* Shared checkbox */}
+                  <label className="flex items-center space-x-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={
+                        !item.assignedGroupIds ||
+                        item.assignedGroupIds.length === 0 ||
+                        (item.assignedGroupIds.length === trip.groups.length &&
+                          trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
+                      }
+                      onChange={() => toggleGroupAssignment(item.id, null)}
+                      className="rounded border-gray-300 dark:border-gray-600"
+                    />
+                    <span className="text-gray-600 dark:text-gray-400">Shared</span>
+                  </label>
+                  {/* Group checkboxes */}
+                  {trip.groups.map((group) => (
+                    <label
+                      key={group.id}
+                      className="flex items-center space-x-1 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.assignedGroupIds?.includes(group.id) || false}
+                        onChange={() => toggleGroupAssignment(item.id, group.id)}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                        style={{ accentColor: group.color }}
+                      />
+                      <span style={{ color: group.color }}>{group.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Status Badges */}
+            <div className="flex items-center space-x-1">
+              {item.isOwned && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Owned
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Layout */}
+      <div className="hidden sm:block">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-600">Qty:</label>
-            <input
-              type="number"
-              value={editedQuantity}
-              onChange={(e) => setEditedQuantity(e.target.value)}
-              onBlur={(e) => handleQuantityChange(e.target.value)}
-              className="w-14 px-2 py-1 border rounded text-center text-sm"
-              min="1"
-            />
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setIsEditingNotes(!isEditingNotes)}
-              className={`p-1.5 rounded transition-colors ${
-                item.notes ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'
-              }`}
-              title="Notes"
-            >
-              <StickyNote className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={() => onDelete(item.id)}
-              className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
-              title="Delete item"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+          <div className="flex items-center space-x-3 flex-1">
+            {/* Status Buttons */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => toggleOwned(item.id)}
+                className={`p-1 rounded-full transition-colors ${item.isOwned
+                  ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400'
+                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                  }`}
+                title={item.isOwned ? "I have this item" : "Mark as 'I have it'"}
+              >
+                <CheckCircle className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => togglePacked(item.id)}
+                className={`p-1 rounded-full transition-colors ${item.isPacked
+                  ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
+                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
+                  }`}
+                title={item.isPacked ? "Item is packed" : "Mark as packed"}
+              >
+                <Check className="h-4 w-4" />
+              </button>
+            </div>
+            {/* Item Details */}
+            {editingItem === item.id ? (
+              <div className="flex items-center space-x-2 flex-1 max-w-xl">
+                <input
+                  type="text"
+                  value={item.name}
+                  onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0"
+                  style={{ width: `${Math.max(item.name.length * 8 + 32, 120)}px` }}
+                />
+                <input
+                  type="number"
+                  min="1"
+                  value={item.quantity}
+                  onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
+                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700"
+                />
+                <button
+                  onClick={() => setEditingItem(null)}
+                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 flex-1 max-w-xl">
+                <div
+                  onClick={() => setEditingItem(item.id)}
+                  className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-1 rounded flex items-center"
+                >
+                  <span className={`${item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                    } break-words max-w-[300px]`}>
+                    {item.name}
+                  </span>
+                  {item.quantity > 1 && (
+                    <span className="text-sm text-gray-500 bg-transparent ml-2">×{item.quantity}</span>
+                  )}
+                  {item.weight && (
+                    <span className="text-sm text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
+                  )}
+                </div>
+                {/* Group Assignment */}
+                {trip.isCoordinated && (
+                  <div className="flex items-center space-x-2 text-sm ml-2">
+                    {/* Shared checkbox */}
+                    <label className="flex items-center space-x-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={
+                          !item.assignedGroupIds ||
+                          item.assignedGroupIds.length === 0 ||
+                          (item.assignedGroupIds.length === trip.groups.length &&
+                            trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
+                        }
+                        onChange={() => toggleGroupAssignment(item.id, null)}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      <span className="text-gray-600 dark:text-gray-400">Shared</span>
+                    </label>
+                    {/* Group checkboxes */}
+                    {trip.groups.map((group) => (
+                      <label
+                        key={group.id}
+                        className="flex items-center space-x-1 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.assignedGroupIds?.includes(group.id) || false}
+                          onChange={() => toggleGroupAssignment(item.id, group.id)}
+                          className="rounded border-gray-300 dark:border-gray-600"
+                          style={{ accentColor: group.color }}
+                        />
+                        <span style={{ color: group.color }}>{group.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center space-x-2 ml-4">
+                  <button
+                    onClick={() => setEditingItem(item.id)}
+                    className="text-gray-400 hover:text-blue-600"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startEditingNotes(item.id, item.notes);
+                    }}
+                    className={`${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
+                  >
+                    <StickyNote className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteItem(item.id);
+                    }}
+                    className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                {/* Status Badge */}
+                {item.isOwned && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Owned
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Third Row - Group assignment (if groups exist) */}
-        {groups && groups.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            <label className="flex items-center gap-1 text-xs cursor-pointer">
-              <input
-                type="radio"
-                name={`mobile-group-${item.id}`}
-                value="shared"
-                checked={!item.assignedGroupId}
-                ref={(input) => {
-                  // CRITICAL DEBUG: Log shared radio button state for Map item specifically
-                  if (item.name.includes('Map') && input) {
-                    console.log(`📻 [PackingItemRow-Mobile] SHARED radio button for "${item.name}":`, {
-                      itemAssignedGroupId: item.assignedGroupId,
-                      itemAssignedGroupIdType: typeof item.assignedGroupId,
-                      hasAssignedGroupId: !!item.assignedGroupId,
-                      notAssignedGroupId: !item.assignedGroupId,
-                      checked: input.checked,
-                      shouldBeChecked: !item.assignedGroupId
-                    });
-                  }
-                }}
-                onChange={() => {
-                  console.log(`📝 [PackingItemRow-Mobile] Setting item to SHARED`);
-                  
-                  // Assign item to shared (no group)
-                  
-                  onUpdate(item.id, { assignedGroupId: undefined });
-                }}
-                className="h-5 w-5 text-blue-600 focus:ring-blue-500 cursor-pointer"
-              />
-              <span>Shared</span>
-            </label>
-            {groups.map(group => (
-              <label key={`${item.id}-${group.id}`} className="flex items-center gap-1 text-xs cursor-pointer">
-                <input
-                  type="radio"
-                  name={`mobile-group-${item.id}`}
-                  value={group.id}
-                  checked={item.assignedGroupId === group.id}
-                  ref={(input) => {
-                    // CRITICAL DEBUG: Log radio button state for Map item specifically
-                    if (item.name.includes('Map') && input) {
-                      console.log(`📻 [PackingItemRow-Mobile] Radio button for "${item.name}" -> group "${group.name}":`, {
-                        itemAssignedGroupId: item.assignedGroupId,
-                        itemAssignedGroupIdType: typeof item.assignedGroupId,
-                        groupId: group.id,
-                        groupIdType: typeof group.id,
-                        equality: item.assignedGroupId === group.id,
-                        checked: input.checked,
-                        shouldBeChecked: item.assignedGroupId === group.id
-                      });
-                    }
-                  }}
-                  onChange={() => {
-                    console.log(`📝 [PackingItemRow-Mobile] Setting item to group (id: ${group.id})`);
-                    
-                    // Assign item to selected group
-                    
-                    onUpdate(item.id, { assignedGroupId: group.id });
-                  }}
-                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  style={group.color ? { accentColor: group.color } : {}}
-                />
-                <span>{group.name}</span>
-              </label>
-            ))}
+        {/* Notes editing section for desktop */}
+        {editingNotes === item.id && (
+          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-2 mb-2">
+              <StickyNote className="h-4 w-4 text-blue-500" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
+            </div>
+            <textarea
+              value={notesText}
+              onChange={(e) => setNotesText(e.target.value)}
+              placeholder="Add notes about this item..."
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
+              rows={3}
+              autoFocus
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={() => saveNotes(item.id)}
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Save
+              </button>
+              <button
+                onClick={cancelEditingNotes}
+                className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Display existing notes for desktop */}
+        {item.notes && editingNotes !== item.id && (
+          <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+            <div className="flex items-start gap-2">
+              <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
+            </div>
           </div>
         )}
       </div>
-
-      {/* Desktop Layout - Single Row */}
-      <div className="hidden sm:flex items-center justify-between gap-2">
-        <div className="flex items-center space-x-3 flex-1 min-w-0">
-          {/* Status icons */}
-          <div className="flex items-center space-x-1 flex-shrink-0">
-            <button
-              onClick={() => onUpdate(item.id, { needsToBuy: !item.needsToBuy })}
-              className={`p-1.5 rounded transition-colors ${
-                item.needsToBuy ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400 hover:text-gray-600'
-              }`}
-              title={item.needsToBuy ? 'Need to buy' : 'Mark as need to buy'}
-            >
-              <ShoppingCart className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={() => onUpdate(item.id, { isOwned: !item.isOwned })}
-              className={`p-1.5 rounded transition-colors ${
-                item.isOwned ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:text-gray-600'
-              }`}
-              title={item.isOwned ? 'Owned' : 'Mark as owned'}
-            >
-              <Check className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={() => onUpdate(item.id, { isPacked: !item.isPacked })}
-              className={`p-1.5 rounded transition-colors ${
-                item.isPacked ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400 hover:text-gray-600'
-              }`}
-              title={item.isPacked ? 'Packed' : 'Mark as packed'}
-            >
-              <CheckCircle className="h-4 w-4" />
-            </button>
-          </div>
-
-          {isEditingName ? (
-            <div className="flex items-center space-x-1 flex-1 min-w-0">
-              <input
-                type="text"
-                value={editedName}
-                onChange={(e) => setEditedName(e.target.value)}
-                className="px-1.5 py-0.5 border rounded flex-1 min-w-0 text-sm"
-                style={{ fontSize: '0.875rem', height: '28px' }}
-                autoFocus
-              />
-              <button onClick={handleSaveName} className="text-green-600 flex-shrink-0 p-1">
-                <Check className="h-4 w-4" />
-              </button>
-              <button onClick={() => setIsEditingName(false)} className="text-red-600 flex-shrink-0 p-1">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-1 flex-1 min-w-0">
-              <span className={`font-medium ${
-                item.isPacked ? 'line-through text-gray-500' : 'text-gray-800'
-              }`}>
-                {item.name}
-              </span>
-              <button onClick={() => setIsEditingName(true)} className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-1">
-                <Edit3 className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-
-          <input
-            type="number"
-            value={editedQuantity}
-            onChange={(e) => setEditedQuantity(e.target.value)}
-            onBlur={(e) => handleQuantityChange(e.target.value)}
-            className="w-16 px-2 py-1 border rounded text-center flex-shrink-0"
-            min="1"
-          />
-        </div>
-
-        <div className="flex items-center space-x-2 flex-shrink-0">
-          <button
-            onClick={() => setIsEditingNotes(!isEditingNotes)}
-            className={`p-2 rounded transition-colors ${
-              item.notes ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'
-            }`}
-            title="Notes"
-          >
-            <StickyNote className="h-4 w-4" />
-          </button>
-
-          {groups && groups.length > 0 && (
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name={`desktop-group-${item.id}`}
-                  value="shared"
-                  checked={!item.assignedGroupId}
-                  onChange={() => {
-                    console.log(`📝 [PackingItemRow] Setting item "${item.name}" to shared (undefined)`);
-                    console.trace('📍 [PackingItemRow] Shared assignment call stack');
-                    
-                    // Assign item to shared (no group)
-                    
-                    onUpdate(item.id, { assignedGroupId: undefined });
-                  }}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Shared</span>
-              </label>
-              {groups.map(group => (
-                <label key={`${item.id}-${group.id}`} className="flex items-center gap-1 text-sm cursor-pointer">
-                  <input
-                    type="radio"
-                    name={`desktop-group-${item.id}`}
-                    value={group.id}
-                    checked={item.assignedGroupId === group.id}
-                    onChange={() => {
-                      console.log(`📝 [PackingItemRow] Setting item to group (id: ${group.id}, type: ${typeof group.id})`);
-                      console.trace('📍 [PackingItemRow] Group assignment call stack');
-                      
-                      // Assign item to selected group
-                      
-                      onUpdate(item.id, { assignedGroupId: group.id });
-                    }}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    style={group.color ? { accentColor: group.color } : {}}
-                  />
-                  <span>{group.name}</span>
-                </label>
-              ))}
-            </div>
-          )}
-
-          <button
-            onClick={() => onDelete(item.id)}
-            className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
-            title="Delete item"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {isEditingNotes && (
-        <div className="mt-3 p-3 bg-gray-50 rounded-md border">
-          <textarea
-            value={editedNotes}
-            onChange={(e) => setEditedNotes(e.target.value)}
-            placeholder="Add notes about this item..."
-            className="w-full px-3 py-2 text-sm border rounded resize-none"
-            rows={3}
-            autoFocus
-          />
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={handleSaveNotes}
-              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setIsEditingNotes(false)}
-              className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {item.notes && !isEditingNotes && (
-        <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-200">
-          <div className="flex items-start gap-2">
-            <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-blue-800">{item.notes}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

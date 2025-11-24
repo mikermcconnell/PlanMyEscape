@@ -82,6 +82,7 @@ PlanMyEscape is a collaborative trip planning web app. It helps users (often gro
 - [2024-07-08] Improved group color handling: always coerce to valid `GroupColor` on load/save
 - [2024-07-08] Synced button styles for "Add Activity" and "Create New Group"
 - [2024-07-08] Added notification for "Added to shopping list!" when toggling need to buy
+- [2025-10-27] Rebuilt marketing landing page; hero collage assets live in `public/media/landing/*.webp` (trip-overview plus feature screenshots). Replace files with same names to refresh visuals and keep widths ~1200px for optimal performance.
 
 ## Open Questions / TODOs
 - Should group creation be allowed for all users or only coordinators?
@@ -97,4 +98,4 @@ PlanMyEscape is a collaborative trip planning web app. It helps users (often gro
 - Keep UI/UX consistent with Tailwind and lucide-react icons
 
 ---
-_Last updated: 2024-07-08 (AI assistant)_ 
+_Last updated: 2025-10-27 (AI assistant)_ 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Outlet, Link } from 'react-router-dom';
 import { ArrowLeft, Tent } from 'lucide-react';
 import { Trip } from '../types';
-import { getTrips } from '../utils/supabaseTrips';
+import { tripService } from '../services/tripService';
 import TripNavigation from './TripNavigation';
 
 const TripContainer: React.FC = () => {
@@ -16,11 +16,11 @@ const TripContainer: React.FC = () => {
         console.log('🔍 [TripContainer] No tripId provided');
         return;
       }
-      
+
       console.log('🔍 [TripContainer] Loading trip:', { tripId });
       setLoading(true);
       try {
-        const trips = await getTrips();
+        const trips = await tripService.getTrips();
         console.log('🔍 [TripContainer] All trips loaded:', {
           tripCount: trips.length,
           trips: trips.map(t => ({
@@ -32,7 +32,7 @@ const TripContainer: React.FC = () => {
             endDateType: typeof t.endDate
           }))
         });
-        
+
         const currentTrip = trips.find((t: Trip) => t.id === tripId);
         console.log('🔍 [TripContainer] Found trip:', {
           tripId,
@@ -47,20 +47,20 @@ const TripContainer: React.FC = () => {
             fullTrip: currentTrip
           } : null
         });
-        
+
         // Ensure isCoordinated property exists (for older trips)
         if (currentTrip && currentTrip.isCoordinated === undefined) {
           currentTrip.isCoordinated = currentTrip.groups && currentTrip.groups.length > 0;
         }
-        
+
         setTrip(currentTrip || null);
-        
+
       } catch (error) {
         console.error('🔴 [TripContainer] Failed to load trip:', error);
       }
       setLoading(false);
     };
-    
+
     loadTrip();
   }, [tripId]);
 
@@ -119,8 +119,8 @@ const TripContainer: React.FC = () => {
       </div>
 
       {/* Trip Navigation */}
-      <TripNavigation 
-        tripId={trip.id} 
+      <TripNavigation
+        tripId={trip.id}
         tripName={trip.tripName}
       />
 

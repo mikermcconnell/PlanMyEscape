@@ -168,14 +168,26 @@ export const getMeals = async (tripId: string): Promise<Meal[]> => {
 
 export const saveMeals = async (tripId: string, meals: Meal[]): Promise<boolean> => {
   try {
+    const normalizedMeals: Meal[] = [];
+
     for (const meal of meals) {
-      const validation = validateData(MealSchema, meal);
+      const mealWithDefaults: Meal = {
+        ...meal,
+        isCustom: meal.isCustom ?? false,
+        servings: meal.servings ?? 1,
+        sharedServings: meal.sharedServings ?? true
+      };
+
+      const validation = validateData(MealSchema, mealWithDefaults);
       if (!validation.success) {
         console.error('Invalid meal data:', validation.error);
         return false;
       }
+
+      normalizedMeals.push(validation.data as Meal);
     }
-    await saveMealsToDB(tripId, meals);
+
+    await saveMealsToDB(tripId, normalizedMeals);
     return true;
   } catch (error) {
     console.error('Failed to save meals:', error);

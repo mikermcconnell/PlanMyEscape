@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Tent, Package, Utensils, Users, Calendar, MapPin, Activity } from 'lucide-react';
 import { Trip, TripType } from '../types';
-import { getTrips, saveTrip } from '../utils/supabaseTrips';
+import { tripService } from '../services/tripService';
 import WeatherCard from '../components/WeatherCard';
 import ActivitiesPlanner from '../components/ActivitiesPlanner';
 
@@ -16,7 +16,7 @@ const TripDetail = () => {
 
   useEffect(() => {
     setLoading(true);
-    getTrips()
+    tripService.getTrips()
       .then(trips => {
         const currentTrip = trips.find((t: Trip) => t.id === tripId);
         if (currentTrip) {
@@ -32,7 +32,7 @@ const TripDetail = () => {
     if (!trip || !tripId) return;
     const updatedTrip = { ...trip, location: locationInput };
     setTrip(updatedTrip);
-    await saveTrip(updatedTrip);
+    await tripService.saveTrip(updatedTrip);
     setShowLocationEdit(false);
   };
 
@@ -40,7 +40,7 @@ const TripDetail = () => {
     if (!trip || !tripId) return;
     const updatedTrip = { ...trip, activities };
     setTrip(updatedTrip);
-    await saveTrip(updatedTrip);
+    await tripService.saveTrip(updatedTrip);
   };
 
   const getDaysBetweenDates = (startDate: string, endDate: string): number => {
@@ -51,7 +51,7 @@ const TripDetail = () => {
   };
 
   if (loading) return <div>Loading trip...</div>;
-  if (error) return <div style={{color:'red'}}>Error: {error}</div>;
+  if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
 
   if (!trip) {
     return (
@@ -133,7 +133,7 @@ const TripDetail = () => {
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-start">
                 <MapPin className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
                 <div className="flex-1">
@@ -178,16 +178,16 @@ const TripDetail = () => {
                 </div>
               </div>
             </div>
-            
+
             <div>
-              <WeatherCard 
+              <WeatherCard
                 startDate={trip.startDate}
                 endDate={trip.endDate}
                 location={trip.location}
               />
             </div>
           </div>
-          
+
           {trip.description && (
             <div className="mt-4">
               <label className="block text-sm font-medium mb-1">

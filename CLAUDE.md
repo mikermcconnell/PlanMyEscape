@@ -7,6 +7,7 @@ DATA SERVICE: Always use hybridDataService.ts - never direct Supabase calls
 DATA PERSISTENCE: ALL new features with user input MUST save to Supabase
 CHECKPOINT: Run `checkpoint.bat create "description"` before major changes
 COMMANDS: npm start | npm test | npm run type-check | npm run lint
+ANDROID BUILDS: ALWAYS increment versionCode in android/app/build.gradle before building AAB
 ```
 
 ## 🚀 LEVEL 2: HOW DO I...

@@ -1,12 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
-
-interface Note {
-  id: string;
-  title: string;
-  content?: string;
-  created_at: string;
-}
+import { firebaseDataService } from '../services/firebaseDataService';
+import { Note } from '../types';
+import { auth } from '../firebaseConfig';
 
 const Notes: React.FC = () => {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -16,21 +11,27 @@ const Notes: React.FC = () => {
   useEffect(() => {
     const loadNotes = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('notes')
-        .select('*');
 
-      if (error) {
-        setError(error.message);
-      } else {
-        setNotes(data as Note[]);
+      const user = auth.currentUser;
+      if (!user) {
+        setError('You need to be signed in to view notes.');
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+
+      try {
+        const data = await firebaseDataService.getNotes();
+        setNotes(data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
     loadNotes();
   }, []);
 
-  if (loading) return <p className="p-6">Loading notes…</p>;
+  if (loading) return <p className="p-6">Loading notes.</p>;
   if (error) return <p className="p-6 text-red-600">Error: {error}</p>;
 
   return (
@@ -55,4 +56,4 @@ const Notes: React.FC = () => {
   );
 };
 
-export default Notes; 
+export default Notes;

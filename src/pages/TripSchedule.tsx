@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Calendar, Clock, Activity as ActivityIcon, Utensils, Plus } from 'lucide-react';
 import { getMeals } from '../utils/storage';
-import { saveTrip } from '../utils/supabaseTrips';
+import { tripService } from '../services/tripService';
 import { Trip, Meal } from '../types';
 import ActivitiesPlanner from '../components/ActivitiesPlanner';
 import { getDaysBetweenDates, getTripDayDate } from '../utils/dateUtils';
@@ -36,7 +36,7 @@ const TripSchedule: React.FC = () => {
     const updatedTrip = { ...trip, activities };
     setTrip(updatedTrip);
     try {
-      await saveTrip(updatedTrip);
+      await tripService.saveTrip(updatedTrip);
     } catch (error) {
       console.error('Error saving trip:', error);
     }
@@ -46,7 +46,7 @@ const TripSchedule: React.FC = () => {
 
   const generateDays = () => {
     const days = getDaysBetweenDates(trip.startDate, trip.endDate);
-    
+
     return Array.from({ length: days }, (_, index) => {
       const currentDate = getTripDayDate(trip.startDate, index + 1);
       return {
@@ -91,10 +91,10 @@ const TripSchedule: React.FC = () => {
                       Day {day.dayNumber}
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {day.date.toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        month: 'long', 
-                        day: 'numeric' 
+                      {day.date.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric'
                       })}
                     </p>
                   </div>
@@ -115,7 +115,7 @@ const TripSchedule: React.FC = () => {
                 )}
               </div>
             </div>
-            
+
             {/* Desktop Layout */}
             <div className="hidden sm:flex items-center justify-between mb-6 pb-4 border-b-2 border-green-200 dark:border-green-800">
               <div className="flex items-center space-x-4">
@@ -127,15 +127,15 @@ const TripSchedule: React.FC = () => {
                     Day {day.dayNumber}
                   </h3>
                   <p className="text-base font-medium text-gray-600 dark:text-gray-300">
-                    {day.date.toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      month: 'long', 
-                      day: 'numeric' 
+                    {day.date.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric'
                     })}
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex space-x-2">
                 {day.dayNumber === 1 && (
                   <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-green-500 text-white shadow-sm">
@@ -149,7 +149,7 @@ const TripSchedule: React.FC = () => {
                 )}
               </div>
             </div>
-            
+
             {/* Quick Stats - Mobile optimized */}
             <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:space-x-6 text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-4 sm:mb-6">
               <div className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-1 p-2 sm:p-0 bg-gray-50 sm:bg-transparent dark:bg-gray-700 sm:dark:bg-transparent rounded-lg sm:rounded-none">
@@ -180,7 +180,7 @@ const TripSchedule: React.FC = () => {
               <div className="mb-4 sm:mb-6">
                 <div className="flex items-center space-x-2 mb-2 sm:mb-3">
                   <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                    <Utensils className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 dark:text-orange-400"/>
+                    <Utensils className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 dark:text-orange-400" />
                   </div>
                   <h4 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">Meals</h4>
                 </div>
@@ -372,4 +372,4 @@ const TripSchedule: React.FC = () => {
   );
 };
 
-export default TripSchedule; 
+export default TripSchedule;

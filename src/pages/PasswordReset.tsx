@@ -1,92 +1,47 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { Tent } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { auth } from '../firebaseConfig';
+import { verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
+import { Tent, Loader2 } from 'lucide-react';
 import { logSecurityEvent } from '../utils/securityLogger';
 
 export default function PasswordReset() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-  const [sessionReady, setSessionReady] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+
+  const oobCode = searchParams.get('oobCode');
 
   useEffect(() => {
-    const handlePasswordReset = async () => {
+    const verifyCode = async () => {
+      if (!oobCode) {
+        setError('Invalid password reset link. Please request a new one.');
+        setLoading(false);
+        return;
+      }
+
       try {
-        // First check if we already have a session (user might have been redirected here)
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          console.log('Password reset page: Session already exists for user:', session.user.id);
-          setSessionReady(true);
-          setLoading(false);
-          return;
-        }
-
-        // Parse URL fragments for tokens
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const searchParams = new URLSearchParams(window.location.search);
-        
-        const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
-        const type = hashParams.get('type') || searchParams.get('type');
-
-        console.log('Password reset page loaded with:', {
-          type,
-          hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken,
-          fullHash: window.location.hash,
-          search: window.location.search
-        });
-
-        if (type === 'recovery' && accessToken && refreshToken) {
-          // Set the session using the tokens
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-
-          if (sessionError) {
-            console.error('Session error:', sessionError);
-            setError('Invalid or expired reset link. Please request a new password reset.');
-            setLoading(false);
-            return;
-          }
-
-          // Clear the URL hash/search params
-          window.history.replaceState({}, document.title, window.location.pathname);
-          setSessionReady(true);
-          setLoading(false);
-
-          // Log the security event
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            await logSecurityEvent({
-              type: 'password_reset_initiated',
-              userId: user.id,
-              userAgent: navigator.userAgent
-            });
-          }
-        } else if (!session?.user) {
-          setError('Invalid reset link. Please check your email and try clicking the link again.');
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Password reset error:', err);
-        setError('An error occurred. Please try again.');
+        const email = await verifyPasswordResetCode(auth, oobCode);
+        setEmail(email);
+        setLoading(false);
+      } catch (err: any) {
+        console.error('Invalid code:', err);
+        setError('Invalid or expired password reset link. Please request a new one.');
         setLoading(false);
       }
     };
 
-    handlePasswordReset();
-  }, []);
+    verifyCode();
+  }, [oobCode]);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -97,36 +52,29 @@ export default function PasswordReset() {
       return;
     }
 
+    if (!oobCode) return;
+
     setIsUpdating(true);
     setError(null);
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (updateError) {
-        setError(updateError.message);
-        setIsUpdating(false);
-        return;
-      }
+      await confirmPasswordReset(auth, oobCode, newPassword);
 
       // Log successful password update
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await logSecurityEvent({
-          type: 'password_updated',
-          userId: user.id,
-          userAgent: navigator.userAgent
-        });
-      }
+      // Note: We might not have the user ID here if not signed in, 
+      // but we know the email from verifyPasswordResetCode
+      await logSecurityEvent({
+        type: 'password_updated',
+        details: { email },
+        userAgent: navigator.userAgent
+      });
 
-      // Success - redirect to dashboard
-      alert('Password updated successfully!');
-      navigate('/dashboard');
-    } catch (err) {
+      // Success - redirect to sign in
+      alert('Password updated successfully! Please sign in with your new password.');
+      navigate('/signin');
+    } catch (err: any) {
       console.error('Password update error:', err);
-      setError('Failed to update password. Please try again.');
+      setError(err.message);
       setIsUpdating(false);
     }
   };
@@ -136,14 +84,17 @@ export default function PasswordReset() {
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full text-center">
           <Tent className="h-8 w-8 text-green-600 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Processing Reset Link</h1>
-          <p className="text-gray-600">Please wait while we verify your password reset link...</p>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Verifying Link</h1>
+          <div className="flex justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+          </div>
+          <p className="text-gray-600 mt-2">Please wait while we verify your password reset link...</p>
         </div>
       </div>
     );
   }
 
-  if (error && !sessionReady) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
@@ -151,7 +102,7 @@ export default function PasswordReset() {
             <Tent className="h-8 w-8 text-green-600 mx-auto mb-4" />
             <h1 className="text-xl font-semibold text-gray-900 mb-2">Reset Link Error</h1>
           </div>
-          
+
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <p className="text-red-800 text-sm">{error}</p>
           </div>
@@ -162,12 +113,6 @@ export default function PasswordReset() {
               className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
             >
               Back to Sign In
-            </button>
-            <button
-              onClick={() => navigate('/')}
-              className="w-full px-4 py-3 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-            >
-              Go to Home
             </button>
           </div>
         </div>
@@ -181,14 +126,8 @@ export default function PasswordReset() {
         <div className="text-center mb-6">
           <Tent className="h-8 w-8 text-green-600 mx-auto mb-4" />
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Reset Your Password</h1>
-          <p className="text-gray-600">Enter your new password below</p>
+          <p className="text-gray-600">Enter your new password for {email}</p>
         </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-            <p className="text-red-800 text-sm">{error}</p>
-          </div>
-        )}
 
         <form onSubmit={handlePasswordUpdate} className="space-y-4">
           <div>
@@ -226,8 +165,9 @@ export default function PasswordReset() {
           <button
             type="submit"
             disabled={isUpdating || !newPassword || !confirmPassword}
-            className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
           >
+            {isUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
             {isUpdating ? 'Updating Password...' : 'Update Password'}
           </button>
         </form>

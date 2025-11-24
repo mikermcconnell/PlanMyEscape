@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { auth } from '../firebaseConfig';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { logSecurityEvent, checkRateLimit } from './errorHandler';
 import { clearCSRFToken } from './csrfProtection';
 
@@ -65,7 +66,7 @@ class SessionManager {
     });
 
     // Sign out due to inactivity
-    await supabase.auth.signOut();
+    await signOut(auth);
   }
 
   isSessionValid(): boolean {
@@ -81,12 +82,12 @@ class SessionManager {
       return null;
     }
 
-    const session = supabase.auth.getSession();
-    if (!session) return null;
+    const user = auth.currentUser;
+    if (!user) return null;
 
     return {
-      userId: '',  // Will be populated by the auth guard
-      email: '',   // Will be populated by the auth guard
+      userId: user.uid,
+      email: user.email || '',
       lastActivity: this.lastActivity,
       sessionStart: this.sessionStart
     };
@@ -148,15 +149,9 @@ export const useAuthGuard = (): void => {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        await trackAuthAttempt('SESSION_ERROR', false, { error: error.message });
-        await handleSignOut('session_error');
-        return;
-      }
+      const user = auth.currentUser;
 
-      if (!session) {
+      if (!user) {
         await handleSignOut('no_session');
         return;
       }
@@ -170,22 +165,9 @@ export const useAuthGuard = (): void => {
       // Update activity timestamp
       sessionManager.updateActivity();
 
-      // Verify session hasn't been tampered with
-      const { data: user, error: userError } = await supabase.auth.getUser();
-      if (userError || !user?.user) {
-        await trackAuthAttempt('USER_VERIFICATION_FAILED', false, { 
-          error: userError?.message 
-        });
-        await handleSignOut('user_verification_failed');
-        return;
-      }
-
-      // Check for concurrent sessions (if needed)
-      // This would require server-side implementation
-
     } catch (error) {
-      await trackAuthAttempt('AUTH_CHECK_ERROR', false, { 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      await trackAuthAttempt('AUTH_CHECK_ERROR', false, {
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       await handleSignOut('auth_check_error');
     }
@@ -197,9 +179,9 @@ export const useAuthGuard = (): void => {
 
     const initializeAuth = async () => {
       if (!isMounted) return;
-      
+
       await checkAuthStatus();
-      
+
       // Set up periodic session health check
       healthCheckInterval = setInterval(() => {
         if (isMounted) {
@@ -212,41 +194,17 @@ export const useAuthGuard = (): void => {
     initializeAuth();
 
     // Subscribe to auth state changes with enhanced security
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!isMounted) return;
 
-      switch (event) {
-        case 'SIGNED_IN':
-          if (session?.user) {
-            sessionManager.resetSession();
-            await trackAuthAttempt('SIGNED_IN', true, {
-              user_id: session.user.id,
-              provider: session.user.app_metadata?.provider
-            });
-          }
-          break;
-
-        case 'SIGNED_OUT':
-          await handleSignOut('auth_state_change');
-          break;
-
-        case 'TOKEN_REFRESHED':
-          if (session) {
-            sessionManager.updateActivity();
-            await trackAuthAttempt('TOKEN_REFRESHED', true, {
-              user_id: session.user?.id
-            });
-          }
-          break;
-
-        case 'USER_UPDATED':
-          sessionManager.updateActivity();
-          break;
-
-        default:
-          if (!session) {
-            await handleSignOut('unknown_auth_event');
-          }
+      if (user) {
+        sessionManager.resetSession();
+        await trackAuthAttempt('SIGNED_IN', true, {
+          user_id: user.uid,
+          provider: user.providerData[0]?.providerId
+        });
+      } else {
+        await handleSignOut('auth_state_change');
       }
     });
 
@@ -265,13 +223,13 @@ export const useAuthGuard = (): void => {
     // Cleanup function
     return () => {
       isMounted = false;
-      
+
       if (healthCheckInterval) {
         clearInterval(healthCheckInterval);
       }
-      
-      listener.subscription.unsubscribe();
-      
+
+      unsubscribe();
+
       activityEvents.forEach(event => {
         document.removeEventListener(event, handleActivity);
       });
@@ -282,4 +240,4 @@ export const useAuthGuard = (): void => {
 // Export additional security utilities
 export const getCurrentSessionInfo = () => sessionManager.getSessionInfo();
 export const updateSessionActivity = () => sessionManager.updateActivity();
-export const isSessionHealthy = () => sessionManager.isSessionValid(); 
+export const isSessionHealthy = () => sessionManager.isSessionValid();

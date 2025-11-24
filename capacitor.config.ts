@@ -7,21 +7,20 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https'
   },
-  plugins: {
-    SplashScreen: {
-      launchShowDuration: 2000,
-      backgroundColor: '#10B981',
-      showSpinner: false
-    },
-    StatusBar: {
-      style: 'dark'
-    }
+  SplashScreen: {
+    launchShowDuration: 2000,
+    backgroundColor: '#10B981',
+    showSpinner: false,
+    androidScaleType: 'CENTER_CROP',
+    splashFullScreen: true,
+    launchAutoHide: true,
   },
+  StatusBar: {
+    style: 'dark',
+    overlaysWebView: false,
+  }
   ios: {
     contentInset: 'always'
-  },
-  android: {
-    allowMixedContent: true
   }
 };
 

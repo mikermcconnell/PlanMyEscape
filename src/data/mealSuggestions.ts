@@ -28,5 +28,10 @@ export const mealSuggestions: MealSuggestions = {
     breakfast: ["Full English", "Pancakes", "French Toast"],
     lunch: ["BBQ", "Salads", "Grilled Sandwiches"],
     dinner: ["Grilled Meats", "Pasta", "Fresh Fish", "Stir Fry"]
+  },
+  'day hike': {
+    breakfast: ["Energy Bar", "Fruit"],
+    lunch: ["Sandwich", "Trail Mix"],
+    dinner: ["Restaurant", "Home Cooked"]
   }
 }; 

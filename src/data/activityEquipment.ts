@@ -1,42 +1,18 @@
-// Activity to Equipment Mapping for Smart Packing Suggestions
-export interface PackingSuggestion {
-  name: string;
-  category: string;
-  required: boolean;
-  quantity?: number;
-}
+import { PackingSuggestion } from '../types';
 
-// Utility function to separate items with 'and' in their names
-export const separateAndItems = (items: PackingSuggestion[]): PackingSuggestion[] => {
-  const separatedItems: PackingSuggestion[] = [];
-  
-  items.forEach(item => {
-    if (item.name.toLowerCase().includes(' and ')) {
-      // Split the item name by 'and' and create separate items
-      const parts = item.name.split(/\s+and\s+/i);
-      parts.forEach(part => {
-        const trimmedPart = part.trim();
-        if (trimmedPart) {
-          separatedItems.push({
-            ...item,
-            name: trimmedPart,
-            quantity: 1 // Reset quantity to 1 for each separated item
-          });
-        }
-      });
-    } else {
-      // Keep the item as is
-      separatedItems.push(item);
+// Helper function to separate items with 'and' in their names
+export const separateAndItems = (suggestions: PackingSuggestion[]): PackingSuggestion[] => {
+  return suggestions.flatMap(item => {
+    if (item.name.includes(' and ')) {
+      const parts = item.name.split(' and ');
+      return parts.map(part => ({ ...item, name: part.trim() }));
     }
+    return item;
   });
-  
-  return separatedItems;
 };
 
 export const activityEquipmentMap: Record<string, PackingSuggestion[]> = {
-  // Water Activities
   'fishing': [
-    { name: 'Fishing Rod', category: 'Other', required: false },
     { name: 'Tackle Box', category: 'Other', required: false },
     { name: 'Bait', category: 'Other', required: false },
     { name: 'Fishing License', category: 'Personal', required: false },
@@ -68,7 +44,7 @@ export const activityEquipmentMap: Record<string, PackingSuggestion[]> = {
     { name: 'Portage Yoke', category: 'Other', required: false },
     { name: 'Map', category: 'Other', required: false }
   ],
-  
+
   // Hiking Activities
   'hiking': [
     { name: 'Hiking Boots', category: 'Clothing', required: false },
@@ -162,9 +138,9 @@ export const activityEquipmentMap: Record<string, PackingSuggestion[]> = {
 // Function to get equipment suggestions based on activity name
 export const getEquipmentSuggestions = (activityName: string): PackingSuggestion[] => {
   const normalizedName = activityName.toLowerCase();
-  
+
   let suggestions: PackingSuggestion[] = [];
-  
+
   // Direct match
   if (activityEquipmentMap[normalizedName]) {
     suggestions = activityEquipmentMap[normalizedName] ?? [];
@@ -177,7 +153,7 @@ export const getEquipmentSuggestions = (activityName: string): PackingSuggestion
       }
     }
   }
-  
+
   // If no suggestions found, use default
   if (suggestions.length === 0) {
     suggestions = [
@@ -186,7 +162,7 @@ export const getEquipmentSuggestions = (activityName: string): PackingSuggestion
       { name: 'First Aid Kit', category: 'Personal', required: false }
     ];
   }
-  
+
   // Automatically separate items with 'and' in their names
   return separateAndItems(suggestions);
 };
@@ -194,26 +170,26 @@ export const getEquipmentSuggestions = (activityName: string): PackingSuggestion
 // Function to detect activity type based on name
 export const detectActivityType = (activityName: string): 'outdoor' | 'indoor' | 'water' | 'entertainment' => {
   const normalizedName = activityName.toLowerCase();
-  
+
   // Water activities
-  if (normalizedName.includes('swim') || normalizedName.includes('fish') || 
-      normalizedName.includes('kayak') || normalizedName.includes('canoe') ||
-      normalizedName.includes('boat') || normalizedName.includes('water')) {
+  if (normalizedName.includes('swim') || normalizedName.includes('fish') ||
+    normalizedName.includes('kayak') || normalizedName.includes('canoe') ||
+    normalizedName.includes('boat') || normalizedName.includes('water')) {
     return 'water';
   }
-  
+
   // Indoor activities  
   if (normalizedName.includes('game') || normalizedName.includes('card') ||
-      normalizedName.includes('movie') || normalizedName.includes('read')) {
+    normalizedName.includes('movie') || normalizedName.includes('read')) {
     return 'indoor';
   }
-  
+
   // Entertainment activities
   if (normalizedName.includes('music') || normalizedName.includes('dance') ||
-      normalizedName.includes('party') || normalizedName.includes('trivia')) {
+    normalizedName.includes('party') || normalizedName.includes('trivia')) {
     return 'entertainment';
   }
-  
+
   // Default to outdoor
   return 'outdoor';
-}; 
+};

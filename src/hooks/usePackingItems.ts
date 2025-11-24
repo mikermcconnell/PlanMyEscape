@@ -37,7 +37,7 @@ export const usePackingItems = (tripId: string): UsePackingItemsReturn => {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       }
-      
+
       saveTimeoutRef.current = setTimeout(async () => {
         try {
           await hybridDataService.savePackingItems(tripId, items);
@@ -65,28 +65,22 @@ export const usePackingItems = (tripId: string): UsePackingItemsReturn => {
   );
 
   useEffect(() => {
-    const loadItems = async () => {
-      try {
-        setIsLoading(true);
-        const data = await hybridDataService.getPackingItems(tripId);
-        
-        // Log loading statistics (without exposing user data)
-        console.log(`🚀 [usePackingItems] Loaded ${data?.length || 0} items from data service`);
-        const itemsWithGroups = (data || []).filter(item => item.assignedGroupId);
-        if (itemsWithGroups.length > 0) {
-          console.log(`👥 [usePackingItems] ${itemsWithGroups.length} items have group assignments`);
-        }
-        
-        setItems(data || []);
-      } catch (error) {
-        console.error('Error loading packing items:', error);
-        setError('Failed to load packing items');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setIsLoading(true);
 
-    loadItems();
+    console.log(`🎧 [usePackingItems] Subscribing to packing items for trip ${tripId}`);
+    const unsubscribe = hybridDataService.subscribeToPackingItems(tripId, (items) => {
+      const itemsWithGroups = (items || []).filter(item => item.assignedGroupId);
+      if (itemsWithGroups.length > 0) {
+        console.log(`👥 [usePackingItems] ${itemsWithGroups.length} items have group assignments`);
+      }
+
+      setItems(items || []);
+      setIsLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [tripId]);
 
   useEffect(() => {
@@ -101,7 +95,7 @@ export const usePackingItems = (tripId: string): UsePackingItemsReturn => {
   useEffect(() => {
     const currentItems = items;
     const currentTripId = tripId;
-    
+
     return () => {
       if (currentItems.length > 0) {
         hybridDataService.savePackingItems(currentTripId, currentItems).catch(error => {

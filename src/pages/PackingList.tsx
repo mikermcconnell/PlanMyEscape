@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Check, Plus, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, StickyNote, Activity, Save, Download, Upload } from 'lucide-react';
-import { PackingItem, Trip, TripType, PackingTemplate } from '../types';
+import { Check, Trash2, Edit3, X, Package, Utensils, Users, Shield, Sun, Home, ShoppingCart, CheckCircle, RotateCcw, StickyNote, Activity, Save, Download, Upload, Plus } from 'lucide-react';
+import { PackingItem, Trip, TripType, PackingTemplate, PackingSuggestion } from '../types';
 import { hybridDataService } from '../services/hybridDataService';
 import { getPackingListDescription, getPackingTemplate } from '../data/packingTemplates';
-import { separateAndItems, PackingSuggestion } from '../data/activityEquipment';
+import { separateAndItems } from '../data/activityEquipment';
 import ShoppingList from '../components/ShoppingList';
 import SEOHead from '../components/SEOHead';
 import { createPackingTemplate, loadPackingTemplate, filterCompatibleTemplates, getPackingTemplateSummary } from '../utils/templateHelpers';
+import { PackingCategoryGroup } from '../components/packing/PackingCategoryGroup';
+import { PackedCategoryGroup } from '../components/packing/PackedCategoryGroup';
+import { AddItemModal } from '../components/packing/AddItemModal';
 
 interface TripContextType {
   trip: Trip;
@@ -19,7 +22,27 @@ interface TripContextType {
 // ----------------------------------
 // Packing categories never change, so defining them at module level keeps
 // the array identity stable across renders and eliminates 'missing dependency' warnings.
-export const PACKING_CATEGORIES = ['Shelter', 'Kitchen', 'Clothing', 'Personal', 'Tools', 'Sleep', 'Comfort', 'Pack', 'Safety', 'Transportation', 'Fun and games', 'Other'] as const;
+export const PACKING_CATEGORIES = [
+  'Shelter',
+  'Kitchen',
+  'Food & Water',
+  'Clothing',
+  'Personal',
+  'Sleep',
+  'Comfort',
+  'Pack',
+  'Safety',
+  'Transportation',
+  'Navigation',
+  'Tools & Repair',
+  'Fire & Light',
+  'Entertainment',
+  'Activities',
+  'Other',
+  // Legacy categories kept for backward compatibility
+  'Tools',
+  'Fun and games'
+] as const;
 
 
 const PackingList = () => {
@@ -33,12 +56,12 @@ const PackingList = () => {
   const groupOptions = [{ id: 'all', name: 'All' as const }, ...trip.groups];
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
   const categories = PACKING_CATEGORIES;
-  const [addItemModal, setAddItemModal] = useState<{ 
-    show: boolean; 
-    category: string; 
-    name: string; 
-    quantity: number; 
-    assignedGroupId?: string; 
+  const [addItemModal, setAddItemModal] = useState<{
+    show: boolean;
+    category: string;
+    name: string;
+    quantity: number;
+    assignedGroupId?: string;
     isPersonal: boolean;
   }>({ show: false, category: '', name: '', quantity: 1, isPersonal: false });
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -82,20 +105,20 @@ const PackingList = () => {
   // Input validation and sanitization helper
   const validateAndSanitizeInput = (input: string, fieldName: string, maxLength: number = 100): string | null => {
     const trimmed = input.trim();
-    
+
     if (!trimmed) {
       return `${fieldName} cannot be empty`;
     }
-    
+
     if (trimmed.length > maxLength) {
       return `${fieldName} is too long (max ${maxLength} characters)`;
     }
-    
+
     // Basic XSS prevention: remove script tags and suspicious patterns
     if (trimmed.match(/<script.*?>.*?<\/script>/gi) || trimmed.match(/javascript:/gi) || trimmed.match(/on\w+=/gi)) {
       return `${fieldName} contains invalid characters`;
     }
-    
+
     return null; // No errors
   };
 
@@ -147,7 +170,7 @@ const PackingList = () => {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       }
-      
+
       saveTimeoutRef.current = setTimeout(async () => {
         try {
           await hybridDataService.savePackingItems(tripId, items);
@@ -191,7 +214,7 @@ const PackingList = () => {
   useEffect(() => {
     const currentItems = items;
     const currentTripId = tripId;
-    
+
     return () => {
       if (currentItems.length > 0) {
         hybridDataService.savePackingItems(currentTripId, currentItems).catch(error => {
@@ -206,52 +229,52 @@ const PackingList = () => {
     selectedGroupId === 'all'
       ? items
       : items.filter((i: PackingItem) => {
-          // Check both old single assignment and new multiple assignments
-          if (i.assignedGroupId === selectedGroupId) return true;
-          if (i.assignedGroupIds?.includes(selectedGroupId)) return true;
-          // Show shared items (items assigned to all groups) for any specific group view
-          if (i.assignedGroupIds && i.assignedGroupIds.length === trip.groups.length && 
-              trip.groups.every(g => i.assignedGroupIds?.includes(g.id))) return true;
-          return false;
-        }),
+        // Check both old single assignment and new multiple assignments
+        if (i.assignedGroupId === selectedGroupId) return true;
+        if (i.assignedGroupIds?.includes(selectedGroupId)) return true;
+        // Show shared items (items assigned to all groups) for any specific group view
+        if (i.assignedGroupIds && i.assignedGroupIds.length === trip.groups.length &&
+          trip.groups.every(g => i.assignedGroupIds?.includes(g.id))) return true;
+        return false;
+      }),
     [items, selectedGroupId, trip.groups]);
 
   // Separate items by packed status first, then by personal/group
   const unpackedItems = useMemo(() => displayedItems.filter((item: PackingItem) => !item.isPacked), [displayedItems]);
   const packedItems = useMemo(() => displayedItems.filter((item: PackingItem) => item.isPacked), [displayedItems]);
-  
+
   const unpackedPersonalItems = useMemo(() => unpackedItems.filter((item: PackingItem) => item.isPersonal), [unpackedItems]);
   const unpackedGroupItems = useMemo(() => unpackedItems.filter((item: PackingItem) => !item.isPersonal), [unpackedItems]);
   const packedPersonalItems = useMemo(() => packedItems.filter((item: PackingItem) => item.isPersonal), [packedItems]);
   const packedGroupItems = useMemo(() => packedItems.filter((item: PackingItem) => !item.isPersonal), [packedItems]);
-  
+
   const groupedUnpackedPersonalItems = useMemo(() =>
     categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
       acc[category] = unpackedPersonalItems.filter((item: PackingItem) => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
-  , [unpackedPersonalItems, categories]);
-  
+    , [unpackedPersonalItems, categories]);
+
   const groupedUnpackedGroupItems = useMemo(() =>
     categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
       acc[category] = unpackedGroupItems.filter((item: PackingItem) => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
-  , [unpackedGroupItems, categories]);
+    , [unpackedGroupItems, categories]);
 
   const groupedPackedPersonalItems = useMemo(() =>
     categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
       acc[category] = packedPersonalItems.filter((item: PackingItem) => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
-  , [packedPersonalItems, categories]);
-  
+    , [packedPersonalItems, categories]);
+
   const groupedPackedGroupItems = useMemo(() =>
     categories.reduce((acc: Record<string, PackingItem[]>, category: string) => {
       acc[category] = packedGroupItems.filter((item: PackingItem) => item.category === category);
       return acc;
     }, {} as Record<string, PackingItem[]>)
-  , [packedGroupItems, categories]);
+    , [packedGroupItems, categories]);
 
   const totalItems = displayedItems.length;
   const ownedItems = displayedItems.filter((item: PackingItem) => item.isOwned).length;
@@ -263,9 +286,11 @@ const PackingList = () => {
       case 'canoe camping':
         return 'Canoe Camping';
       case 'hike camping':
-        return 'Hike Camping';
+        return 'Backcountry Camping';
       case 'cottage':
         return 'Cottage';
+      case 'day hike':
+        return 'Day Hike';
       default:
         return 'Trip';
     }
@@ -289,7 +314,7 @@ const PackingList = () => {
       if (item.id === itemId) {
         const currentGroups = item.assignedGroupIds || [];
         let newGroups: string[];
-        
+
         if (groupId === null) {
           // Toggle "Shared" - if checked, assign to ALL groups; if unchecked, clear all
           const allGroupIds = trip.groups.map(g => g.id);
@@ -303,7 +328,7 @@ const PackingList = () => {
             newGroups = [...currentGroups, groupId];
           }
         }
-        
+
         return {
           ...item,
           assignedGroupIds: newGroups,
@@ -316,10 +341,10 @@ const PackingList = () => {
   };
 
   const openAddItemModal = (category: string, assignedGroupId?: string, isPersonal: boolean = false) => {
-    setAddItemModal({ 
-      show: true, 
-      category: category, 
-      name: '', 
+    setAddItemModal({
+      show: true,
+      category: category,
+      name: '',
       quantity: 1,
       assignedGroupId: assignedGroupId,
       isPersonal: isPersonal
@@ -346,10 +371,10 @@ const PackingList = () => {
       }
 
       setHasUserInteracted(true); // Mark that user has interacted
-      
+
       // Sanitize the input
       const sanitizedName = sanitizeInput(addItemModal.name);
-      
+
       // Create a suggestion object to use the separateAndItems function
       const suggestions = separateAndItems([{
         name: sanitizedName,
@@ -357,7 +382,7 @@ const PackingList = () => {
         required: false,
         quantity: addItemModal.quantity
       }]);
-      
+
       // Create packing items from the separated suggestions
       const newItems: PackingItem[] = suggestions.map((suggestion: PackingSuggestion) => ({
         id: crypto.randomUUID(),
@@ -373,14 +398,14 @@ const PackingList = () => {
         assignedGroupIds: addItemModal.assignedGroupId ? [addItemModal.assignedGroupId] : [],
         isPersonal: addItemModal.isPersonal
       }));
-      
+
       // Add to the current items list
       const updatedItems = [...items, ...newItems];
       updateItems(updatedItems);
-      
+
       // Reset the form
       closeAddItemModal();
-      
+
     } catch (error) {
       logError('Failed to add item:', error);
       setUpdateError(getErrorMessage(error, 'add item'));
@@ -404,16 +429,16 @@ const PackingList = () => {
       const totalCampers = trip.groups.reduce((sum, group) => sum + group.size, 0);
       const tripDays = Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 60 * 60 * 24));
       const templateItems = getPackingTemplate(trip.tripType, totalCampers, tripDays);
-      
+
       // Preserve user status changes when resetting to template
       const existingItemsMap: { [key: string]: PackingItem } = {};
       items.forEach(item => {
         existingItemsMap[item.name.toLowerCase()] = item;
       });
-      
+
       const mergedItems = templateItems.map(templateItem => {
         const existingItem = existingItemsMap[templateItem.name.toLowerCase()];
-        
+
         if (existingItem) {
           // Preserve user status changes but update template properties
           return {
@@ -426,15 +451,15 @@ const PackingList = () => {
             assignedGroupIds: existingItem.assignedGroupIds // Preserve multiple group assignments
           };
         }
-        
+
         return templateItem; // New template item
       });
-      
+
       // Save the merged items and set them through updateItems for consistency
       updateItems(mergedItems);
       setCurrentTemplateName(`Default ${renderTripTypeText(trip.tripType)} List`);
       setLoadedTemplateName(''); // Clear loaded template name when resetting to default
-      
+
       setConfirmation('Template updated while preserving your status changes!');
       setTimeout(() => setConfirmation(null), 3000);
     } catch (error) {
@@ -453,7 +478,7 @@ const PackingList = () => {
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   // Track if template is currently being created to prevent race conditions
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
-  
+
   // Reset state when trip changes
   useEffect(() => {
     setHasLoaded(false);
@@ -469,25 +494,25 @@ const PackingList = () => {
         log(`⏭️ Skipping load: tripId=${tripId}, hasLoaded=${hasLoaded}, isCreatingTemplate=${isCreatingTemplate}`);
         return; // Prevent reload if already loaded or template creation in progress
       }
-      
+
       log('📥 Loading packing list for trip:', tripId);
-      
+
       try {
         const savedItems = await hybridDataService.getPackingItems(tripId);
         log(`📦 Found ${savedItems.length} existing packing items`);
-        
+
         // CRITICAL: Only create template if NO items exist AND no template creation is in progress
         if (savedItems.length === 0 && trip && !hasUserInteracted && !isCreatingTemplate) {
           log('🔨 No packing items found, creating template...');
           setIsCreatingTemplate(true); // Prevent concurrent template creation
-          
+
           try {
             const totalCampers = trip.groups.reduce((sum, group) => sum + group.size, 0);
             const tripDays = Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 60 * 60 * 24));
             const templateItems = getPackingTemplate(trip.tripType, totalCampers, tripDays);
-            
+
             log(`🎯 Creating ${templateItems.length} template items for ${trip.tripType} trip`);
-            
+
             // Set items directly and save them
             setItems(templateItems);
             await hybridDataService.savePackingItems(tripId, templateItems);
@@ -510,7 +535,7 @@ const PackingList = () => {
         } else {
           log('⏭️ Skipping template creation - conditions not met');
         }
-        
+
         setHasLoaded(true); // Mark as loaded
       } catch (error) {
         logError('❌ Failed to load packing list:', error);
@@ -518,13 +543,13 @@ const PackingList = () => {
         setIsCreatingTemplate(false);
       }
     };
-    
+
     loadPackingList();
   }, [tripId, hasLoaded, isCreatingTemplate]); // Limited dependencies to prevent excessive re-runs
 
   const toggleOwned = async (itemId: string) => {
     const originalItems = [...items]; // Backup for error recovery
-    
+
     try {
       setHasUserInteracted(true); // Mark that user has interacted
       const item = items.find(item => item.id === itemId);
@@ -534,9 +559,9 @@ const PackingList = () => {
       }
 
       const newIsOwned = !item.isOwned;
-      
+
       log(`🎯 Toggling owned status for ${item.name}: ${item.isOwned} → ${newIsOwned}`);
-      
+
       // Optimistically update UI first
       const updatedItems = items.map(itemToUpdate => {
         if (itemToUpdate.id === itemId) {
@@ -547,10 +572,10 @@ const PackingList = () => {
         }
         return itemToUpdate;
       });
-      
+
       // Optimistically update local state
       setItems(updatedItems);
-      
+
       // If marking as owned, remove from shopping list
       if (newIsOwned) {
         try {
@@ -568,12 +593,12 @@ const PackingList = () => {
           // Don't fail the main operation for shopping list errors
         }
       }
-      
+
       // Save the main item changes
       log(`💾 Saving owned status change immediately...`);
       await hybridDataService.savePackingItems(tripId, updatedItems);
       log(`✅ Owned status saved successfully for ${item.name}`);
-      
+
     } catch (error) {
       logError(`❌ Failed to save owned status for item:`, error);
       setUpdateError(getErrorMessage(error, 'update item status'));
@@ -585,7 +610,7 @@ const PackingList = () => {
 
   const togglePacked = async (itemId: string) => {
     const originalItems = [...items]; // Backup for error recovery
-    
+
     try {
       setHasUserInteracted(true); // Mark that user has interacted
       const item = items.find(item => item.id === itemId);
@@ -593,10 +618,10 @@ const PackingList = () => {
         setUpdateError('Item not found. Please refresh the page.');
         return;
       }
-      
+
       const newIsPacked = !item.isPacked;
       log(`🎯 Toggling packed status for ${item.name}: ${item.isPacked} → ${newIsPacked}`);
-      
+
       // Optimistically update UI first
       const updatedItems = items.map(item => {
         if (item.id === itemId) {
@@ -607,15 +632,15 @@ const PackingList = () => {
         }
         return item;
       });
-      
+
       // Optimistically update local state
       setItems(updatedItems);
-      
+
       // Save changes
       log(`💾 Saving packed status change immediately...`);
       await hybridDataService.savePackingItems(tripId, updatedItems);
       log(`✅ Packed status saved successfully for ${item.name}`);
-      
+
     } catch (error) {
       logError(`❌ Failed to save packed status for item:`, error);
       setUpdateError(getErrorMessage(error, 'update item status'));
@@ -666,7 +691,7 @@ const PackingList = () => {
         return item;
       });
       updateItems(updatedItems);
-      
+
     } catch (error) {
       logError('Failed to update item:', error);
       setUpdateError(getErrorMessage(error, 'update item'));
@@ -703,14 +728,14 @@ const PackingList = () => {
       isPacked: false,
       assignedGroupId: undefined
     }));
-    
+
     updateItems(clearedItems);
-    
+
     // Also clear shopping items that were added from this packing list
     const shoppingItems = await hybridDataService.getShoppingItems(tripId);
     const filteredShoppingItems = shoppingItems.filter(item => !item.sourceItemId);
     await hybridDataService.saveShoppingItems(tripId, filteredShoppingItems);
-    
+
     setShowClearConfirmation(false);
   };
 
@@ -769,18 +794,24 @@ const PackingList = () => {
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'Activity Items':
+      case 'Activities':
         return <Activity className="h-5 w-5 mr-2" />;
+      case 'Entertainment':
       case 'Fun and games':
         return <Activity className="h-5 w-5 mr-2" />;
       case 'Shelter':
         return <Home className="h-5 w-5 mr-2" />;
       case 'Kitchen':
+      case 'Food & Water':
         return <Utensils className="h-5 w-5 mr-2" />;
       case 'Clothing':
         return <Users className="h-5 w-5 mr-2" />;
       case 'Personal':
         return <Shield className="h-5 w-5 mr-2" />;
       case 'Tools':
+      case 'Tools & Repair':
+      case 'Fire & Light':
+      case 'Navigation':
         return <Package className="h-5 w-5 mr-2" />;
       case 'Sleep':
         return <Sun className="h-5 w-5 mr-2" />;
@@ -788,8 +819,10 @@ const PackingList = () => {
         return <Home className="h-5 w-5 mr-2" />;
       case 'Pack':
         return <Package className="h-5 w-5 mr-2" />;
-      case 'Food':
-        return <Utensils className="h-5 w-5 mr-2" />;
+      case 'Safety':
+        return <Shield className="h-5 w-5 mr-2" />;
+      case 'Transportation':
+        return <Package className="h-5 w-5 mr-2" />;
       default:
         return <Package className="h-5 w-5 mr-2" />;
     }
@@ -797,7 +830,7 @@ const PackingList = () => {
 
   return (
     <div className="mx-auto w-full md:max-w-5xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow p-4 sm:p-8">
-      <SEOHead 
+      <SEOHead
         title={`Packing List - ${trip.tripName} | PlanMyEscape`}
         description={`Organize and track your packing list for ${trip.tripName}. Never forget essential camping gear with our smart packing checklist.`}
         keywords="camping packing list, outdoor gear checklist, trip packing, camping essentials"
@@ -930,7 +963,7 @@ const PackingList = () => {
             <div className="text-sm text-gray-500">Have It</div>
           </div>
         </div>
-        
+
         {/* Legend */}
         <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
           <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Status Icons</h3>
@@ -966,12 +999,12 @@ const PackingList = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 This will reset all status icons (owned, needs to buy, packed) back to their default state while keeping all items. Items marked as "need to buy" will also be removed from the shopping list.
               </p>
-              
+
               <div className="flex space-x-2 pt-4">
                 <button
                   onClick={clearUserInput}
@@ -992,67 +1025,16 @@ const PackingList = () => {
       )}
 
       {/* Add Item Modal */}
-      {addItemModal.show && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Add Item to {addItemModal.category}
-              </h3>
-              <button
-                onClick={closeAddItemModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Item Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Item name"
-                  value={addItemModal.name}
-                  onChange={(e) => updateAddFormField('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Quantity
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={addItemModal.quantity}
-                  onChange={(e) => updateAddFormField('quantity', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
-                />
-              </div>
-              
-              <div className="flex space-x-2 pt-4">
-                <button
-                  onClick={addItemFromModal}
-                  disabled={!addItemModal.name.trim()}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                >
-                  Add Item
-                </button>
-                <button
-                  onClick={closeAddItemModal}
-                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddItemModal
+        isOpen={addItemModal.show}
+        onClose={closeAddItemModal}
+        category={addItemModal.category}
+        name={addItemModal.name}
+        quantity={addItemModal.quantity}
+        onNameChange={(value) => updateAddFormField('name', value)}
+        onQuantityChange={(value) => updateAddFormField('quantity', value)}
+        onAdd={addItemFromModal}
+      />
 
       {/* Packing List */}
       <div className="space-y-8">
@@ -1069,424 +1051,32 @@ const PackingList = () => {
               </p>
             </div>
             {categories.map(category => {
+              if (category === 'Activities') return null;
               const categoryItems: PackingItem[] = groupedUnpackedPersonalItems[category] ?? [];
-              if (categoryItems.length === 0) return null;
 
               return (
-                <div key={`personal-${category}`} className="bg-white dark:bg-gray-800 shadow rounded-lg pt-8">
-                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
-                    <div className="flex items-center justify-between">
-                      <h3 className={`text-xl font-black flex items-center ${category === 'Kitchen' ? 'text-blue-600' : 'text-gray-800'} dark:text-white`}>
-                        {getCategoryIcon(category)}
-                        <span className="ml-2">{category}</span>
-                      </h3>
-                      <button
-                        onClick={() => openAddItemModal(category, selectedGroupId !== 'all' ? selectedGroupId : undefined, true)}
-                        className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Item
-                      </button>
-                    </div>
-                  </div>
-                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {categoryItems.map((item: PackingItem) => (
-                      <div key={item.id} className="px-3 sm:px-6 py-4">
-                        {/* Mobile Layout */}
-                        <div className="block sm:hidden">
-                          <div className="space-y-3">
-                            {/* Top row: Status buttons and item name */}
-                            <div className="flex items-center space-x-2">
-                              {/* Status Buttons */}
-                              <div className="flex items-center space-x-1">
-                                <button
-                                  onClick={() => toggleOwned(item.id)}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    item.isOwned 
-                                      ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
-                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                  }`}
-                                  title={item.isOwned ? "I have this item" : "Mark as 'I have it'"}
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => togglePacked(item.id)}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    item.isPacked 
-                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
-                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                  }`}
-                                  title={item.isPacked ? "Item is packed" : "Mark as packed"}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </button>
-                              </div>
-                              
-                              {/* Item name and details */}
-                              {editingItem === item.id ? (
-                                <div className="flex items-center space-x-2 flex-1">
-                                  <input
-                                    type="text"
-                                    value={item.name}
-                                    onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                    className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0 text-sm"
-                                  />
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
-                                    className="w-12 px-1 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 text-sm"
-                                  />
-                                  <button
-                                    onClick={() => setEditingItem(null)}
-                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div 
-                                  onClick={() => setEditingItem(item.id)}
-                                  className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-2 rounded flex items-center justify-center"
-                                >
-                                  <div className="text-center">
-                                    <div className="flex items-center justify-center gap-2">
-                                      <span className={`${
-                                        item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                      } text-sm break-words`}>
-                                        {item.name}
-                                      </span>
-                                    </div>
-                                    {item.quantity > 1 && (
-                                      <span className="text-xs text-gray-500 bg-transparent ml-2">×{item.quantity}</span>
-                                    )}
-                                    {item.weight && (
-                                      <span className="text-xs text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Edit, Notes, and Delete buttons */}
-                              {editingItem !== item.id && (
-                                <div className="flex items-center space-x-1">
-                                  <button
-                                    onClick={() => setEditingItem(item.id)}
-                                    className="text-gray-400 hover:text-blue-600 p-1"
-                                  >
-                                    <Edit3 className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      startEditingNotes(item.id, item.notes);
-                                    }}
-                                    className={`p-1 ${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
-                                  >
-                                    <StickyNote className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteItem(item.id);
-                                    }}
-                                    className="text-gray-400 hover:text-red-600 p-1"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Notes editing section */}
-                            {editingNotes === item.id && (
-                              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <StickyNote className="h-4 w-4 text-blue-500" />
-                                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
-                                </div>
-                                <textarea
-                                  value={notesText}
-                                  onChange={(e) => setNotesText(e.target.value)}
-                                  placeholder="Add notes about this item..."
-                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
-                                  rows={3}
-                                  autoFocus
-                                />
-                                <div className="flex items-center gap-2 mt-2">
-                                  <button
-                                    onClick={() => saveNotes(item.id)}
-                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    onClick={cancelEditingNotes}
-                                    className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Display existing notes */}
-                            {item.notes && editingNotes !== item.id && (
-                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
-                                <div className="flex items-start gap-2">
-                                  <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                                  <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Bottom row: Group assignment and status badges */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                {/* Group Assignment */}
-                                {trip.isCoordinated && (
-                                  <div className="flex items-center space-x-2 text-xs">
-                                    {/* Shared checkbox */}
-                                    <label className="flex items-center space-x-1 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={
-                                          !item.assignedGroupIds || 
-                                          item.assignedGroupIds.length === 0 || 
-                                          (item.assignedGroupIds.length === trip.groups.length && 
-                                           trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
-                                        }
-                                        onChange={() => toggleGroupAssignment(item.id, null)}
-                                        className="rounded border-gray-300 dark:border-gray-600"
-                                      />
-                                      <span className="text-gray-600 dark:text-gray-400">Shared</span>
-                                    </label>
-                                    {/* Group checkboxes */}
-                                    {trip.groups.map((group) => (
-                                      <label 
-                                        key={group.id} 
-                                        className="flex items-center space-x-1 cursor-pointer"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={item.assignedGroupIds?.includes(group.id) || false}
-                                          onChange={() => toggleGroupAssignment(item.id, group.id)}
-                                          className="rounded border-gray-300 dark:border-gray-600"
-                                          style={{ accentColor: group.color }}
-                                        />
-                                        <span style={{ color: group.color }}>{group.name}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {/* Status Badges */}
-                              <div className="flex items-center space-x-1">
-                                {item.isOwned && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Owned
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Desktop Layout */}
-                        <div className="hidden sm:block">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3 flex-1">
-                              {/* Status Buttons */}
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => toggleOwned(item.id)}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    item.isOwned 
-                                      ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
-                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                  }`}
-                                  title={item.isOwned ? "I have this item" : "Mark as 'I have it'"}
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => togglePacked(item.id)}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    item.isPacked 
-                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
-                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                  }`}
-                                  title={item.isPacked ? "Item is packed" : "Mark as packed"}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </button>
-                              </div>
-                              {/* Item Details */}
-                              {editingItem === item.id ? (
-                                <div className="flex items-center space-x-2 flex-1 max-w-xl">
-                                  <input
-                                    type="text"
-                                    value={item.name}
-                                    onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                    className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0"
-                                    style={{ width: `${Math.max(item.name.length * 8 + 32, 120)}px` }}
-                                  />
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
-                                    className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700"
-                                  />
-                                  <button
-                                    onClick={() => setEditingItem(null)}
-                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center space-x-2 flex-1 max-w-xl">
-                                  <div 
-                                    onClick={() => setEditingItem(item.id)}
-                                    className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-1 rounded flex items-center"
-                                  >
-                                    <span className={`${
-                                      item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                    } break-words max-w-[300px]`}>
-                                      {item.name}
-                                    </span>
-                                    {item.quantity > 1 && (
-                                      <span className="text-sm text-gray-500 bg-transparent ml-2">×{item.quantity}</span>
-                                    )}
-                                    {item.weight && (
-                                      <span className="text-sm text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
-                                    )}
-                                  </div>
-                                  {/* Group Assignment */}
-                                  {trip.isCoordinated && (
-                                    <div className="flex items-center space-x-2 text-sm ml-2">
-                                      {/* Shared checkbox */}
-                                      <label className="flex items-center space-x-1 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={
-                                            !item.assignedGroupIds || 
-                                            item.assignedGroupIds.length === 0 || 
-                                            (item.assignedGroupIds.length === trip.groups.length && 
-                                             trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
-                                          }
-                                          onChange={() => toggleGroupAssignment(item.id, null)}
-                                          className="rounded border-gray-300 dark:border-gray-600"
-                                        />
-                                        <span className="text-gray-600 dark:text-gray-400">Shared</span>
-                                      </label>
-                                      {/* Group checkboxes */}
-                                      {trip.groups.map((group) => (
-                                        <label 
-                                          key={group.id} 
-                                          className="flex items-center space-x-1 cursor-pointer"
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={item.assignedGroupIds?.includes(group.id) || false}
-                                            onChange={() => toggleGroupAssignment(item.id, group.id)}
-                                            className="rounded border-gray-300 dark:border-gray-600"
-                                            style={{ accentColor: group.color }}
-                                          />
-                                          <span style={{ color: group.color }}>{group.name}</span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  )}
-                                  <div className="flex items-center space-x-2 ml-4">
-                                    <button
-                                      onClick={() => setEditingItem(item.id)}
-                                      className="text-gray-400 hover:text-blue-600"
-                                    >
-                                      <Edit3 className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        startEditingNotes(item.id, item.notes);
-                                      }}
-                                      className={`${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
-                                    >
-                                      <StickyNote className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        deleteItem(item.id);
-                                      }}
-                                      className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                  {/* Status Badge */}
-                                  {item.isOwned && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                      <CheckCircle className="h-3 w-3 mr-1" />
-                                      Owned
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Notes editing section for desktop */}
-                          {editingNotes === item.id && (
-                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
-                              <div className="flex items-center gap-2 mb-2">
-                                <StickyNote className="h-4 w-4 text-blue-500" />
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
-                              </div>
-                              <textarea
-                                value={notesText}
-                                onChange={(e) => setNotesText(e.target.value)}
-                                placeholder="Add notes about this item..."
-                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
-                                rows={3}
-                                autoFocus
-                              />
-                              <div className="flex items-center gap-2 mt-2">
-                                <button
-                                  onClick={() => saveNotes(item.id)}
-                                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={cancelEditingNotes}
-                                  className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Display existing notes for desktop */}
-                          {item.notes && editingNotes !== item.id && (
-                            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
-                              <div className="flex items-start gap-2">
-                                <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                                <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <PackingCategoryGroup
+                  key={`personal-${category}`}
+                  category={category}
+                  items={categoryItems}
+                  icon={getCategoryIcon(category)}
+                  onAddItem={() => openAddItemModal(category, selectedGroupId !== 'all' ? selectedGroupId : undefined, true)}
+                  trip={trip}
+                  editingItem={editingItem}
+                  setEditingItem={setEditingItem}
+                  editingNotes={editingNotes}
+                  notesText={notesText}
+                  setNotesText={setNotesText}
+                  toggleOwned={toggleOwned}
+                  togglePacked={togglePacked}
+                  updateItem={updateItem}
+                  updateItemQuantity={updateItemQuantity}
+                  deleteItem={deleteItem}
+                  startEditingNotes={startEditingNotes}
+                  saveNotes={saveNotes}
+                  cancelEditingNotes={cancelEditingNotes}
+                  toggleGroupAssignment={toggleGroupAssignment}
+                />
               );
             })}
           </div>
@@ -1506,423 +1096,30 @@ const PackingList = () => {
             </div>
             {categories.map(category => {
               const categoryItems: PackingItem[] = groupedUnpackedGroupItems[category] ?? [];
-              if (categoryItems.length === 0) return null;
 
               return (
-                <div key={`group-${category}`} className="bg-white dark:bg-gray-800 shadow rounded-lg">
-                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xl font-black text-gray-800 dark:text-white flex items-center">
-                        {getCategoryIcon(category)}
-                        <span className="ml-2">{category}</span>
-                      </h3>
-                      <button
-                        onClick={() => openAddItemModal(category, selectedGroupId !== 'all' ? selectedGroupId : undefined, false)}
-                        className="inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Item
-                      </button>
-                    </div>
-                  </div>
-                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {categoryItems.map((item: PackingItem) => (
-                      <div key={item.id} className="px-3 sm:px-6 py-4">
-                        {/* Mobile Layout */}
-                        <div className="block sm:hidden">
-                          <div className="space-y-3">
-                            {/* Top row: Status buttons and item name */}
-                            <div className="flex items-center space-x-2">
-                              {/* Status Buttons */}
-                              <div className="flex items-center space-x-1">
-                                <button
-                                  onClick={() => toggleOwned(item.id)}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    item.isOwned 
-                                      ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
-                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                  }`}
-                                  title={item.isOwned ? "I have this item" : "Mark as 'I have it'"}
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => togglePacked(item.id)}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    item.isPacked 
-                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
-                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                  }`}
-                                  title={item.isPacked ? "Item is packed" : "Mark as packed"}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </button>
-                              </div>
-                              
-                              {/* Item name and details */}
-                              {editingItem === item.id ? (
-                                <div className="flex items-center space-x-2 flex-1">
-                                  <input
-                                    type="text"
-                                    value={item.name}
-                                    onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                    className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0 text-sm"
-                                  />
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
-                                    className="w-12 px-1 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 text-sm"
-                                  />
-                                  <button
-                                    onClick={() => setEditingItem(null)}
-                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div 
-                                  onClick={() => setEditingItem(item.id)}
-                                  className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-2 rounded flex items-center justify-center"
-                                >
-                                  <div className="text-center">
-                                    <div className="flex items-center justify-center gap-2">
-                                      <span className={`${
-                                        item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                      } text-sm break-words`}>
-                                        {item.name}
-                                      </span>
-                                    </div>
-                                    {item.quantity > 1 && (
-                                      <span className="text-xs text-gray-500 bg-transparent ml-2">×{item.quantity}</span>
-                                    )}
-                                    {item.weight && (
-                                      <span className="text-xs text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Edit, Notes, and Delete buttons */}
-                              {editingItem !== item.id && (
-                                <div className="flex items-center space-x-1">
-                                  <button
-                                    onClick={() => setEditingItem(item.id)}
-                                    className="text-gray-400 hover:text-blue-600 p-1"
-                                  >
-                                    <Edit3 className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      startEditingNotes(item.id, item.notes);
-                                    }}
-                                    className={`p-1 ${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
-                                  >
-                                    <StickyNote className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteItem(item.id);
-                                    }}
-                                    className="text-gray-400 hover:text-red-600 p-1"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Notes editing section */}
-                            {editingNotes === item.id && (
-                              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <StickyNote className="h-4 w-4 text-blue-500" />
-                                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
-                                </div>
-                                <textarea
-                                  value={notesText}
-                                  onChange={(e) => setNotesText(e.target.value)}
-                                  placeholder="Add notes about this item..."
-                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
-                                  rows={3}
-                                  autoFocus
-                                />
-                                <div className="flex items-center gap-2 mt-2">
-                                  <button
-                                    onClick={() => saveNotes(item.id)}
-                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    onClick={cancelEditingNotes}
-                                    className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Display existing notes */}
-                            {item.notes && editingNotes !== item.id && (
-                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
-                                <div className="flex items-start gap-2">
-                                  <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                                  <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Bottom row: Group assignment and status badges */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                {/* Group Assignment */}
-                                {trip.isCoordinated && (
-                                  <div className="flex items-center space-x-2 text-xs">
-                                    {/* Shared checkbox */}
-                                    <label className="flex items-center space-x-1 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={
-                                          !item.assignedGroupIds || 
-                                          item.assignedGroupIds.length === 0 || 
-                                          (item.assignedGroupIds.length === trip.groups.length && 
-                                           trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
-                                        }
-                                        onChange={() => toggleGroupAssignment(item.id, null)}
-                                        className="rounded border-gray-300 dark:border-gray-600"
-                                      />
-                                      <span className="text-gray-600 dark:text-gray-400">Shared</span>
-                                    </label>
-                                    {/* Group checkboxes */}
-                                    {trip.groups.map((group) => (
-                                      <label 
-                                        key={group.id} 
-                                        className="flex items-center space-x-1 cursor-pointer"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={item.assignedGroupIds?.includes(group.id) || false}
-                                          onChange={() => toggleGroupAssignment(item.id, group.id)}
-                                          className="rounded border-gray-300 dark:border-gray-600"
-                                          style={{ accentColor: group.color }}
-                                        />
-                                        <span style={{ color: group.color }}>{group.name}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {/* Status Badges */}
-                              <div className="flex items-center space-x-1">
-                                {item.isOwned && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Owned
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Desktop Layout */}
-                        <div className="hidden sm:block">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3 flex-1">
-                              {/* Status Buttons */}
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => toggleOwned(item.id)}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    item.isOwned 
-                                      ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
-                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                  }`}
-                                  title={item.isOwned ? "I have this item" : "Mark as 'I have it'"}
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => togglePacked(item.id)}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    item.isPacked 
-                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
-                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600'
-                                  }`}
-                                  title={item.isPacked ? "Item is packed" : "Mark as packed"}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </button>
-                              </div>
-                              {/* Item Details */}
-                              {editingItem === item.id ? (
-                                <div className="flex items-center space-x-2 flex-1 max-w-xl">
-                                  <input
-                                    type="text"
-                                    value={item.name}
-                                    onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                    className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700 flex-1 min-w-0"
-                                    style={{ width: `${Math.max(item.name.length * 8 + 32, 120)}px` }}
-                                  />
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
-                                    className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 rounded dark:bg-gray-700"
-                                  />
-                                  <button
-                                    onClick={() => setEditingItem(null)}
-                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center space-x-2 flex-1 max-w-xl">
-                                  <div 
-                                    onClick={() => setEditingItem(item.id)}
-                                    className="flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-1 rounded flex items-center"
-                                  >
-                                    <span className={`${
-                                      item.isPacked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                                    } break-words max-w-[300px]`}>
-                                      {item.name}
-                                    </span>
-                                    {item.quantity > 1 && (
-                                      <span className="text-sm text-gray-500 bg-transparent ml-2">×{item.quantity}</span>
-                                    )}
-                                    {item.weight && (
-                                      <span className="text-sm text-gray-500 ml-2">({Math.round(item.weight / 1000 * 10) / 10}kg)</span>
-                                    )}
-                                  </div>
-                                  {/* Group Assignment */}
-                                  {trip.isCoordinated && (
-                                    <div className="flex items-center space-x-2 text-sm ml-2">
-                                      {/* Shared checkbox */}
-                                      <label className="flex items-center space-x-1 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={
-                                            !item.assignedGroupIds || 
-                                            item.assignedGroupIds.length === 0 || 
-                                            (item.assignedGroupIds.length === trip.groups.length && 
-                                             trip.groups.every(g => item.assignedGroupIds?.includes(g.id)))
-                                          }
-                                          onChange={() => toggleGroupAssignment(item.id, null)}
-                                          className="rounded border-gray-300 dark:border-gray-600"
-                                        />
-                                        <span className="text-gray-600 dark:text-gray-400">Shared</span>
-                                      </label>
-                                      {/* Group checkboxes */}
-                                      {trip.groups.map((group) => (
-                                        <label 
-                                          key={group.id} 
-                                          className="flex items-center space-x-1 cursor-pointer"
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={item.assignedGroupIds?.includes(group.id) || false}
-                                            onChange={() => toggleGroupAssignment(item.id, group.id)}
-                                            className="rounded border-gray-300 dark:border-gray-600"
-                                            style={{ accentColor: group.color }}
-                                          />
-                                          <span style={{ color: group.color }}>{group.name}</span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  )}
-                                  <div className="flex items-center space-x-2 ml-4">
-                                    <button
-                                      onClick={() => setEditingItem(item.id)}
-                                      className="text-gray-400 hover:text-blue-600"
-                                    >
-                                      <Edit3 className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        startEditingNotes(item.id, item.notes);
-                                      }}
-                                      className={`${item.notes ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-600'}`}
-                                    >
-                                      <StickyNote className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        deleteItem(item.id);
-                                      }}
-                                      className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                  {/* Status Badge */}
-                                  {item.isOwned && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                      <CheckCircle className="h-3 w-3 mr-1" />
-                                      Owned
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Notes editing section for desktop */}
-                          {editingNotes === item.id && (
-                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
-                              <div className="flex items-center gap-2 mb-2">
-                                <StickyNote className="h-4 w-4 text-blue-500" />
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Notes</span>
-                              </div>
-                              <textarea
-                                value={notesText}
-                                onChange={(e) => setNotesText(e.target.value)}
-                                placeholder="Add notes about this item..."
-                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none dark:bg-gray-800 dark:text-white"
-                                rows={3}
-                                autoFocus
-                              />
-                              <div className="flex items-center gap-2 mt-2">
-                                <button
-                                  onClick={() => saveNotes(item.id)}
-                                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={cancelEditingNotes}
-                                  className="px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Display existing notes for desktop */}
-                          {item.notes && editingNotes !== item.id && (
-                            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
-                              <div className="flex items-start gap-2">
-                                <StickyNote className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                                <span className="text-sm text-blue-800 dark:text-blue-200">{item.notes}</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <PackingCategoryGroup
+                  key={`group-${category}`}
+                  category={category}
+                  items={categoryItems}
+                  icon={getCategoryIcon(category)}
+                  onAddItem={() => openAddItemModal(category, selectedGroupId !== 'all' ? selectedGroupId : undefined, false)}
+                  trip={trip}
+                  editingItem={editingItem}
+                  setEditingItem={setEditingItem}
+                  editingNotes={editingNotes}
+                  notesText={notesText}
+                  setNotesText={setNotesText}
+                  toggleOwned={toggleOwned}
+                  togglePacked={togglePacked}
+                  updateItem={updateItem}
+                  updateItemQuantity={updateItemQuantity}
+                  deleteItem={deleteItem}
+                  startEditingNotes={startEditingNotes}
+                  saveNotes={saveNotes}
+                  cancelEditingNotes={cancelEditingNotes}
+                  toggleGroupAssignment={toggleGroupAssignment}
+                />
               );
             })}
           </div>
@@ -1949,44 +1146,17 @@ const PackingList = () => {
                   Personal Items
                 </h3>
                 {categories.map(category => {
+                  if (category === 'Activities') return null;
                   const categoryItems: PackingItem[] = groupedPackedPersonalItems[category] ?? [];
-                  if (categoryItems.length === 0) return null;
 
                   return (
-                    <div key={`packed-personal-${category}`} className="bg-gray-50 dark:bg-gray-700 shadow rounded-lg">
-                      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-600">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-lg font-black text-gray-700 dark:text-gray-200 flex items-center">
-                            {getCategoryIcon(category)}
-                            <span className="ml-2">{category}</span>
-                          </h4>
-                        </div>
-                      </div>
-                      <div className="divide-y divide-gray-200 dark:divide-gray-600">
-                        {categoryItems.map((item: PackingItem) => (
-                          <div key={item.id} className="px-3 sm:px-6 py-3 opacity-75">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <Check className="h-4 w-4 text-green-600" />
-                                <span className="text-gray-600 dark:text-gray-400 line-through">
-                                  {item.name}
-                                </span>
-                                {item.quantity > 1 && (
-                                  <span className="text-xs text-gray-500 bg-transparent">×{item.quantity}</span>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => togglePacked(item.id)}
-                                className="text-gray-400 hover:text-blue-600 p-1"
-                                title="Unpack this item"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <PackedCategoryGroup
+                      key={`packed-personal-${category}`}
+                      category={category}
+                      items={categoryItems}
+                      icon={getCategoryIcon(category)}
+                      togglePacked={togglePacked}
+                    />
                   );
                 })}
               </div>
@@ -2001,43 +1171,15 @@ const PackingList = () => {
                 </h3>
                 {categories.map(category => {
                   const categoryItems: PackingItem[] = groupedPackedGroupItems[category] ?? [];
-                  if (categoryItems.length === 0) return null;
 
                   return (
-                    <div key={`packed-group-${category}`} className="bg-gray-50 dark:bg-gray-700 shadow rounded-lg">
-                      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-600">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-lg font-black text-gray-700 dark:text-gray-200 flex items-center">
-                            {getCategoryIcon(category)}
-                            <span className="ml-2">{category}</span>
-                          </h4>
-                        </div>
-                      </div>
-                      <div className="divide-y divide-gray-200 dark:divide-gray-600">
-                        {categoryItems.map((item: PackingItem) => (
-                          <div key={item.id} className="px-3 sm:px-6 py-3 opacity-75">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <Check className="h-4 w-4 text-green-600" />
-                                <span className="text-gray-600 dark:text-gray-400 line-through">
-                                  {item.name}
-                                </span>
-                                {item.quantity > 1 && (
-                                  <span className="text-xs text-gray-500 bg-transparent">×{item.quantity}</span>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => togglePacked(item.id)}
-                                className="text-gray-400 hover:text-blue-600 p-1"
-                                title="Unpack this item"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <PackedCategoryGroup
+                      key={`packed-group-${category}`}
+                      category={category}
+                      items={categoryItems}
+                      icon={getCategoryIcon(category)}
+                      togglePacked={togglePacked}
+                    />
                   );
                 })}
               </div>
@@ -2048,10 +1190,10 @@ const PackingList = () => {
 
       {/* Shopping List Modal */}
       {showShoppingList && tripId && (
-        <ShoppingList 
+        <ShoppingList
           tripId={tripId}
           groups={trip.groups}
-          onClose={() => setShowShoppingList(false)} 
+          onClose={() => setShowShoppingList(false)}
         />
       )}
 
@@ -2070,11 +1212,11 @@ const PackingList = () => {
                 <X className="h-6 w-6" />
               </button>
             </div>
-            
+
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Choose a packing list template to add to your current list. Items from the template will be added to your existing items.
             </p>
-            
+
             {availableTemplates.length === 0 ? (
               <div className="text-center py-8">
                 <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -2124,7 +1266,7 @@ const PackingList = () => {
                 ))}
               </div>
             )}
-            
+
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowTemplateModal(false)}
@@ -2147,4 +1289,4 @@ const PackingList = () => {
   );
 };
 
-export default PackingList; 
+export default PackingList;

@@ -157,19 +157,24 @@ export const mealSuggestions: MealSuggestions = {
     breakfast: ["Full English", "Pancakes", "French Toast", "Eggs Benedict", "Breakfast Casserole"],
     lunch: ["BBQ", "Salads", "Grilled Sandwiches", "Soups", "Quiche"],
     dinner: ["Grilled Meats", "Pasta", "Fresh Fish", "Stir Fry", "Roasted Vegetables"]
+  },
+  'day hike': {
+    breakfast: ["Energy Bar", "Fruit"],
+    lunch: ["Sandwich", "Trail Mix"],
+    dinner: ["Restaurant", "Home Cooked"]
   }
 };
 
 export const suggestIngredients = (mealName: string): string[] => {
   // Convert to lowercase and remove special characters for matching
   const normalizedName = mealName.toLowerCase().replace(/[^a-z0-9\s]/g, '');
-  
+
   // Look for exact or partial matches in recipe suggestions
-  const match = Object.entries(recipeSuggestions).find(([key]) => 
-    key.toLowerCase().includes(normalizedName) || 
+  const match = Object.entries(recipeSuggestions).find(([key]) =>
+    key.toLowerCase().includes(normalizedName) ||
     normalizedName.includes(key.toLowerCase())
   );
-  
+
   if (match) {
     return [...match[1].baseIngredients];
   }
@@ -190,7 +195,7 @@ export const suggestIngredients = (mealName: string): string[] => {
   if (normalizedName.includes('stir fry')) {
     return ['Rice', 'Vegetables', 'Protein', 'Soy sauce', 'Oil', 'Garlic'];
   }
-  
+
   // Default basic ingredients for unknown meals
   return ['Please specify ingredients'];
 }; 

@@ -1,123 +1,82 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../supabaseClient';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
 import FullPageSpinner from '../components/FullPageSpinner';
 import { hybridDataService } from '../services/hybridDataService';
 import { TripStorage } from '../services/tripStorage';
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
+  loading: boolean;
+  signOut: () => Promise<void>;
   migrationStatus: 'pending' | 'complete' | 'error' | 'retrying' | null;
   retryMigration: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType>({ 
-  user: null, 
-  session: null, 
+export const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  signOut: async () => { },
   migrationStatus: null,
-  retryMigration: async () => {} 
+  retryMigration: async () => { }
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [migrationStatus, setMigrationStatus] = useState<'pending' | 'complete' | 'error' | 'retrying' | null>(null);
   const [hasTriggeredMigration, setHasTriggeredMigration] = useState(false);
-  const [, setMigrationRetryCount] = useState(0);
-  const maxRetries = 3;
 
-  // Migration function with retry logic
-  const performMigration = useCallback(async () => {
-    let currentRetryCount = 0;
-    
-    const attemptMigration = async (): Promise<void> => {
-      try {
-        setMigrationStatus(currentRetryCount > 0 ? 'retrying' : 'pending');
-        
-        // Get all trip IDs from LOCAL storage specifically for migration
-        const localTripAdapter = new TripStorage();
-        const localTrips = await localTripAdapter.getTrips();
-        const tripIds = localTrips.map(trip => trip.id);
-        
-        if (tripIds.length > 0) {
-          console.log(`Starting migration for ${tripIds.length} trips... (attempt ${currentRetryCount + 1})`);
-          await hybridDataService.migrateLocalDataToSupabase(tripIds);
-          console.log('Data migration completed successfully');
-        } else {
-          console.log('No trips found to migrate');
-        }
-        
-        setMigrationStatus('complete');
-        setMigrationRetryCount(0);
-      } catch (error) {
-        console.error(`Data migration failed (attempt ${currentRetryCount + 1}):`, error);
-        currentRetryCount++;
-        setMigrationRetryCount(currentRetryCount);
-        
-        if (currentRetryCount < maxRetries) {
-          // Exponential backoff: wait 2^attempt seconds
-          const delay = Math.pow(2, currentRetryCount) * 1000;
-          console.log(`Retrying migration in ${delay}ms...`);
-          
-          setTimeout(() => {
-            attemptMigration();
-          }, delay);
-        } else {
-          console.error('Migration failed after maximum retries');
-          setMigrationStatus('error');
-        }
+  const performMigration = async () => {
+    try {
+      setMigrationStatus('pending');
+      const localTripAdapter = new TripStorage();
+      const localTrips = await localTripAdapter.getTrips();
+      const tripIds = localTrips.map(trip => trip.id);
+
+      if (tripIds.length > 0) {
+        console.log(`Starting migration for ${tripIds.length} trips...`);
+        // We'll update hybridDataService to have this method
+        await hybridDataService.migrateLocalDataToFirebase(tripIds);
+        console.log('Data migration completed successfully');
       }
-    };
-    
-    await attemptMigration();
-  }, [maxRetries]);
+
+      setMigrationStatus('complete');
+    } catch (error) {
+      console.error('Data migration failed:', error);
+      setMigrationStatus('error');
+    }
+  };
 
   useEffect(() => {
-    let isMounted = true;
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
 
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (isMounted) {
-        setSession(data.session);
-        setLoading(false);
-      }
-    })();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (isMounted) {
-        setSession(newSession);
-        
-        // Trigger data migration when user signs in
-        if (event === 'SIGNED_IN' && newSession?.user && !hasTriggeredMigration) {
-          setHasTriggeredMigration(true);
-          performMigration();
-        }
-        
-        // Reset migration status and flag on sign out
-        if (event === 'SIGNED_OUT') {
-          setHasTriggeredMigration(false);
-          setMigrationStatus(null);
-          setMigrationRetryCount(0);
-        }
+      if (currentUser && !hasTriggeredMigration) {
+        setHasTriggeredMigration(true);
+        performMigration();
+      } else if (!currentUser) {
+        setHasTriggeredMigration(false);
+        setMigrationStatus(null);
       }
     });
 
-    return () => {
-      isMounted = false;
-      listener.subscription.unsubscribe();
-    };
-  }, [hasTriggeredMigration, performMigration]);
-  
-  // Manual retry function for user-triggered retries
-  const retryMigration = async () => {
-    if (!session?.user) {
-      console.warn('Cannot retry migration: user not signed in');
-      return;
+    return () => unsubscribe();
+  }, [hasTriggeredMigration]);
+
+  const signOut = async () => {
+    try {
+      await firebaseSignOut(auth);
+    } catch (error) {
+      console.error('Error signing out:', error);
     }
-    
-    setMigrationRetryCount(0);
-    await performMigration();
+  };
+
+  const retryMigration = async () => {
+    if (user) {
+      await performMigration();
+    }
   };
 
   if (loading) {
@@ -125,9 +84,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ 
-      user: session?.user ?? null, 
-      session, 
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      signOut,
       migrationStatus,
       retryMigration
     }}>
@@ -142,4 +102,4 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}; 
+};

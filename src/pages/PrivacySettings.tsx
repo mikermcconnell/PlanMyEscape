@@ -3,12 +3,13 @@ import { deleteUserAccount } from '../utils/accountDeletion';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, User, Shield, Bell, Eye, Key } from 'lucide-react';
 import { AuthContext } from '../contexts/AuthContext';
-import { supabase } from '../supabaseClient';
+import { auth } from '../firebaseConfig';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 const PrivacySettings = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
-  
+
   // Settings state
   const [analytics, setAnalytics] = useState<boolean>(() => {
     return localStorage.getItem('allow_analytics') !== 'false';
@@ -22,7 +23,7 @@ const PrivacySettings = () => {
   const [dataSharing, setDataSharing] = useState<boolean>(() => {
     return localStorage.getItem('allow_data_sharing') === 'true';
   });
-  
+
   // Action states
   const [deleting, setDeleting] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -30,10 +31,10 @@ const PrivacySettings = () => {
   const handleAnalyticsChange = (value: boolean) => {
     setAnalytics(value);
     localStorage.setItem('allow_analytics', String(value));
-    
+
     if (!value) {
       // Clear any existing analytics data when opted out
-      const analyticsKeys = Object.keys(localStorage).filter(key => 
+      const analyticsKeys = Object.keys(localStorage).filter(key =>
         key.startsWith('analytics_') || key.startsWith('tracking_')
       );
       analyticsKeys.forEach(key => localStorage.removeItem(key));
@@ -64,15 +65,8 @@ const PrivacySettings = () => {
 
     setChangingPassword(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(user.email!, {
-        redirectTo: `${window.location.origin}/reset-password`
-      });
-
-      if (error) {
-        alert('Failed to send password reset email. Please try again.');
-      } else {
-        alert('Password reset email sent! Check your inbox.');
-      }
+      await sendPasswordResetEmail(auth, user.email!);
+      alert('Password reset email sent! Check your inbox.');
     } catch (error) {
       console.error('Password reset error:', error);
       alert('An error occurred. Please try again.');
@@ -124,7 +118,7 @@ const PrivacySettings = () => {
               <span className="font-medium">Email:</span> {user.email}
             </p>
             <p className="text-sm text-gray-600">
-              <span className="font-medium">Account created:</span> {new Date(user.created_at).toLocaleDateString()}
+              <span className="font-medium">Account created:</span> {user.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'N/A'}
             </p>
           </div>
         </div>
@@ -270,4 +264,4 @@ const PrivacySettings = () => {
   );
 };
 
-export default PrivacySettings; 
+export default PrivacySettings;

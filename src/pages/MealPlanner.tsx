@@ -1,17 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Plus, Trash2, Edit3, X, ShoppingCart, Calendar, CheckCircle, RotateCcw, Save, Download } from 'lucide-react';
-import { Meal, Trip, TripType } from '../types';
-import type { MealTemplate } from '../types';
+import {
+  Plus,
+  Trash2,
+  Edit3,
+  X,
+  ShoppingCart,
+  Calendar,
+  CheckCircle,
+  RotateCcw,
+  Save,
+  Download
+} from 'lucide-react';
+import { Meal, Trip, TripType, MealTemplate, ShoppingItem } from '../types';
 import { hybridDataService } from '../services/hybridDataService';
+import { tripService } from '../services/tripService';
 import { getMealTemplates } from '../data/mealTemplates';
-import ShoppingList from '../components/ShoppingList';
-import { ShoppingItem } from '../types';
-// Shopping and packing operations now handled through hybridDataService
 import { suggestIngredients } from '../data/recipeSuggestions';
+import ShoppingList from '../components/ShoppingList';
 import SEOHead from '../components/SEOHead';
 import { tripMealSuggestions } from '../data/tripMealSuggestions';
-import { createMealTemplate, loadMealTemplate, filterCompatibleTemplates, getMealTemplateSummary, getTripDuration } from '../utils/templateHelpers';
+import {
+  createMealTemplate,
+  loadMealTemplate,
+  filterCompatibleTemplates,
+  getMealTemplateSummary,
+  getTripDuration
+} from '../utils/templateHelpers';
 
 interface TripContextType {
   trip: Trip;
@@ -19,213 +34,168 @@ interface TripContextType {
 }
 
 const MealPlanner = () => {
-  const { trip } = useOutletContext<TripContextType>();
+  const { trip, setTrip } = useOutletContext<TripContextType>();
   const tripId = trip.id;
+
+  // State Management
   const [meals, setMeals] = useState<Meal[]>([]);
   const [showMealModal, setShowMealModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState(1);
   const [selectedType, setSelectedType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('breakfast');
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
+
+  // Shopping List State
   const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null);
   const [newIngredientName, setNewIngredientName] = useState('');
-  const [newIngredientQty, setNewIngredientQty] = useState<number>(1);
+  const [newIngredientQty, setNewIngredientQty] = useState(1);
+
+  // Custom Meal Form State
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customMealName, setCustomMealName] = useState('');
-  const [, setSuggestedIngredients] = useState<string[]>([]);
+  const [suggestedIngredients, setSuggestedIngredients] = useState<string[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [customIngredient, setCustomIngredient] = useState('');
+
+  // UI Feedback State
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [showClearIngredientsConfirmation, setShowClearIngredientsConfirmation] = useState(false);
+
+  // Editing State
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const [deletedIngredients, setDeletedIngredients] = useState<Set<string>>(new Set());
+
+  // Group Assignment State
   const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>(undefined);
   const [filterGroupId, setFilterGroupId] = useState<string>('all');
 
-  // Template management state
+  // Refs for data consistency
+  const latestMealsRef = useRef<Meal[]>([]);
+
+  // Template State
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<MealTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
 
-  // Sync groups to database when component mounts
-  useEffect(() => {
-    const syncGroupsToDatabase = async () => {
-      if (trip && trip.groups && trip.groups.length > 0) {
-        try {
-          console.log('🔄 [MealPlanner] Syncing groups to database...');
-          // Re-save the trip to ensure groups are in the database
-          const { saveTrip } = await import('../utils/supabaseTrips');
-          await saveTrip(trip);
-          console.log('✅ [MealPlanner] Groups synced successfully');
-        } catch (error) {
-          console.error('❌ [MealPlanner] Failed to sync groups:', error);
-        }
-      }
-    };
-    
-    syncGroupsToDatabase();
-  }, [trip]);
-
-  // Save on unmount to prevent data loss
-  useEffect(() => {
-    return () => {
-      if (meals.length > 0) {
-        hybridDataService.saveMeals(tripId, meals).catch(error => {
-          console.error('Failed to save meals on unmount:', error);
-        });
-      }
-    };
-  }, [tripId, meals]);
-
-  // Track if data has been loaded to prevent re-initialization
+  // Loading State
   const [hasLoadedMeals, setHasLoadedMeals] = useState(false);
 
+  // Sync groups to database if needed
   useEffect(() => {
-    const loadMealsAndDeletedIngredients = async () => {
-      if (!tripId) {
-        console.log(`🔄 [MealPlanner] Skip loading - no tripId provided`);
-        return;
-      }
-      
-      console.log(`📥 [MealPlanner] Loading meals and deleted ingredients for trip ${tripId}...`);
-      setHasLoadedMeals(false); // Reset loading flag
-      
-      const [savedMeals, deletedIngredientsArray] = await Promise.all([
-        hybridDataService.getMeals(tripId),
-        hybridDataService.getDeletedIngredients(tripId)
-      ]);
-      
-      console.log(`📊 [MealPlanner] Loaded ${savedMeals?.length || 0} meals from database`);
-      if (savedMeals && savedMeals.length > 0) {
-        console.log(`📝 [MealPlanner] Setting ${savedMeals.length} meals in component state:`, savedMeals.map(m => m.name));
-        // Debug: Check if assignedGroupId is being loaded
-        savedMeals.forEach(meal => {
-          if (meal.assignedGroupId) {
-            console.log(`🎯 [MealPlanner] Meal has assignedGroupId: ${meal.assignedGroupId}`);
-          } else {
-            console.log(`⚠️ [MealPlanner] Meal has NO assignedGroupId (will show as shared)`);
-          }
-        });
-        setMeals(savedMeals);
-      } else {
-        console.log(`📝 [MealPlanner] No meals found, keeping current state (${meals.length} meals)`);
-        setMeals([]);
-      }
-      
-      console.log(`🚫 [MealPlanner] Loaded ${deletedIngredientsArray?.length || 0} deleted ingredients`);
-      setDeletedIngredients(new Set(deletedIngredientsArray));
-      setHasLoadedMeals(true); // Mark as loaded
-    };
-    loadMealsAndDeletedIngredients();
-  }, [tripId]); // Only depend on tripId, not trip object
+    const syncGroupsToDatabase = async () => {
+      if (!tripId || !trip.groups) return;
 
-  // Load shopping list on mount (only meal-related items for ingredients sidebar)
+      try {
+        // We don't need to fetch groups here as we have them in the trip object
+        // But we might want to ensure they are persisted if they were just added locally
+        // For now, we'll assume tripService handles group persistence
+      } catch (error) {
+        console.error('Error syncing groups:', error);
+      }
+    };
+
+    syncGroupsToDatabase();
+  }, [tripId, trip.groups]);
+
+  // Save meals on unmount
+  useEffect(() => {
+    return () => {
+      if (latestMealsRef.current.length > 0) {
+        hybridDataService.saveMeals(tripId, latestMealsRef.current).catch(console.error);
+      }
+    };
+  }, [tripId]);
+
+  // Update ref when meals change
+  useEffect(() => {
+    latestMealsRef.current = meals;
+  }, [meals]);
+
+  // Load meals and deleted ingredients
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [loadedMeals, loadedDeletedIngredients] = await Promise.all([
+          hybridDataService.getMeals(tripId),
+          hybridDataService.getDeletedIngredients(tripId)
+        ]);
+
+        setMeals(loadedMeals);
+        setDeletedIngredients(new Set(loadedDeletedIngredients));
+        setHasLoadedMeals(true);
+      } catch (error) {
+        console.error('Error loading meal data:', error);
+        setConfirmation('Failed to load meal plan. Please refresh.');
+      }
+    };
+
+    if (tripId) {
+      loadData();
+    }
+  }, [tripId]);
+
+  // Load initial shopping list
   useEffect(() => {
     const loadShoppingList = async () => {
-      if (!tripId || hasLoadedMeals) return; // Wait for meals to load first
-      const savedShoppingList = await hybridDataService.getShoppingItems(tripId);
-      // Filter to only show food items that are NOT from packing list
-      const mealRelatedItems = savedShoppingList.filter(item => 
-        !item.sourceItemId && item.category === 'food'
-      );
-      setShoppingItems(mealRelatedItems);
+      if (!tripId) return;
+      try {
+        const items = await hybridDataService.getShoppingItems(tripId);
+        setShoppingItems(items);
+      } catch (error) {
+        console.error('Error loading shopping list:', error);
+      }
     };
     loadShoppingList();
-  }, [tripId, hasLoadedMeals]);
+  }, [tripId]);
 
-  // Trigger shopping list update when meals change
+  // Refresh shopping list when meals change
   useEffect(() => {
-    if (!tripId || !hasLoadedMeals) return; // Wait for initial load to complete
+    const refreshShoppingList = async () => {
+      if (!hasLoadedMeals) return;
 
-    console.log('MealPlanner - Meals changed, triggering shopping list refresh...');
-    
-    // Use the new method that accepts current meals to avoid database reload race conditions
-    (async () => {
-      const refreshedShoppingItems = await hybridDataService.getShoppingItemsWithMeals(tripId, meals);
-      // Filter to only show food items that are NOT from packing list for the ingredients sidebar
-      const mealRelatedItems = refreshedShoppingItems.filter(item => 
-        !item.sourceItemId && item.category === 'food'
-      );
-      setShoppingItems(mealRelatedItems);
-    })();
-  }, [meals, tripId, deletedIngredients, hasLoadedMeals]);
+      try {
+        const refreshedItems = await hybridDataService.getShoppingItemsWithMeals(tripId, meals);
+        const mealRelatedItems = refreshedItems.filter(item =>
+          !item.sourceItemId && item.category === 'food'
+        );
+        setShoppingItems(mealRelatedItems);
+      } catch (error) {
+        console.error('Error refreshing shopping list:', error);
+      }
+    };
 
-  // Helpers for toggling status
+    refreshShoppingList();
+  }, [meals, tripId, hasLoadedMeals]);
+
+  // Helper Functions
   const updateShoppingItem = async (itemId: string, updates: Partial<ShoppingItem>) => {
-    // Update local ingredients list
-    setShoppingItems(prev => prev.map(it => it.id === itemId ? { ...it, ...updates } : it));
-    
-    // Update global shopping list
-    if (tripId) {
-      const allItems = await hybridDataService.getShoppingItems(tripId);
-      const updatedAllItems = allItems.map(it => it.id === itemId ? { ...it, ...updates } : it);
-      await hybridDataService.saveShoppingItems(tripId, updatedAllItems);
-    }
+    const updatedItems = shoppingItems.map(item =>
+      item.id === itemId ? { ...item, ...updates } : item
+    );
+    setShoppingItems(updatedItems);
+
+    // Debounce save to avoid too many writes
+    const timeoutId = setTimeout(async () => {
+      await hybridDataService.saveShoppingItems(tripId, updatedItems);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
   };
 
-  const handleToggleNeedsToBuy = async (itemId: string) => {
-    const current = shoppingItems.find(i => i.id === itemId);
-    if (!current || !tripId) return;
-    const newNeedsToBuy = !current.needsToBuy;
-    if (!newNeedsToBuy) {
-      // Remove from shopping list if unchecked
-      const updated = shoppingItems.filter(i => i.id !== itemId);
-      setShoppingItems(updated);
-      await hybridDataService.saveShoppingItems(tripId, updated);
-      return;
+  const handleToggleNeedsToBuy = (itemId: string) => {
+    const item = shoppingItems.find(i => i.id === itemId);
+    if (item) {
+      updateShoppingItem(itemId, { needsToBuy: !item.needsToBuy });
     }
-    updateShoppingItem(itemId, { needsToBuy: true, isOwned: false });
-    setConfirmation('Added to shopping list!');
-    setTimeout(() => setConfirmation(null), 2000);
   };
 
   const handleToggleOwned = (itemId: string) => {
-    const current = shoppingItems.find(i => i.id === itemId);
-    if (!current) return;
-    const newOwned = !current.isOwned;
-    if (newOwned) {
-      // Remove from shopping list if marked as owned
-      const updated = shoppingItems.filter(i => i.id !== itemId);
-      setShoppingItems(updated);
-      if (tripId) hybridDataService.saveShoppingItems(tripId, updated);
-      // Sync to packing list when marked owned
-      if (tripId) {
-        (async () => {
-          const packing = await hybridDataService.getPackingItems(tripId);
-          const exists = packing.find(p => p.name.toLowerCase() === current.name.toLowerCase() && p.category === 'Food');
-          if (!exists) {
-            const newPackingItem = {
-              id: crypto.randomUUID(),
-              name: current.name,
-              category: 'Food',
-              quantity: current.quantity,
-              isChecked: false,
-              isOwned: true,
-              needsToBuy: false,
-              isPacked: false,
-              required: false,
-              isPersonal: false
-            } as any;
-            await hybridDataService.savePackingItems(tripId, [...packing, newPackingItem]);
-            setConfirmation('Added to packing list!');
-            setTimeout(() => setConfirmation(null), 2000);
-          }
-        })();
-      }
-    } else {
-      updateShoppingItem(itemId, { isOwned: false });
+    const item = shoppingItems.find(i => i.id === itemId);
+    if (item) {
+      updateShoppingItem(itemId, { isOwned: !item.isOwned });
     }
   };
-
-  useEffect(() => {
-    if (customMealName.trim()) {
-      const ingredients = suggestIngredients(customMealName);
-      setSuggestedIngredients(ingredients);
-    } else {
-      setSuggestedIngredients([]);
-    }
-  }, [customMealName]);
 
   const getDaysArray = () => {
     if (!trip) return [];
@@ -244,38 +214,36 @@ const MealPlanner = () => {
     const month = parseInt(dateParts[1]!, 10);
     const dayPart = parseInt(dateParts[2]!, 10);
     if (isNaN(year) || isNaN(month) || isNaN(dayPart)) return '';
-    
+
     const start = new Date(year, month - 1, dayPart); // month is 0-indexed
     const dayDate = new Date(start);
     dayDate.setDate(start.getDate() + day - 1);
-    return dayDate.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
+    return dayDate.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
     });
   };
-
-
 
   const deleteMeal = async (mealId: string) => {
     const mealToDelete = meals.find(meal => meal.id === mealId);
     console.log(`🗑️ [MealPlanner] Deleting meal (ID: ${mealId})`);
     console.log(`📊 [MealPlanner] Before deletion - Total meals: ${meals.length}`);
-    
+
     const updatedMeals = meals.filter(meal => meal.id !== mealId);
     console.log(`📊 [MealPlanner] After deletion - Total meals: ${updatedMeals.length}`);
-    
+
     setMeals(updatedMeals);
     try {
       // Save immediately for delete operations
       console.log(`💾 [MealPlanner] Saving ${updatedMeals.length} meals to database...`);
       await hybridDataService.saveMeals(tripId, updatedMeals);
       console.log('✅ [MealPlanner] Meal deleted and saved immediately');
-      
+
       // Show success feedback
       setConfirmation(`${mealToDelete?.name || 'Meal'} deleted successfully!`);
       setTimeout(() => setConfirmation(null), 3000);
-      
+
       // The useEffect with [meals] dependency will handle shopping list refresh automatically
     } catch (error) {
       console.error('❌ [MealPlanner] Failed to delete meal:', error);
@@ -319,11 +287,11 @@ const MealPlanner = () => {
       // Save immediately for edit operations
       await hybridDataService.saveMeals(tripId, updatedMeals);
       console.log('✅ [MealPlanner] Meal edited and saved immediately');
-      
+
       // Refresh shopping list to reflect group assignment changes
       console.log('🛒 [MealPlanner] Refreshing shopping list with updated meal group assignments...');
       const refreshedShoppingItems = await hybridDataService.getShoppingItemsWithMeals(tripId, updatedMeals);
-      const mealRelatedItems = refreshedShoppingItems.filter(item => 
+      const mealRelatedItems = refreshedShoppingItems.filter(item =>
         !item.sourceItemId && item.category === 'food'
       );
       setShoppingItems(mealRelatedItems);
@@ -438,7 +406,7 @@ const MealPlanner = () => {
 
   const addCustomMeal = async () => {
     if (customMealName.trim() && selectedIngredients.length > 0) {
-      const newMeal = {
+      const newMeal: Meal = {
         id: crypto.randomUUID(),
         name: customMealName.trim(),
         day: selectedDay,
@@ -455,11 +423,11 @@ const MealPlanner = () => {
         // Save immediately for add operations
         await hybridDataService.saveMeals(tripId, updatedMeals);
         console.log('MealPlanner: Meal added and saved immediately');
-        
+
         // Refresh shopping list to include new meal ingredients with group assignment
         console.log('🛒 [MealPlanner] Refreshing shopping list with new meal ingredients...');
         const refreshedShoppingItems = await hybridDataService.getShoppingItemsWithMeals(tripId, updatedMeals);
-        const mealRelatedItems = refreshedShoppingItems.filter(item => 
+        const mealRelatedItems = refreshedShoppingItems.filter(item =>
           !item.sourceItemId && item.category === 'food'
         );
         setShoppingItems(mealRelatedItems);
@@ -470,11 +438,11 @@ const MealPlanner = () => {
         setTimeout(() => setConfirmation(null), 3000);
         return;
       }
-      
+
       // Show success feedback
       setConfirmation(`${customMealName.trim()} added to ingredients list!`);
       setTimeout(() => setConfirmation(null), 3000);
-      
+
       // Reset form
       setCustomMealName('');
       setSuggestedIngredients([]);
@@ -485,8 +453,6 @@ const MealPlanner = () => {
       setShowMealModal(false);
     }
   };
-
-
 
   const addCustomIngredientToList = () => {
     if (customIngredient.trim() && !selectedIngredients.includes(customIngredient.trim())) {
@@ -504,19 +470,19 @@ const MealPlanner = () => {
   const removeShoppingItem = async (itemId: string) => {
     // Find the item being deleted to track its name
     const itemToDelete = shoppingItems.find(i => i.id === itemId);
-    
+
     // Remove from local ingredients list
     setShoppingItems(prev => prev.filter(i => i.id !== itemId));
-    
+
     // Track this ingredient as manually deleted and persist it
     if (itemToDelete && !itemToDelete.sourceItemId) {
       const newDeletedIngredients = new Set(deletedIngredients).add(itemToDelete.name.toLowerCase());
       setDeletedIngredients(newDeletedIngredients);
-      
+
       // PERSIST THE DELETED INGREDIENTS
       await hybridDataService.saveDeletedIngredients(tripId, Array.from(newDeletedIngredients));
     }
-    
+
     // Remove from global shopping list
     if (tripId) {
       const allItems = await hybridDataService.getShoppingItems(tripId);
@@ -528,7 +494,7 @@ const MealPlanner = () => {
   const addIngredient = async () => {
     if (!newIngredientName.trim()) return;
     const ingredientName = newIngredientName.trim();
-    
+
     const newItem: ShoppingItem = {
       id: crypto.randomUUID(),
       name: ingredientName,
@@ -539,25 +505,25 @@ const MealPlanner = () => {
       isOwned: false,
       sourceItemId: undefined
     };
-    
+
     // Remove from deleted ingredients list if it was previously deleted
     const newDeletedIngredients = new Set(deletedIngredients);
     newDeletedIngredients.delete(ingredientName.toLowerCase());
     setDeletedIngredients(newDeletedIngredients);
-    
+
     // PERSIST THE UPDATED DELETED INGREDIENTS
     await hybridDataService.saveDeletedIngredients(tripId, Array.from(newDeletedIngredients));
-    
+
     // Add to local ingredients list
     setShoppingItems(prev => [...prev, newItem]);
-    
+
     // Add to global shopping list
     if (tripId) {
       const allItems = await hybridDataService.getShoppingItems(tripId);
       const updated = [...allItems, newItem];
       await hybridDataService.saveShoppingItems(tripId, updated);
     }
-    
+
     setNewIngredientName('');
     setNewIngredientQty(1);
   };
@@ -566,19 +532,19 @@ const MealPlanner = () => {
     // Clear all meals - both custom meals and template meals added by user
     const clearedMeals: Meal[] = [];
     console.log(`🧹 [MealPlanner] Clearing all ${meals.length} meals...`);
-    
+
     setMeals(clearedMeals);
     try {
       console.log('💾 [MealPlanner] Attempting to save empty meals array to database...');
       await hybridDataService.saveMeals(tripId, clearedMeals);
       console.log('✅ [MealPlanner] All meals cleared and saved to database');
-      
+
       // Verify the save worked by reloading from database after a small delay
       console.log('🔍 [MealPlanner] Waiting briefly then verifying meals were cleared...');
       await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for database consistency
       const verifyMeals = await hybridDataService.getMeals(tripId);
       console.log(`📊 [MealPlanner] Verification: ${verifyMeals.length} meals found in database after clear`);
-      
+
       if (verifyMeals.length > 0) {
         console.error(`❌ [MealPlanner] Clear verification failed! Found ${verifyMeals.length} meals still in database:`, verifyMeals);
         setConfirmation(`Clear failed: ${verifyMeals.length} meals still exist. Please try again.`);
@@ -597,34 +563,34 @@ const MealPlanner = () => {
       setTimeout(() => setConfirmation(null), 3000);
       return;
     }
-    
+
     // Clear the deleted ingredients list since we're clearing everything
     setDeletedIngredients(new Set());
     await hybridDataService.saveDeletedIngredients(tripId, []);
-    
+
     // Force refresh the shopping list using the cleaned meals to avoid race conditions
     console.log('🔄 [MealPlanner] Force refreshing shopping list after clearing meals...');
     const refreshedShoppingItems = await hybridDataService.getShoppingItemsWithMeals(tripId, clearedMeals);
-    const mealRelatedItems = refreshedShoppingItems.filter(item => 
+    const mealRelatedItems = refreshedShoppingItems.filter(item =>
       !item.sourceItemId && item.category === 'food'
     );
     setShoppingItems(mealRelatedItems);
     console.log(`🛒 [MealPlanner] Shopping list refreshed: ${mealRelatedItems.length} meal-related items`);
-    
+
     setShowClearIngredientsConfirmation(false);
   };
 
   const saveIngredientEdit = async (itemId: string, name: string, qty: number) => {
     // Update local ingredients list
     setShoppingItems(prev => prev.map(i => i.id === itemId ? { ...i, name, quantity: qty } : i));
-    
+
     // Update global shopping list
     if (tripId) {
       const allItems = await hybridDataService.getShoppingItems(tripId);
       const updated = allItems.map(i => i.id === itemId ? { ...i, name, quantity: qty } : i);
       await hybridDataService.saveShoppingItems(tripId, updated);
     }
-    
+
     setEditingIngredientId(null);
   };
 
@@ -665,7 +631,7 @@ const MealPlanner = () => {
 
   return (
     <div className="p-6">
-      <SEOHead 
+      <SEOHead
         title={`Meal Planner - ${trip.tripName} | PlanMyEscape`}
         description={`Plan delicious camping meals for ${trip.tripName}. Get recipe suggestions, create shopping lists, and organize group meal planning.`}
         keywords="camping meal planning, outdoor cooking, camping recipes, meal prep, group meal planning"
@@ -679,7 +645,7 @@ const MealPlanner = () => {
               Meal Planner
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              {renderTripTypeText(trip.tripType)} • 
+              {renderTripTypeText(trip.tripType)} •
               {totalPeople} {totalPeople === 1 ? 'person' : 'people'} total
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -763,17 +729,17 @@ const MealPlanner = () => {
                 Meal Calendar
               </h2>
             </div>
-            
+
             <div className="p-6">
               {days.map(day => (
                 <div key={day} className="mb-6 last:mb-0">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
                     Day {day} - {getDateForDay(day)}
                   </h3>
-                  
+
                   {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map(mealType => {
                     const dayMeals = getMealsByType(day, mealType);
-                    
+
                     return (
                       <div key={mealType} className="mb-4">
                         <div className="flex items-center justify-between mb-2">
@@ -787,7 +753,7 @@ const MealPlanner = () => {
                             <Plus className="h-4 w-4" />
                           </button>
                         </div>
-                        
+
                         {dayMeals.length === 0 ? (
                           <div className="text-sm text-gray-500 dark:text-gray-400 italic">
                             No meals planned
@@ -863,7 +829,7 @@ const MealPlanner = () => {
                 Clear
               </button>
             </div>
-            
+
             <div className="p-6">
               {/* Add Ingredient Form */}
               <div className="mb-4 space-y-2 sm:space-y-0">
@@ -893,7 +859,7 @@ const MealPlanner = () => {
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Desktop: Horizontal Layout */}
                 <div className="hidden sm:flex space-x-2">
                   <input
@@ -952,24 +918,22 @@ const MealPlanner = () => {
                           <div className="flex items-center space-x-1">
                             <button
                               onClick={() => handleToggleNeedsToBuy(item.id)}
-                              className={`p-1 rounded-full transition-colors ${
-                                item.needsToBuy ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                              }`}
+                              className={`p-1 rounded-full transition-colors ${item.needsToBuy ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                                }`}
                               title={item.needsToBuy ? 'Need to buy' : 'Mark as need to buy'}
                             >
                               <ShoppingCart className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleToggleOwned(item.id)}
-                              className={`p-1 rounded-full transition-colors ${
-                                item.isOwned ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                              }`}
+                              className={`p-1 rounded-full transition-colors ${item.isOwned ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                                }`}
                               title={item.isOwned ? 'Owned' : 'Mark as owned'}
                             >
                               <CheckCircle className="h-4 w-4" />
                             </button>
                           </div>
-                          
+
                           {editingIngredientId === item.id ? (
                             <div className="flex items-center space-x-2 flex-1">
                               <input
@@ -993,7 +957,7 @@ const MealPlanner = () => {
                               {item.name}{item.quantity > 1 && ` ×${item.quantity}`}
                             </span>
                           )}
-                          
+
                           {editingIngredientId !== item.id && (
                             <div className="flex items-center space-x-1">
                               <button onClick={() => setEditingIngredientId(item.id)} className="text-gray-400 hover:text-blue-600 p-1">
@@ -1013,18 +977,16 @@ const MealPlanner = () => {
                         <div className="flex items-center space-x-2 mr-3">
                           <button
                             onClick={() => handleToggleNeedsToBuy(item.id)}
-                            className={`p-1 rounded-full transition-colors ${
-                              item.needsToBuy ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                            }`}
+                            className={`p-1 rounded-full transition-colors ${item.needsToBuy ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                              }`}
                             title={item.needsToBuy ? 'Need to buy' : 'Mark as need to buy'}
                           >
                             <ShoppingCart className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleToggleOwned(item.id)}
-                            className={`p-1 rounded-full transition-colors ${
-                              item.isOwned ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                            }`}
+                            className={`p-1 rounded-full transition-colors ${item.isOwned ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                              }`}
                             title={item.isOwned ? 'Owned' : 'Mark as owned'}
                           >
                             <CheckCircle className="h-4 w-4" />
@@ -1087,7 +1049,7 @@ const MealPlanner = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             {!showCustomForm && !editingMeal ? (
               <>
                 {/* Template Selection */}
@@ -1103,7 +1065,7 @@ const MealPlanner = () => {
                       Create Custom Meal
                     </button>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {getMealTemplates()[selectedType].map(meal => (
                       <div
@@ -1139,7 +1101,7 @@ const MealPlanner = () => {
                       Back to Templates
                     </button>
                   </div>
-                  
+
                   <div className="space-y-4">
                     {/* Meal Name Input */}
                     <div>
@@ -1154,7 +1116,7 @@ const MealPlanner = () => {
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
                       />
                     </div>
-                    
+
                     {/* Custom Ingredient Input */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1178,7 +1140,7 @@ const MealPlanner = () => {
                         </button>
                       </div>
                     </div>
-                    
+
                     {/* Group Assignment with Checkboxes */}
                     {trip.groups.length > 1 && (
                       <div>
@@ -1217,7 +1179,7 @@ const MealPlanner = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Selected Ingredients List */}
                     {selectedIngredients.length > 0 && (
                       <div>
@@ -1242,7 +1204,7 @@ const MealPlanner = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Action Buttons */}
                     <div className="flex justify-end space-x-2 pt-4">
                       <button
@@ -1276,10 +1238,10 @@ const MealPlanner = () => {
 
       {/* Shopping List Modal */}
       {showShoppingList && tripId && (
-        <ShoppingList 
+        <ShoppingList
           tripId={tripId}
           groups={trip.groups}
-          onClose={() => setShowShoppingList(false)} 
+          onClose={() => setShowShoppingList(false)}
         />
       )}
 
@@ -1334,14 +1296,25 @@ const MealPlanner = () => {
                   All groups together
                 </p>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                    {meals.filter(meal => !meal.assignedGroupId).length} shared {meals.filter(meal => !meal.assignedGroupId).length === 1 ? 'meal' : 'meals'}
-                  </p>
-                  {meals.filter(meal => !meal.assignedGroupId).slice(0, 3).map(meal => (
-                    <p key={meal.id} className="text-sm text-gray-600 dark:text-gray-400">
-                      • Day {meal.day} {meal.type}: {meal.name}
-                    </p>
-                  ))}
+                  {meals.filter(meal => !meal.assignedGroupId).length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">No shared meals</p>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                        {meals.filter(meal => !meal.assignedGroupId).length} shared {meals.filter(meal => !meal.assignedGroupId).length === 1 ? 'meal' : 'meals'}
+                      </p>
+                      {meals.filter(meal => !meal.assignedGroupId).slice(0, 3).map(meal => (
+                        <p key={meal.id} className="text-sm text-gray-600 dark:text-gray-400">
+                          • Day {meal.day} {meal.type}: {meal.name}
+                        </p>
+                      ))}
+                      {meals.filter(meal => !meal.assignedGroupId).length > 3 && (
+                        <p className="text-sm text-gray-400 italic">
+                          ...and {meals.filter(meal => !meal.assignedGroupId).length - 3} more
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -1349,159 +1322,42 @@ const MealPlanner = () => {
         </div>
       )}
 
-      {/* Trip Meal Suggestions */}
-      <div className="mt-8 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-          Suggested Meals for {renderTripTypeText(trip.tripType)}
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <h4 className="font-medium text-gray-900 dark:text-white mb-2">Breakfast</h4>
-            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              {getMealSuggestions(trip.tripType, 'breakfast').map((meal, index) => (
-                <li key={index}>{meal}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-900 dark:text-white mb-2">Lunch</h4>
-            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              {getMealSuggestions(trip.tripType, 'lunch').map((meal, index) => (
-                <li key={index}>{meal}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-900 dark:text-white mb-2">Dinner</h4>
-            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              {getMealSuggestions(trip.tripType, 'dinner').map((meal, index) => (
-                <li key={index}>{meal}</li>
-              ))}
-            </ul>
-          </div>
+      {/* Feedback Toast */}
+      {confirmation && (
+        <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in-up">
+          {confirmation}
         </div>
-      </div>
+      )}
 
-      {/* Clear Ingredients Confirmation Modal */}
+      {/* Clear Confirmation Dialog */}
       {showClearIngredientsConfirmation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Clear Ingredients
-              </h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              Clear All Meals?
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">
+              Are you sure you want to clear all meals? This will remove all meals from the calendar and clear the ingredients list. This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowClearIngredientsConfirmation(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                This will remove all meals from your meal plan and clear all ingredients from your ingredients list. All meal-related items will be removed from the shopping list. You can start fresh by adding new meals.
-              </p>
-              
-              <div className="flex space-x-2 pt-4">
-                <button
-                  onClick={clearIngredients}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                >
-                  Clear Ingredients
-                </button>
-                <button
-                  onClick={() => setShowClearIngredientsConfirmation(false)}
-                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Template Selection Modal */}
-      {showTemplateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Load Meal Plan Template
-              </h3>
-              <button
-                onClick={() => setShowTemplateModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Choose a meal plan template to add to your current plan. Meals from the template will be added to your existing meals.
-            </p>
-            
-            {availableTemplates.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400 mb-2">No compatible templates found</p>
-                <p className="text-sm text-gray-500">
-                  Create your first template by planning meals and clicking "Save This Meal Plan"
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {availableTemplates.map((template) => (
-                  <div key={template.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-900 dark:text-white">
-                        {template.name}
-                      </h4>
-                      <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                        {template.tripType}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                      {getMealTemplateSummary(template)}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">
-                        Created: {new Date(template.createdAt).toLocaleDateString()}
-                      </span>
-                      <button
-                        onClick={() => loadTemplate(template)}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Load Template
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowTemplateModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
+              <button
+                onClick={clearIngredients}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Clear All
+              </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Confirmation Toast */}
-      {confirmation && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50">
-          {confirmation}
         </div>
       )}
     </div>
   );
 };
 
-export default MealPlanner; 
+export default MealPlanner;

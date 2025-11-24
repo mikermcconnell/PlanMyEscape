@@ -1,10 +1,11 @@
 import { LogOut } from 'lucide-react';
-import { supabase } from '../supabaseClient';
+import { auth } from '../firebaseConfig';
+import { signOut } from 'firebase/auth';
 
 export default function LogoutButton() {
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      await signOut(auth);
       window.location.href = '/';
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -22,4 +23,4 @@ export default function LogoutButton() {
       <span className="sm:hidden text-xs">Logout</span>
     </button>
   );
-} 
+}

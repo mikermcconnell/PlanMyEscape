@@ -1,6 +1,6 @@
-import { supabaseDataService } from './supabaseDataService';
-import { 
-  getPackingList as getPackingListLocal, 
+import { firebaseDataService } from './firebaseDataService';
+import {
+  getPackingList as getPackingListLocal,
   savePackingList as savePackingListLocal,
   getMeals as getMealsLocal,
   saveMeals as saveMealsLocal,
@@ -11,35 +11,31 @@ import {
   getTodoItems as getTodoItemsLocal,
   saveTodoItems as saveTodoItemsLocal
 } from '../utils/storage';
-import { supabase } from '../supabaseClient';
+import { auth } from '../firebaseConfig';
 import { PackingItem, Meal, ShoppingItem, GearItem, TodoItem, PackingTemplate, MealTemplate } from '../types';
+import { Unsubscribe } from 'firebase/firestore';
 import logger from '../utils/logger';
 
 /**
- * Hybrid data service that tries Supabase first, falls back to local storage
- * Handles data migration from local to Supabase when user signs in
+ * Hybrid data service that tries Firebase first, falls back to local storage
+ * Handles data migration from local to Firebase when user signs in
  * Implements ephemeral data collection for Google Play Console compliance
  */
 export class HybridDataService {
-  
+
   // Data retention periods (in days)
   private static readonly DATA_RETENTION_DAYS = 365; // Keep user data for 1 year
   private static readonly SECURITY_LOG_RETENTION_DAYS = 90; // Keep security logs for 90 days
   private static readonly TEMP_DATA_RETENTION_MINUTES = 30; // Clear temporary data after 30 minutes
-  
+
   private async isSignedIn(): Promise<boolean> {
-    try {
-      const { data, error } = await supabase.auth.getUser();
-      const signedIn = !error && !!data.user;
-      // Only log essential auth info, not detailed user data
-      logger.log(`🔐 [HybridDataService] Auth check - Status: ${signedIn ? 'authenticated' : 'anonymous'}`);
-      return signedIn;
-    } catch (authError) {
-      logger.error('❌ [HybridDataService] Auth check failed');
-      return false;
-    }
+    const user = auth.currentUser;
+    const signedIn = !!user;
+    // Only log essential auth info, not detailed user data
+    logger.log(`🔐 [HybridDataService] Auth check - Status: ${signedIn ? 'authenticated' : 'anonymous'}`);
+    return signedIn;
   }
-  
+
   /**
    * Clean up expired temporary data in memory
    * Called automatically to maintain ephemeral data collection
@@ -47,13 +43,13 @@ export class HybridDataService {
   private cleanupTempData(): void {
     const now = Date.now();
     const cutoffTime = now - (HybridDataService.TEMP_DATA_RETENTION_MINUTES * 60 * 1000);
-    
+
     // Clear any temporary data older than retention period
     // This ensures data is processed ephemerally
-    const tempDataKeys = Object.keys(localStorage).filter(key => 
+    const tempDataKeys = Object.keys(localStorage).filter(key =>
       key.startsWith('temp_') || key.startsWith('cache_')
     );
-    
+
     tempDataKeys.forEach(key => {
       try {
         const item = localStorage.getItem(key);
@@ -70,183 +66,126 @@ export class HybridDataService {
       }
     });
   }
-  
+
   /**
    * Initialize cleanup on service creation
    */
   constructor() {
     // Run cleanup on initialization
     this.cleanupTempData();
-    
+
     // Schedule regular cleanup every 15 minutes
     setInterval(() => {
       this.cleanupTempData();
     }, 15 * 60 * 1000);
   }
-  
+
+  // === MIGRATION ===
+
+  async migrateLocalDataToFirebase(tripIds: string[]): Promise<void> {
+    if (!await this.isSignedIn()) {
+      throw new Error('User must be signed in to migrate data');
+    }
+
+    logger.log(`🚀 [HybridDataService] Starting migration for ${tripIds.length} trips to Firebase`);
+
+    for (const tripId of tripIds) {
+      try {
+        // 1. Packing Items
+        const packingItems = await getPackingListLocal(tripId);
+        if (packingItems.length > 0) {
+          await firebaseDataService.savePackingItems(tripId, packingItems);
+          logger.log(`✅ [HybridDataService] Migrated ${packingItems.length} packing items for trip ${tripId}`);
+        }
+
+        // 2. Meals
+        const meals = await getMealsLocal(tripId);
+        if (meals.length > 0) {
+          await firebaseDataService.saveMeals(tripId, meals);
+          logger.log(`✅ [HybridDataService] Migrated ${meals.length} meals for trip ${tripId}`);
+        }
+
+        // 3. Shopping Items
+        const shoppingItems = await getShoppingListLocal(tripId);
+        if (shoppingItems.length > 0) {
+          await firebaseDataService.saveShoppingItems(tripId, shoppingItems);
+          logger.log(`✅ [HybridDataService] Migrated ${shoppingItems.length} shopping items for trip ${tripId}`);
+        }
+
+        // 4. Deleted Ingredients
+        const deletedIngredients = await getDeletedIngredientsLocal(tripId);
+        if (deletedIngredients.length > 0) {
+          await firebaseDataService.saveDeletedIngredients(tripId, deletedIngredients);
+          logger.log(`✅ [HybridDataService] Migrated ${deletedIngredients.length} deleted ingredients for trip ${tripId}`);
+        }
+
+        // 5. Todo Items
+        const todoItems = await getTodoItemsLocal(tripId);
+        if (todoItems.length > 0) {
+          await firebaseDataService.saveTodoItems(tripId, todoItems);
+          logger.log(`✅ [HybridDataService] Migrated ${todoItems.length} todo items for trip ${tripId}`);
+        }
+
+      } catch (error) {
+        logger.error(`❌ [HybridDataService] Failed to migrate trip ${tripId}:`, error);
+        // Continue with other trips even if one fails
+      }
+    }
+  }
+
   // === PACKING ITEMS ===
-  
+
   async getPackingItems(tripId: string): Promise<PackingItem[]> {
     console.log(`🎒 [HybridDataService] Getting packing items for trip ${tripId}`);
-    
+
     // Clean temp data before processing
     this.cleanupTempData();
-    
+
     if (await this.isSignedIn()) {
       try {
-        const items = await supabaseDataService.getPackingItems(tripId);
-        console.log(`📦 [HybridDataService] Loaded ${items.length} packing items from Supabase`);
-        
-        // Log group assignment statistics (without exposing user data)
-        const itemsWithGroups = items.filter(i => i.assignedGroupId);
-        if (itemsWithGroups.length > 0) {
-          logger.log(`👥 [HybridDataService] Loaded ${itemsWithGroups.length} items with group assignments from Supabase`);
-        }
-        
-        // Process data ephemerally - don't store sensitive details in logs
-        // Check for duplicates but only clean if there are actual issues
-        const duplicateCount = items.length - new Set(items.map(i => `${i.name}-${i.category}`)).size;
-        if (duplicateCount > 0) {
-          console.warn(`⚠️ [HybridDataService] Found ${duplicateCount} potential duplicates on load, cleaning...`);
-          const uniqueItems = this.removeDuplicatePackingItems(items);
-          if (uniqueItems.length !== items.length) {
-            console.warn(`⚠️ [HybridDataService] Cleaned ${items.length - uniqueItems.length} duplicate items`);
-            await this.savePackingItemsInternal(tripId, uniqueItems);
-            return uniqueItems;
-          }
-        }
-        
+        const items = await firebaseDataService.getPackingItems(tripId);
+        console.log(`📦 [HybridDataService] Loaded ${items.length} packing items from Firebase`);
         return items;
       } catch (error) {
-        console.error('Failed to get packing items from Supabase, using local fallback');
+        console.error('Failed to get packing items from Firebase, using local fallback');
         const localItems = await getPackingListLocal(tripId);
-        return this.removeDuplicatePackingItems(localItems);
+        return localItems;
       }
     }
-    
+
     const localItems = await getPackingListLocal(tripId);
     console.log(`📱 [HybridDataService] Loaded ${localItems.length} items from local storage`);
-    return this.removeDuplicatePackingItems(localItems);
+    return localItems;
   }
-  
+
+  subscribeToPackingItems(tripId: string, callback: (items: PackingItem[]) => void): Unsubscribe {
+    if (auth.currentUser) {
+      console.log(`🎧 [HybridDataService] Delegating subscription to Firebase for trip ${tripId}`);
+      return firebaseDataService.subscribeToPackingItems(tripId, async (items) => {
+        // Also save to local storage for offline backup
+        await savePackingListLocal(tripId, items);
+        callback(items);
+      });
+    } else {
+      console.log('📱 [HybridDataService] User not signed in, loading local items once (no real-time updates)');
+      getPackingListLocal(tripId).then(items => callback(items));
+      return () => { }; // No-op unsubscribe
+    }
+  }
+
   async savePackingItems(tripId: string, items: PackingItem[]): Promise<void> {
     logger.log(`🎒 [HybridDataService] Saving ${items.length} packing items for trip ${tripId}`);
-    
-    // Log group assignment count for monitoring (without exposing user data)
-    const itemsWithGroups = items.filter(i => i.assignedGroupId);
-    if (itemsWithGroups.length > 0) {
-      logger.log(`👥 [HybridDataService] ${itemsWithGroups.length} items have group assignments`);
-    }
-    
-    // DUPLICATE PREVENTION: Check for obvious duplicates before saving
-    const duplicateCount = items.length - new Set(items.map(i => `${i.name}-${i.category}`)).size;
-    if (duplicateCount > 0) {
-      logger.warn(`⚠️ [HybridDataService] Found ${duplicateCount} potential duplicates before save, cleaning...`);
-      const uniqueItems = this.removeDuplicatePackingItems(items);
-      if (uniqueItems.length !== items.length) {
-        logger.warn(`⚠️ [HybridDataService] Removed ${items.length - uniqueItems.length} duplicate packing items before saving`);
-      }
-      return await this.savePackingItemsInternal(tripId, uniqueItems);
-    }
-    
-    // No duplicates detected, save as-is
-    return await this.savePackingItemsInternal(tripId, items);
-  }
-  
-  /**
-   * Internal save method that bypasses duplicate checking (used for cleanup operations)
-   */
-  private async savePackingItemsInternal(tripId: string, items: PackingItem[]): Promise<void> {
+
     if (await this.isSignedIn()) {
       try {
-        console.log('📤 [HybridDataService] User signed in, saving to Supabase...');
-        await supabaseDataService.savePackingItems(tripId, items);
-        
-        // Post-save verification for group assignments
-        const itemsWithGroups = items.filter(i => i.assignedGroupId);
-        if (itemsWithGroups.length > 0) {
-          console.log('🔍 [HybridDataService] Verifying group assignments were saved...');
-          const savedItems = await supabaseDataService.getPackingItems(tripId);
-          const savedWithGroups = savedItems.filter(i => i.assignedGroupId);
-          
-          if (savedWithGroups.length !== itemsWithGroups.length) {
-            console.error(`❌ [HybridDataService] GROUP ASSIGNMENT SAVE FAILURE!`);
-            console.error(`❌ Expected ${itemsWithGroups.length} items with groups, got ${savedWithGroups.length}`);
-            console.error(`🚨 [HybridDataService] STARTING EMERGENCY RECOVERY...`);
-            
-            try {
-              // EMERGENCY: Find which items lost their assignments and restore them
-              const lostItems = itemsWithGroups.filter(originalItem => 
-                !savedWithGroups.find(savedItem => 
-                  savedItem.id === originalItem.id && savedItem.assignedGroupId === originalItem.assignedGroupId
-                )
-              );
-              
-              console.error(`🚨 [HybridDataService] ITEMS THAT LOST GROUPS:`, lostItems.map(item => ({
-                id: item.id,
-                name: item.name,
-                expectedGroupId: item.assignedGroupId,
-                actualGroupId: savedItems.find(s => s.id === item.id)?.assignedGroupId
-              })));
-              
-              // Also check for items that got WRONG group assignments (group swaps)
-              const itemsWithWrongGroups = savedItems.filter(savedItem => {
-                if (!savedItem.assignedGroupId) return false;
-                const originalItem = itemsWithGroups.find(orig => orig.id === savedItem.id);
-                return originalItem && originalItem.assignedGroupId && originalItem.assignedGroupId !== savedItem.assignedGroupId;
-              });
-              
-              if (itemsWithWrongGroups.length > 0) {
-                console.error(`🔄 [HybridDataService] ITEMS WITH WRONG GROUP ASSIGNMENTS:`, itemsWithWrongGroups.map(item => ({
-                  id: item.id,
-                  name: item.name,
-                  expectedGroupId: itemsWithGroups.find(orig => orig.id === item.id)?.assignedGroupId,
-                  actualGroupId: item.assignedGroupId
-                })));
-              }
-              
-              // EMERGENCY RECOVERY: Re-save with correct assignments (fix both lost AND wrong assignments)
-              const correctedItems = savedItems.map(savedItem => {
-                const originalItem = itemsWithGroups.find(orig => orig.id === savedItem.id);
-                if (originalItem) {
-                  // Case 1: Item lost its group assignment
-                  if (originalItem.assignedGroupId && !savedItem.assignedGroupId) {
-                    console.log(`🔧 [HybridDataService] RESTORE LOST: "${savedItem.name}" group assignment: ${originalItem.assignedGroupId}`);
-                    return { ...savedItem, assignedGroupId: originalItem.assignedGroupId };
-                  }
-                  // Case 2: Item got wrong group assignment
-                  if (originalItem.assignedGroupId && savedItem.assignedGroupId && originalItem.assignedGroupId !== savedItem.assignedGroupId) {
-                    console.log(`🔧 [HybridDataService] FIX WRONG: "${savedItem.name}" group assignment: ${savedItem.assignedGroupId} → ${originalItem.assignedGroupId}`);
-                    return { ...savedItem, assignedGroupId: originalItem.assignedGroupId };
-                  }
-                  // Case 3: Item shouldn't have group assignment but does
-                  if (!originalItem.assignedGroupId && savedItem.assignedGroupId) {
-                    console.log(`🔧 [HybridDataService] REMOVE WRONG: "${savedItem.name}" removing incorrect group assignment: ${savedItem.assignedGroupId}`);
-                    return { ...savedItem, assignedGroupId: undefined };
-                  }
-                }
-                return savedItem;
-              });
-              
-              // Re-save the corrected data
-              console.log(`🚑 [HybridDataService] Re-saving with corrected assignments...`);
-              await supabaseDataService.savePackingItems(tripId, correctedItems);
-              console.log(`✅ [HybridDataService] Emergency recovery completed successfully!`);
-              
-            } catch (recoveryError) {
-              console.error(`💥 [HybridDataService] Emergency recovery failed:`, recoveryError);
-            }
-            
-          } else {
-            console.log(`✅ [HybridDataService] Verified ${savedWithGroups.length} group assignments saved successfully`);
-          }
-        }
-        
+        console.log('📤 [HybridDataService] User signed in, saving to Firebase...');
+        await firebaseDataService.savePackingItems(tripId, items);
+
         // Also save locally as backup
         await savePackingListLocal(tripId, items);
-        console.log('✅ [HybridDataService] Packing items saved successfully to Supabase');
+        console.log('✅ [HybridDataService] Packing items saved successfully to Firebase');
       } catch (error) {
-        console.error('❌ [HybridDataService] Failed to save packing items to Supabase, saving locally:', error);
+        console.error('❌ [HybridDataService] Failed to save packing items to Firebase, saving locally:', error);
         await savePackingListLocal(tripId, items);
       }
     } else {
@@ -254,103 +193,19 @@ export class HybridDataService {
       await savePackingListLocal(tripId, items);
     }
   }
-  
-  /**
-   * Remove duplicate packing items based on name and category
-   */
-  private removeDuplicatePackingItems(items: PackingItem[]): PackingItem[] {
-    const seen = new Map<string, PackingItem>();
-    const debugRemovals: string[] = [];
-    
-    for (const item of items) {
-      // Don't include assignedGroupId in key - we want to merge true duplicates
-      const key = `${item.name.toLowerCase().trim()}-${item.category.toLowerCase().trim()}-${item.isPersonal}`;
-      
-      if (!seen.has(key)) {
-        seen.set(key, item);
-      } else {
-        // Keep the item with more user data, especially group assignments
-        const existing = seen.get(key)!;
-        
-        // Count the amount of user data each item has
-        // Group assignments are CRITICAL - weight them extremely high to prevent loss
-        const itemDataScore = 
-          (item.isOwned ? 1 : 0) + 
-          (item.isPacked ? 1 : 0) + 
-          (item.needsToBuy ? 1 : 0) + 
-          (item.notes ? 1 : 0) + 
-          (item.assignedGroupId ? 100 : 0); // MASSIVELY weight group assignments
-        
-        const existingDataScore = 
-          (existing.isOwned ? 1 : 0) + 
-          (existing.isPacked ? 1 : 0) + 
-          (existing.needsToBuy ? 1 : 0) + 
-          (existing.notes ? 1 : 0) + 
-          (existing.assignedGroupId ? 100 : 0); // MASSIVELY weight group assignments
-        
-        // CRITICAL: Never replace an item that has a group assignment with one that doesn't
-        if (existing.assignedGroupId && !item.assignedGroupId) {
-          debugRemovals.push(`🛡️ PROTECTED: Keeping "${existing.name}" with group ${existing.assignedGroupId}, rejecting ungrouped duplicate`);
-          // Keep existing item - don't replace
-        } else if (!existing.assignedGroupId && item.assignedGroupId) {
-          debugRemovals.push(`✨ UPGRADING: "${existing.name}" to have group assignment: ${item.assignedGroupId}`);
-          seen.set(key, item);
-        } else if (itemDataScore > existingDataScore) {
-          debugRemovals.push(`📊 SCORE WIN: Replacing "${existing.name}" (group: ${existing.assignedGroupId || 'none'}, score: ${existingDataScore}) with version (group: ${item.assignedGroupId || 'none'}, score: ${itemDataScore})`);
-          seen.set(key, item);
-        } else if (itemDataScore === existingDataScore && item.assignedGroupId && !existing.assignedGroupId) {
-          // If scores are equal but new item has group assignment, prefer it
-          debugRemovals.push(`⚖️ TIE BREAK: Updating "${existing.name}" to have group: ${item.assignedGroupId}`);
-          seen.set(key, item);
-        } else {
-          debugRemovals.push(`✋ KEEPING: "${existing.name}" (group: ${existing.assignedGroupId || 'none'}, score: ${existingDataScore}) over duplicate (group: ${item.assignedGroupId || 'none'}, score: ${itemDataScore})`);
-        }
-      }
-    }
-    
-    if (debugRemovals.length > 0) {
-      console.log(`🔍 [HybridDataService] Duplicate removal details:`, debugRemovals);
-    }
-    
-    const resultItems = Array.from(seen.values());
-    
-    // VALIDATION: Ensure no group assignments were lost during deduplication
-    const originalWithGroups = items.filter(i => i.assignedGroupId);
-    const resultWithGroups = resultItems.filter(i => i.assignedGroupId);
-    
-    if (originalWithGroups.length !== resultWithGroups.length) {
-      console.error(`🚨 [HybridDataService] GROUP ASSIGNMENT LOSS DETECTED!`);
-      console.error(`🚨 Original items with groups: ${originalWithGroups.length}`);
-      console.error(`🚨 Result items with groups: ${resultWithGroups.length}`);
-      console.error(`🚨 Lost assignments:`, originalWithGroups.filter(orig => 
-        !resultItems.find(result => result.name === orig.name && result.assignedGroupId === orig.assignedGroupId)
-      ));
-      
-      // Emergency fallback - restore lost assignments
-      for (const lostItem of originalWithGroups) {
-        const resultItem = resultItems.find(r => r.name === lostItem.name && r.category === lostItem.category);
-        if (resultItem && !resultItem.assignedGroupId && lostItem.assignedGroupId) {
-          console.log(`🔧 [HybridDataService] RESTORING lost group assignment for "${lostItem.name}": ${lostItem.assignedGroupId}`);
-          resultItem.assignedGroupId = lostItem.assignedGroupId;
-        }
-      }
-    }
-    
-    return resultItems;
-  }
-  
+
   // === MEALS ===
-  
+
   async getMeals(tripId: string): Promise<Meal[]> {
     console.log(`🍽️ [HybridDataService] Getting meals for trip ${tripId}`);
     if (await this.isSignedIn()) {
       try {
-        console.log('📤 [HybridDataService] User signed in, loading from Supabase...');
-        const supabaseMeals = await supabaseDataService.getMeals(tripId);
-        console.log(`✅ [HybridDataService] Loaded ${supabaseMeals.length} meals from Supabase`);
-        return supabaseMeals;
+        console.log('📤 [HybridDataService] User signed in, loading from Firebase...');
+        const firebaseMeals = await firebaseDataService.getMeals(tripId);
+        console.log(`✅ [HybridDataService] Loaded ${firebaseMeals.length} meals from Firebase`);
+        return firebaseMeals;
       } catch (error) {
-        console.error('❌ [HybridDataService] Failed to get meals from Supabase, falling back to local:', error);
+        console.error('❌ [HybridDataService] Failed to get meals from Firebase, falling back to local:', error);
         const localMeals = await getMealsLocal(tripId);
         console.log(`📱 [HybridDataService] Loaded ${localMeals.length} meals from local storage as fallback`);
         return localMeals;
@@ -361,45 +216,60 @@ export class HybridDataService {
     console.log(`📱 [HybridDataService] Loaded ${localMeals.length} meals from local storage`);
     return localMeals;
   }
-  
+
+  subscribeToMeals(tripId: string, callback: (meals: Meal[]) => void): Unsubscribe {
+    if (auth.currentUser) {
+      console.log(`🎧 [HybridDataService] Delegating subscription to Firebase for meals trip ${tripId}`);
+      return firebaseDataService.subscribeToMeals(tripId, async (meals) => {
+        await saveMealsLocal(tripId, meals);
+        callback(meals);
+      });
+    } else {
+      console.log('📱 [HybridDataService] User not signed in, loading local meals once');
+      getMealsLocal(tripId).then(meals => callback(meals));
+      return () => { };
+    }
+  }
+
   async saveMeals(tripId: string, meals: Meal[]): Promise<void> {
     console.log(`🔍 [HybridDataService] saveMeals called with tripId: ${tripId}, meals.length: ${meals.length}`);
     console.log(`🍽️ [HybridDataService] Saving ${meals.length} meals for trip ${tripId}`);
-    
+
     const isSignedIn = await this.isSignedIn();
     console.log(`🔐 [HybridDataService] User signed in status: ${isSignedIn}`);
-    
+
     if (isSignedIn) {
       try {
-        console.log('📤 [HybridDataService] User signed in, calling supabaseDataService.saveMeals...');
-        await supabaseDataService.saveMeals(tripId, meals);
-        console.log('✅ [HybridDataService] supabaseDataService.saveMeals completed successfully');
-        
+        console.log('📤 [HybridDataService] User signed in, calling firebaseDataService.saveMeals...');
+        await firebaseDataService.saveMeals(tripId, meals);
+        console.log('✅ [HybridDataService] firebaseDataService.saveMeals completed successfully');
+
         // Also save locally as backup
         console.log('💾 [HybridDataService] Saving locally as backup...');
         await saveMealsLocal(tripId, meals);
-        console.log('✅ [HybridDataService] Meals saved successfully to Supabase and local backup');
+        console.log('✅ [HybridDataService] Meals saved successfully to Firebase and local backup');
       } catch (error) {
-        console.error('❌ [HybridDataService] Failed to save meals to Supabase, saving locally:', error);
+        console.error('❌ [HybridDataService] Failed to save meals to Firebase, saving locally:', error);
         await saveMealsLocal(tripId, meals);
-        throw error; // Re-throw the error so the MealPlanner can handle it
+        console.warn('⚠️ [HybridDataService] Firebase save failed; meals saved locally only');
+        return;
       }
     } else {
       console.log('📱 [HybridDataService] User not signed in, saving locally only');
       await saveMealsLocal(tripId, meals);
     }
   }
-  
+
   // === SHOPPING ITEMS ===
-  
+
   async getShoppingItems(tripId: string): Promise<ShoppingItem[]> {
     if (await this.isSignedIn()) {
       try {
-        const items = await supabaseDataService.getShoppingItems(tripId);
+        const items = await firebaseDataService.getShoppingItems(tripId);
         // Ensure shopping list is automatically populated with packing and meal items
         return await this.ensureShoppingListPopulated(tripId, items);
       } catch (error) {
-        console.error('Failed to get shopping items from Supabase, falling back to local:', error);
+        console.error('Failed to get shopping items from Firebase, falling back to local:', error);
         const localItems = await getShoppingListLocal(tripId);
         return await this.ensureShoppingListPopulated(tripId, localItems);
       }
@@ -407,16 +277,34 @@ export class HybridDataService {
     const localItems = await getShoppingListLocal(tripId);
     return await this.ensureShoppingListPopulated(tripId, localItems);
   }
-  
+
+  subscribeToShoppingItems(tripId: string, callback: (items: ShoppingItem[]) => void): Unsubscribe {
+    if (auth.currentUser) {
+      console.log(`🎧 [HybridDataService] Delegating subscription to Firebase for shopping items trip ${tripId}`);
+      return firebaseDataService.subscribeToShoppingItems(tripId, async (items) => {
+        const populatedItems = await this.ensureShoppingListPopulated(tripId, items);
+        await saveShoppingListLocal(tripId, populatedItems);
+        callback(populatedItems);
+      });
+    } else {
+      console.log('📱 [HybridDataService] User not signed in, loading local shopping items once');
+      getShoppingListLocal(tripId).then(async items => {
+        const populated = await this.ensureShoppingListPopulated(tripId, items);
+        callback(populated);
+      });
+      return () => { };
+    }
+  }
+
   // New method that accepts meals to avoid database reload race conditions
   async getShoppingItemsWithMeals(tripId: string, currentMeals: Meal[]): Promise<ShoppingItem[]> {
     if (await this.isSignedIn()) {
       try {
-        const items = await supabaseDataService.getShoppingItems(tripId);
+        const items = await firebaseDataService.getShoppingItems(tripId);
         // Use provided meals instead of loading from database
         return await this.ensureShoppingListPopulatedWithMeals(tripId, items, currentMeals);
       } catch (error) {
-        console.error('Failed to get shopping items from Supabase, falling back to local:', error);
+        console.error('Failed to get shopping items from Firebase, falling back to local:', error);
         const localItems = await getShoppingListLocal(tripId);
         return await this.ensureShoppingListPopulatedWithMeals(tripId, localItems, currentMeals);
       }
@@ -424,20 +312,39 @@ export class HybridDataService {
     const localItems = await getShoppingListLocal(tripId);
     return await this.ensureShoppingListPopulatedWithMeals(tripId, localItems, currentMeals);
   }
-  
+
   private async ensureShoppingListPopulated(tripId: string, existingItems: ShoppingItem[]): Promise<ShoppingItem[]> {
-    console.log(`🛒 [HybridDataService] Ensuring shopping list is populated for trip ${tripId}`);
-    
     // Get packing items and meals to auto-populate shopping list
     const [packingItems, meals, deletedIngredients] = await Promise.all([
       this.getPackingItems(tripId),
       this.getMeals(tripId),
       this.getDeletedIngredients(tripId)
     ]);
-    
+
+    return this.populateShoppingListLogic(tripId, existingItems, packingItems, meals, deletedIngredients);
+  }
+
+  private async ensureShoppingListPopulatedWithMeals(tripId: string, existingItems: ShoppingItem[], currentMeals: Meal[]): Promise<ShoppingItem[]> {
+    // Get packing items and deleted ingredients (but use provided meals)
+    const [packingItems, deletedIngredients] = await Promise.all([
+      this.getPackingItems(tripId),
+      this.getDeletedIngredients(tripId)
+    ]);
+
+    return this.populateShoppingListLogic(tripId, existingItems, packingItems, currentMeals, deletedIngredients);
+  }
+
+  private async populateShoppingListLogic(
+    tripId: string,
+    existingItems: ShoppingItem[],
+    packingItems: PackingItem[],
+    meals: Meal[],
+    deletedIngredients: string[]
+  ): Promise<ShoppingItem[]> {
+
     const existingItemsMap = new Map(existingItems.map(item => [item.name.toLowerCase(), item]));
     const deletedIngredientsSet = new Set(deletedIngredients.map(name => name.toLowerCase()));
-    
+
     // 1. Add packing items marked as needsToBuy
     const packingShoppingItems: ShoppingItem[] = packingItems
       .filter(item => item.needsToBuy && !item.isOwned)
@@ -454,42 +361,31 @@ export class HybridDataService {
           sourceItemId: item.id // Link back to packing item
         };
       });
-    
-    // 2. Add meal ingredients (excluding deleted ones) with group assignments
-    const ingredientInfo = meals.length > 0 
+
+    // 2. Add meal ingredients (excluding deleted ones)
+    const ingredientInfo = meals.length > 0
       ? meals.flatMap(m => m.ingredients.map(ing => ({ ingredient: ing, groupId: m.assignedGroupId })))
-          .reduce<Record<string, { count: number, groupId?: string }>>((acc, { ingredient, groupId }) => {
-            const normalizedName = ingredient.toLowerCase().trim();
-            if (!deletedIngredientsSet.has(normalizedName)) {
-              if (!acc[ingredient]) {
-                acc[ingredient] = { count: 0, groupId };
-              }
-              acc[ingredient]!.count += 1;
-              // If ingredients come from meals with different group assignments, don't assign to a specific group
-              if (acc[ingredient]!.groupId !== groupId) {
-                acc[ingredient]!.groupId = undefined;
-              }
+        .reduce<Record<string, { count: number, groupId?: string }>>((acc, { ingredient, groupId }) => {
+          const normalizedName = ingredient.toLowerCase().trim();
+          if (!deletedIngredientsSet.has(normalizedName)) {
+            if (!acc[ingredient]) {
+              acc[ingredient] = { count: 0, groupId };
             }
-            return acc;
-          }, {})
+            acc[ingredient]!.count += 1;
+            if (acc[ingredient]!.groupId !== groupId) {
+              acc[ingredient]!.groupId = undefined;
+            }
+          }
+          return acc;
+        }, {})
       : {};
-    
-    console.log(`🍽️ [HybridDataService] Current meal ingredients with groups:`, ingredientInfo);
-    
+
     const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientInfo)
       .map(([name, info]) => {
         const existing = existingItemsMap.get(name.toLowerCase());
         if (existing) {
-          // Always update existing item with group assignment from meal
-          // This ensures ingredients inherit the meal's group assignment
-          if (existing.assignedGroupId !== info.groupId) {
-            console.log(`🔄 [HybridDataService] Updating ingredient "${name}" group assignment: ${existing.assignedGroupId || 'none'} → ${info.groupId || 'shared'}`);
-            existing.assignedGroupId = info.groupId;
-          }
-          // Return the updated existing item
           return { ...existing, assignedGroupId: info.groupId };
         }
-        console.log(`➕ [HybridDataService] Creating new ingredient "${name}" with group: ${info.groupId || 'shared'}`);
         return {
           id: crypto.randomUUID(),
           name,
@@ -498,208 +394,54 @@ export class HybridDataService {
           isChecked: false,
           needsToBuy: true,
           isOwned: false,
-          sourceItemId: undefined, // No sourceItemId means it's from meals
-          assignedGroupId: info.groupId // Auto-assign to meal's group
+          sourceItemId: undefined,
+          assignedGroupId: info.groupId
         };
       });
-    
-    // 3. Get manually added items (items not from packing or current meals)
-    // FIXED: Properly filter out orphaned meal ingredients
+
+    // 3. Get manually added items
     const manualItems = existingItems.filter(item => {
-      // Keep items that are not auto-generated from packing or meals
       const isFromPacking = item.sourceItemId && packingItems.some(p => p.id === item.sourceItemId);
-      
-      // For food items without sourceItemId, only keep them if they're currently in meals
-      // This will remove orphaned ingredients from deleted meals
       const isFoodItemWithoutSource = !item.sourceItemId && item.category === 'food';
       const isCurrentlyInMeals = ingredientInfo[item.name];
-      
-      if (isFromPacking) {
-        return false; // Will be handled by packing section
-      }
-      
+
+      if (isFromPacking) return false;
       if (isFoodItemWithoutSource) {
-        if (isCurrentlyInMeals) {
-          return false; // Will be handled by meals section
-        } else {
-          // This is an orphaned ingredient from a deleted meal
-          console.log(`🗑️ [HybridDataService] Removing orphaned meal ingredient: ${item.name}`);
-          return false;
-        }
+        if (isCurrentlyInMeals) return false;
+        else return false; // Orphaned ingredient
       }
-      
-      // Keep camping items and other manually added items
       return true;
     });
-    
+
     // 4. Combine all items
     const allItems = [...packingShoppingItems, ...mealShoppingItems, ...manualItems];
-    
-    console.log(`🛒 [HybridDataService] Shopping list populated: ${packingShoppingItems.length} packing + ${mealShoppingItems.length} meal + ${manualItems.length} manual = ${allItems.length} total`);
-    
-    // 5. Save the updated shopping list if it changed
-    if (allItems.length !== existingItems.length || 
-        !allItems.every(item => existingItems.some(existing => 
-          existing.id === item.id && 
-          existing.name === item.name && 
-          existing.quantity === item.quantity &&
-          existing.assignedGroupId === item.assignedGroupId // Also check group assignment changes
-        ))) {
+
+    // 5. Save if changed
+    if (allItems.length !== existingItems.length ||
+      !allItems.every(item => existingItems.some(existing =>
+        existing.id === item.id &&
+        existing.name === item.name &&
+        existing.quantity === item.quantity &&
+        existing.assignedGroupId === item.assignedGroupId
+      ))) {
       console.log(`🛒 [HybridDataService] Shopping list changed, saving...`);
       await this.saveShoppingItems(tripId, allItems);
       return allItems;
     }
-    
+
     return existingItems;
   }
-  
-  private async ensureShoppingListPopulatedWithMeals(tripId: string, existingItems: ShoppingItem[], currentMeals: Meal[]): Promise<ShoppingItem[]> {
-    console.log(`🛒 [HybridDataService] Ensuring shopping list is populated for trip ${tripId} with provided meals`);
-    
-    // Get packing items and deleted ingredients (but use provided meals)
-    const [packingItems, deletedIngredients] = await Promise.all([
-      this.getPackingItems(tripId),
-      this.getDeletedIngredients(tripId)
-    ]);
-    
-    const existingItemsMap = new Map(existingItems.map(item => [item.name.toLowerCase(), item]));
-    const deletedIngredientsSet = new Set(deletedIngredients.map(name => name.toLowerCase()));
-    
-    // 1. Add packing items marked as needsToBuy
-    const packingShoppingItems: ShoppingItem[] = packingItems
-      .filter(item => item.needsToBuy && !item.isOwned)
-      .map(item => {
-        const existing = existingItemsMap.get(item.name.toLowerCase());
-        return existing || {
-          id: crypto.randomUUID(),
-          name: item.name,
-          quantity: item.quantity,
-          category: 'camping' as const,
-          isChecked: false,
-          needsToBuy: true,
-          isOwned: false,
-          sourceItemId: item.id // Link back to packing item
-        };
-      });
-    
-    // 2. Add meal ingredients from provided meals (excluding deleted ones) with group assignments
-    console.log(`🍽️ [HybridDataService] Processing meals for ingredients:`, currentMeals.map(m => ({
-      name: m.name,
-      assignedGroupId: m.assignedGroupId,
-      ingredients: m.ingredients
-    })));
-    
-    const ingredientInfo = currentMeals.length > 0 
-      ? currentMeals.flatMap(m => m.ingredients.map(ing => ({ ingredient: ing, groupId: m.assignedGroupId })))
-          .reduce<Record<string, { count: number, groupId?: string }>>((acc, { ingredient, groupId }) => {
-            const normalizedName = ingredient.toLowerCase().trim();
-            if (!deletedIngredientsSet.has(normalizedName)) {
-              if (!acc[ingredient]) {
-                acc[ingredient] = { count: 0, groupId };
-                console.log(`🍽️ [HybridDataService] Adding ingredient "${ingredient}" with groupId: ${groupId || 'none'}`);
-              }
-              acc[ingredient]!.count += 1;
-              // If ingredients come from meals with different group assignments, don't assign to a specific group
-              if (acc[ingredient]!.groupId !== groupId) {
-                console.log(`🍽️ [HybridDataService] Ingredient "${ingredient}" has conflicting groups: ${acc[ingredient]!.groupId} vs ${groupId}, clearing assignment`);
-                acc[ingredient]!.groupId = undefined;
-              }
-            }
-            return acc;
-          }, {})
-      : {};
-    
-    console.log(`🍽️ [HybridDataService] Processed ingredient info:`, ingredientInfo);
-    
-    const mealShoppingItems: ShoppingItem[] = Object.entries(ingredientInfo)
-      .map(([name, info]) => {
-        const existing = existingItemsMap.get(name.toLowerCase());
-        if (existing) {
-          // Always update existing item with group assignment from meal
-          // This ensures ingredients inherit the meal's group assignment
-          if (existing.assignedGroupId !== info.groupId) {
-            console.log(`🔄 [HybridDataService] Updating ingredient "${name}" group assignment: ${existing.assignedGroupId || 'none'} → ${info.groupId || 'shared'}`);
-            existing.assignedGroupId = info.groupId;
-          }
-          // Return the updated existing item
-          return { ...existing, assignedGroupId: info.groupId };
-        }
-        const newItem = {
-          id: crypto.randomUUID(),
-          name,
-          quantity: info.count,
-          category: 'food' as const,
-          isChecked: false,
-          needsToBuy: true,
-          isOwned: false,
-          sourceItemId: undefined, // No sourceItemId means it's from meals
-          assignedGroupId: info.groupId // Auto-assign to meal's group
-        };
-        console.log(`🛒 [HybridDataService] Creating new shopping item "${name}" with groupId: ${info.groupId || 'none'}`);
-        return newItem;
-      });
-    
-    // 3. Get manually added items (items not from packing or current meals)
-    // FIXED: Properly filter out orphaned meal ingredients
-    const manualItems = existingItems.filter(item => {
-      // Keep items that are not auto-generated from packing or meals
-      const isFromPacking = item.sourceItemId && packingItems.some(p => p.id === item.sourceItemId);
-      
-      // For food items without sourceItemId, only keep them if they're currently in meals
-      // This will remove orphaned ingredients from deleted meals
-      const isFoodItemWithoutSource = !item.sourceItemId && item.category === 'food';
-      const isCurrentlyInMeals = ingredientInfo[item.name];
-      
-      if (isFromPacking) {
-        return false; // Will be handled by packing section
-      }
-      
-      if (isFoodItemWithoutSource) {
-        if (isCurrentlyInMeals) {
-          return false; // Will be handled by meals section
-        } else {
-          // This is an orphaned ingredient from a deleted meal
-          console.log(`🗑️ [HybridDataService] Removing orphaned meal ingredient: ${item.name}`);
-          return false;
-        }
-      }
-      
-      // Keep camping items and other manually added items
-      return true;
-    });
-    
-    // 4. Combine all items
-    const allItems = [...packingShoppingItems, ...mealShoppingItems, ...manualItems];
-    
-    console.log(`🛒 [HybridDataService] Shopping list populated with provided meals: ${packingShoppingItems.length} packing + ${mealShoppingItems.length} meal + ${manualItems.length} manual = ${allItems.length} total`);
-    
-    // 5. Save the updated shopping list if it changed
-    if (allItems.length !== existingItems.length || 
-        !allItems.every(item => existingItems.some(existing => 
-          existing.id === item.id && 
-          existing.name === item.name && 
-          existing.quantity === item.quantity &&
-          existing.assignedGroupId === item.assignedGroupId // Also check group assignment changes
-        ))) {
-      console.log(`🛒 [HybridDataService] Shopping list changed, saving...`);
-      await this.saveShoppingItems(tripId, allItems);
-      return allItems;
-    }
-    
-    return existingItems;
-  }
-  
+
   async saveShoppingItems(tripId: string, items: ShoppingItem[]): Promise<void> {
     console.log(`🛒 [HybridDataService] Saving ${items.length} shopping items for trip ${tripId}`);
     if (await this.isSignedIn()) {
       try {
-        console.log('📤 [HybridDataService] User signed in, saving to Supabase...');
-        await supabaseDataService.saveShoppingItems(tripId, items);
-        // Also save locally as backup
+        console.log('📤 [HybridDataService] User signed in, saving to Firebase...');
+        await firebaseDataService.saveShoppingItems(tripId, items);
         await saveShoppingListLocal(tripId, items);
-        console.log('✅ [HybridDataService] Shopping items saved successfully to Supabase');
+        console.log('✅ [HybridDataService] Shopping items saved successfully to Firebase');
       } catch (error) {
-        console.error('❌ [HybridDataService] Failed to save shopping items to Supabase, saving locally:', error);
+        console.error('❌ [HybridDataService] Failed to save shopping items to Firebase, saving locally:', error);
         await saveShoppingListLocal(tripId, items);
       }
     } else {
@@ -707,219 +449,143 @@ export class HybridDataService {
       await saveShoppingListLocal(tripId, items);
     }
   }
-  
+
   // === GEAR ITEMS ===
-  
+
   async getGearItems(): Promise<GearItem[]> {
     if (await this.isSignedIn()) {
       try {
-        return await supabaseDataService.getGearItems();
+        return await firebaseDataService.getGearItems();
       } catch (error) {
-        console.error('Failed to get gear items from Supabase, falling back to local:', error);
-        return []; // Return empty array as fallback since local gear storage may not exist
+        console.error('Failed to get gear items from Firebase, falling back to local:', error);
+        return [];
       }
     }
-    return []; // Return empty array for local storage fallback
+    return [];
   }
-  
+
   async saveGearItems(items: GearItem[]): Promise<void> {
     if (await this.isSignedIn()) {
       try {
-        await supabaseDataService.saveGearItems(items);
+        await firebaseDataService.saveGearItems(items);
       } catch (error) {
-        console.error('Failed to save gear items to Supabase:', error);
+        console.error('Failed to save gear items to Firebase:', error);
         throw error;
       }
     } else {
       console.warn('Cannot save gear items: user not signed in');
     }
   }
-  
+
   // === DELETED INGREDIENTS ===
-  
+
   async getDeletedIngredients(tripId: string): Promise<string[]> {
     if (await this.isSignedIn()) {
       try {
-        return await supabaseDataService.getDeletedIngredients(tripId);
+        return await firebaseDataService.getDeletedIngredients(tripId);
       } catch (error) {
-        console.error('Failed to get deleted ingredients from Supabase, falling back to local:', error);
+        console.error('Failed to get deleted ingredients from Firebase, falling back to local:', error);
         return await getDeletedIngredientsLocal(tripId);
       }
     }
     return await getDeletedIngredientsLocal(tripId);
   }
-  
+
   async saveDeletedIngredients(tripId: string, ingredientNames: string[]): Promise<void> {
     if (await this.isSignedIn()) {
       try {
-        await supabaseDataService.saveDeletedIngredients(tripId, ingredientNames);
-        // Also save locally as backup
+        await firebaseDataService.saveDeletedIngredients(tripId, ingredientNames);
         await saveDeletedIngredientsLocal(tripId, ingredientNames);
       } catch (error) {
-        console.error('Failed to save deleted ingredients to Supabase, saving locally:', error);
+        console.error('Failed to save deleted ingredients to Firebase, saving locally:', error);
         await saveDeletedIngredientsLocal(tripId, ingredientNames);
       }
     } else {
       await saveDeletedIngredientsLocal(tripId, ingredientNames);
     }
   }
-  
+
   // === TODO ITEMS ===
-  
+
   async getTodoItems(tripId: string): Promise<TodoItem[]> {
     if (await this.isSignedIn()) {
       try {
-        return await supabaseDataService.getTodoItems(tripId);
+        return await firebaseDataService.getTodoItems(tripId);
       } catch (error) {
-        console.error('Failed to get todo items from Supabase, falling back to local:', error);
+        console.error('Failed to get todo items from Firebase, falling back to local:', error);
         return await getTodoItemsLocal(tripId);
       }
     }
     return await getTodoItemsLocal(tripId);
   }
-  
+
+  subscribeToTodoItems(tripId: string, callback: (items: TodoItem[]) => void): Unsubscribe {
+    if (auth.currentUser) {
+      console.log(`🎧 [HybridDataService] Delegating subscription to Firebase for todo items trip ${tripId}`);
+      return firebaseDataService.subscribeToTodoItems(tripId, async (items) => {
+        await saveTodoItemsLocal(tripId, items);
+        callback(items);
+      });
+    } else {
+      console.log('📱 [HybridDataService] User not signed in, loading local todo items once');
+      getTodoItemsLocal(tripId).then(items => callback(items));
+      return () => { };
+    }
+  }
+
   async saveTodoItems(tripId: string, items: TodoItem[]): Promise<void> {
     console.log(`✅ [HybridDataService] Saving ${items.length} todo items for trip ${tripId}`);
     if (await this.isSignedIn()) {
       try {
-        console.log('📤 [HybridDataService] User signed in, saving to Supabase...');
-        await supabaseDataService.saveTodoItems(tripId, items);
-        // Also save locally as backup
+        console.log('📤 [HybridDataService] User signed in, saving to Firebase...');
+        await firebaseDataService.saveTodoItems(tripId, items);
         await saveTodoItemsLocal(tripId, items);
-        console.log('✅ [HybridDataService] Todo items saved successfully to Supabase');
       } catch (error) {
-        console.error('❌ [HybridDataService] Failed to save todo items to Supabase, saving locally:', error);
+        console.error('Failed to save todo items to Firebase, saving locally:', error);
         await saveTodoItemsLocal(tripId, items);
       }
     } else {
-      console.log('📱 [HybridDataService] User not signed in, saving locally only');
       await saveTodoItemsLocal(tripId, items);
     }
   }
-  
-  // === TEMPLATE MANAGEMENT ===
-  
+
+  // === TEMPLATES ===
+
   async getPackingTemplates(): Promise<PackingTemplate[]> {
     if (await this.isSignedIn()) {
       try {
-        return await supabaseDataService.getPackingTemplates();
+        return await firebaseDataService.getPackingTemplates();
       } catch (error) {
-        console.error('Failed to get packing templates from Supabase:', error);
+        console.error('Failed to get packing templates from Firebase:', error);
         return [];
       }
     }
     return [];
   }
-  
+
   async savePackingTemplate(template: PackingTemplate): Promise<void> {
     if (await this.isSignedIn()) {
-      try {
-        await supabaseDataService.savePackingTemplate(template);
-        console.log(`✅ [HybridDataService] Packing template "${template.name}" saved successfully`);
-      } catch (error) {
-        console.error('Failed to save packing template:', error);
-        throw error;
-      }
-    } else {
-      console.warn('Cannot save packing template: user not signed in');
-      throw new Error('Please sign in to save templates');
+      await firebaseDataService.savePackingTemplate(template);
     }
   }
-  
-  /**
-   * Get all meal templates for the current user
-   * @returns Promise resolving to array of MealTemplate objects
-   */
+
   async getMealTemplates(): Promise<MealTemplate[]> {
     if (await this.isSignedIn()) {
       try {
-        return await supabaseDataService.getMealTemplates();
+        return await firebaseDataService.getMealTemplates();
       } catch (error) {
-        console.error('Failed to get meal templates from Supabase:', error);
+        console.error('Failed to get meal templates from Firebase:', error);
         return [];
       }
     }
     return [];
   }
-  
+
   async saveMealTemplate(template: MealTemplate): Promise<void> {
     if (await this.isSignedIn()) {
-      try {
-        await supabaseDataService.saveMealTemplate(template);
-        console.log(`✅ [HybridDataService] Meal template "${template.name}" saved successfully`);
-      } catch (error) {
-        console.error('Failed to save meal template:', error);
-        throw error;
-      }
-    } else {
-      console.warn('Cannot save meal template: user not signed in');
-      throw new Error('Please sign in to save templates');
-    }
-  }
-  
-  // === DATA MIGRATION ===
-  
-  /**
-   * Migrate local data to Supabase when user signs in
-   * Should be called after successful authentication
-   */
-  async migrateLocalDataToSupabase(tripIds: string[]): Promise<void> {
-    if (!(await this.isSignedIn())) {
-      console.warn('Cannot migrate data: user not signed in');
-      return;
-    }
-    
-    console.log('Starting data migration to Supabase...');
-    
-    try {
-      // Migrate each trip's data
-      for (const tripId of tripIds) {
-        // Migrate packing items
-        const localPackingItems = await getPackingListLocal(tripId);
-        if (localPackingItems.length > 0) {
-          await supabaseDataService.savePackingItems(tripId, localPackingItems);
-          console.log(`Migrated ${localPackingItems.length} packing items for trip ${tripId}`);
-        }
-        
-        // Migrate meals
-        const localMeals = await getMealsLocal(tripId);
-        if (localMeals.length > 0) {
-          await supabaseDataService.saveMeals(tripId, localMeals);
-          console.log(`Migrated ${localMeals.length} meals for trip ${tripId}`);
-        }
-        
-        // Migrate shopping items
-        const localShoppingItems = await getShoppingListLocal(tripId);
-        if (localShoppingItems.length > 0) {
-          await supabaseDataService.saveShoppingItems(tripId, localShoppingItems);
-          console.log(`Migrated ${localShoppingItems.length} shopping items for trip ${tripId}`);
-        }
-        
-        // Migrate deleted ingredients
-        const localDeletedIngredients = await getDeletedIngredientsLocal(tripId);
-        if (localDeletedIngredients.length > 0) {
-          await supabaseDataService.saveDeletedIngredients(tripId, localDeletedIngredients);
-          console.log(`Migrated ${localDeletedIngredients.length} deleted ingredients for trip ${tripId}`);
-        }
-        
-        // Migrate todo items
-        const localTodoItems = await getTodoItemsLocal(tripId);
-        if (localTodoItems.length > 0) {
-          await supabaseDataService.saveTodoItems(tripId, localTodoItems);
-          console.log(`Migrated ${localTodoItems.length} todo items for trip ${tripId}`);
-        }
-      }
-      
-      // Note: Gear items migration skipped - local gear storage may not exist
-      console.log('Gear items migration skipped - not implemented in local storage');
-      
-      console.log('Data migration completed successfully');
-    } catch (error) {
-      console.error('Data migration failed:', error);
-      throw error;
+      await firebaseDataService.saveMealTemplate(template);
     }
   }
 }
 
-// Export singleton instance
 export const hybridDataService = new HybridDataService();

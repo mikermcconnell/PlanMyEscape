@@ -27,26 +27,26 @@ interface TripDataState {
 interface TripDataActions {
   // Trip actions
   updateTrip: (updates: Partial<Trip>) => Promise<void>;
-  
+
   // Packing actions
   addPackingItem: (item: Omit<PackingItem, 'id'>) => Promise<void>;
   updatePackingItem: (id: string, updates: Partial<PackingItem>) => Promise<void>;
   deletePackingItem: (id: string) => Promise<void>;
-  
+
   // Meal actions
   addMeal: (meal: Omit<Meal, 'id'>) => Promise<void>;
   updateMeal: (id: string, updates: Partial<Meal>) => Promise<void>;
   deleteMeal: (id: string) => Promise<void>;
-  
+
   // Shopping actions
   updateShoppingItem: (id: string, updates: Partial<ShoppingItem>) => Promise<void>;
   syncShoppingList: () => Promise<void>;
-  
+
   // Todo actions
   addTodoItem: (item: Omit<TodoItem, 'id'>) => Promise<void>;
   updateTodoItem: (id: string, updates: Partial<TodoItem>) => Promise<void>;
   deleteTodoItem: (id: string) => Promise<void>;
-  
+
   // Sync actions
   syncAll: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -67,7 +67,7 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
   const { measure } = usePerformanceMonitor('TripData');
   const { isOffline } = useOfflineDetection();
 
-  // Load all trip data
+  // Load all trip data (manual fetch for refresh/recovery)
   const loadTripData = useCallback(async () => {
     if (!tripId) return;
 
@@ -83,7 +83,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
           hybridDataService.getTodoItems(tripId)
         ]);
 
-        setState({
+        setState(prev => ({
+          ...prev,
           trip,
           packingItems,
           meals,
@@ -92,7 +93,7 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
           loading: false,
           error: null,
           lastSyncTime: new Date()
-        });
+        }));
       });
     } catch (error) {
       setState(prev => ({
@@ -103,10 +104,75 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
     }
   }, [tripId, measure]);
 
-  // Initial load
+  // Load all trip data with subscriptions
   useEffect(() => {
-    loadTripData();
-  }, [loadTripData]);
+    if (!tripId) return;
+
+    setState(prev => ({ ...prev, loading: true, error: null }));
+
+    let unsubPacking: () => void = () => { };
+    let unsubMeals: () => void = () => { };
+    let unsubShopping: () => void = () => { };
+    let unsubTodos: () => void = () => { };
+
+    const setupSubscriptions = async () => {
+      try {
+        // Fetch trip details once (trip metadata usually doesn't change often in real-time in this context, 
+        // or we can add a subscription for it too if needed, but for now let's stick to items)
+        const trip = await hybridDataService.getTrip(tripId);
+
+        setState(prev => ({ ...prev, trip }));
+
+        // Subscribe to collections
+        unsubPacking = hybridDataService.subscribeToPackingItems(tripId, (items) => {
+          setState(prev => ({
+            ...prev,
+            packingItems: items,
+            loading: false // We can set loading to false after first data arrives? 
+            // Or wait for all? Let's wait for all roughly or just update as they come.
+            // To avoid flickering, maybe we should track what has loaded.
+            // But for simplicity, we'll just update.
+          }));
+        });
+
+        unsubMeals = hybridDataService.subscribeToMeals(tripId, (meals) => {
+          setState(prev => ({ ...prev, meals }));
+        });
+
+        unsubShopping = hybridDataService.subscribeToShoppingItems(tripId, (items) => {
+          setState(prev => ({ ...prev, shoppingItems: items }));
+        });
+
+        unsubTodos = hybridDataService.subscribeToTodoItems(tripId, (items) => {
+          setState(prev => ({ ...prev, todoItems: items }));
+        });
+
+        // Set loading false after a short timeout or assume data comes quickly?
+        // Better: The callbacks will fire immediately with initial data (or cached).
+        // So we can set loading to false in the callbacks. 
+        // But we have multiple callbacks.
+        // Let's just set loading to false after setup, assuming callbacks fire soon.
+        // Actually, onSnapshot fires immediately with current contents.
+        // So we can rely on that.
+
+      } catch (error) {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Failed to load trip data'
+        }));
+      }
+    };
+
+    setupSubscriptions();
+
+    return () => {
+      unsubPacking();
+      unsubMeals();
+      unsubShopping();
+      unsubTodos();
+    };
+  }, [tripId]);
 
   // Auto-sync when coming back online
   useEffect(() => {
@@ -198,7 +264,7 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
 
   const deletePackingItem = async (id: string) => {
     const deletedItem = state.packingItems.find(item => item.id === id);
-    
+
     await optimisticUpdate(
       prev => ({
         ...prev,
@@ -211,7 +277,7 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
       // Revert function
       prev => ({
         ...prev,
-        packingItems: deletedItem 
+        packingItems: deletedItem
           ? [...prev.packingItems, deletedItem].sort((a, b) => a.name.localeCompare(b.name))
           : prev.packingItems
       })
@@ -255,7 +321,7 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
 
   const deleteMeal = async (id: string) => {
     const deletedMeal = state.meals.find(meal => meal.id === id);
-    
+
     await optimisticUpdate(
       prev => ({
         ...prev,

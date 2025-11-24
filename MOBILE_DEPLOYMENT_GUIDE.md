@@ -88,6 +88,19 @@ npx cap open android
 # 2. Upload to Google Play Console
 ```
 
+**Secure Android Signing (required before release submission):**
+1. Create your release keystore outside of the repository (for example, `../secrets/planmyescape-release.jks`).
+2. Add a `keystore.properties` file (kept out of git) alongside `android/` with the following keys:
+   ```properties
+   storeFile=../secrets/planmyescape-release.jks
+   storePassword=your-store-password
+   keyAlias=your-key-alias
+   keyPassword=your-key-password
+   ```
+3. Alternatively, configure CI environment variables (`ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_STORE_PASSWORD`, `ANDROID_KEYSTORE_KEY_ALIAS`, `ANDROID_KEYSTORE_KEY_PASSWORD`).
+4. Never commit the keystore or `keystore.properties`; both are ignored via `.gitignore`.
+5. Verify a release build signs correctly before uploading to Play.
+
 ## Update Workflow
 
 ### **For Both Web and Mobile Updates:**
@@ -175,7 +188,13 @@ versionCode 1          // Internal version (increment each upload)
 # Development
 npm start                    # Web dev server
 npm run mobile:ios          # Open iOS in Xcode
-npm run mobile:android      # Open Android Studio
+npm run mobile:android      # Open Android Studio (sync first)
+
+# Android Studio helpers
+npm run android:studio      # Launch Android Studio using Capacitor
+npm run android:assembleDebug  # Gradle assembleDebug via helper script
+npm run android:bundleRelease  # Gradle bundleRelease via helper script
+npm run android:clean          # Gradle clean via helper script
 
 # Building
 npm run build               # Web production build

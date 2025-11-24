@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trip, TripType, TRIP_TYPES } from '../types';
-import { getTrips } from '../utils/supabaseTrips';
+// import { getTrips } from '../utils/supabaseTrips';
 import { Tent, Compass, Mountain, Home, Calendar, Users, Plus, MapPin, Activity, Trash2 } from 'lucide-react';
 import { tripService } from '../services/tripService';
 import { parseLocalDate, formatLocalDate } from '../utils/dateUtils';
@@ -15,7 +15,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     setLoading(true);
-    getTrips()
+    tripService.getTrips()
       .then(data => setTrips(data || []))
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
@@ -110,11 +110,11 @@ const Dashboard = () => {
     );
   }
 
-  if (error) return <div style={{color:'red'}}>Error: {error}</div>;
+  if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
 
   return (
     <div>
-      <SEOHead 
+      <SEOHead
         title="Dashboard - PlanMyEscape"
         description="Manage your camping trips, view upcoming adventures, and plan new outdoor experiences with PlanMyEscape dashboard."
         keywords="camping dashboard, trip management, outdoor planning, camping trips"
@@ -137,7 +137,7 @@ const Dashboard = () => {
         {TRIP_TYPES.map(type => {
           const typeTrips = trips.filter(t => t.tripType === type);
           const upcomingCount = typeTrips.filter(t => parseLocalDate(t.startDate) >= new Date()).length;
-          
+
           return (
             <div key={type} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
               <div className="flex items-center space-x-3">
@@ -172,7 +172,7 @@ const Dashboard = () => {
             </h2>
             <div className="space-y-3">
               {getUpcomingTrips().map(trip => {
-                
+
                 return (
                   <div
                     key={trip.id}
@@ -182,10 +182,10 @@ const Dashboard = () => {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-lg text-gray-900 dark:text-white">{trip.tripName}</span>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTripTypeColor(trip.tripType)}`}>
-                            {getTripTypeIcon(trip.tripType)}
-                            <span className="ml-1">{renderTripTypeText(trip.tripType)}</span>
-                          </span>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTripTypeColor(trip.tripType)}`}>
+                          {getTripTypeIcon(trip.tripType)}
+                          <span className="ml-1">{renderTripTypeText(trip.tripType)}</span>
+                        </span>
                       </div>
                       <button
                         className="p-2 rounded-full text-red-500 hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
@@ -200,25 +200,25 @@ const Dashboard = () => {
                       >
                         <Trash2 className="h-5 w-5" />
                       </button>
-                        </div>
-                        <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-1" />
-                            {formatLocalDate(trip.startDate)}
-                          </div>
-                          {trip.location && (
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-1" />
-                              {trip.location}
-                            </div>
-                          )}
-                        </div>
+                    </div>
+                    <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {formatLocalDate(trip.startDate)}
                       </div>
+                      {trip.location && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          {trip.location}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
           </div>
-          
+
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Quick Actions
@@ -234,7 +234,7 @@ const Dashboard = () => {
                   <p className="text-sm text-green-700 dark:text-green-300">Start planning your next adventure</p>
                 </div>
               </Link>
-              
+
             </div>
           </div>
         </div>
@@ -266,7 +266,7 @@ const Dashboard = () => {
           ) : (
             trips.map(trip => {
               const isUpcoming = parseLocalDate(trip.startDate) >= new Date();
-              
+
               return (
                 <div
                   key={trip.id}
@@ -302,11 +302,11 @@ const Dashboard = () => {
                         </button>
                       </div>
                     </div>
-                    
+
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
                       {trip.tripName}
                     </h3>
-                    
+
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                         <Calendar className="h-4 w-4 mr-2" />
@@ -327,12 +327,12 @@ const Dashboard = () => {
                             {getTotalCampers(trip)} {getTotalCampers(trip) === 1 ? 'person' : 'people'}
                           </span>
                         </div>
-                                                 {trip.activities && trip.activities.length > 0 && (
-                           <div className="flex items-center">
-                             <Activity className="h-4 w-4 mr-1" />
-                             <span>{trip.activities.length} activities</span>
-                           </div>
-                         )}
+                        {trip.activities && trip.activities.length > 0 && (
+                          <div className="flex items-center">
+                            <Activity className="h-4 w-4 mr-1" />
+                            <span>{trip.activities.length} activities</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 

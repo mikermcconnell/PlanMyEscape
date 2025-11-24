@@ -72,8 +72,12 @@ export const MealSchema = z.object({
   day: z.number().int().min(1),
   type: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
   ingredients: z.array(z.string()),
-  servings: z.number().int().positive().default(1).optional(),
-  isCustom: z.boolean()
+  servings: z.number().int().positive().optional(),
+  isCustom: z.boolean().optional(),
+  assignedGroupId: z.string().optional(),
+  sharedServings: z.boolean().optional(),
+  lastModifiedBy: z.string().optional(),
+  lastModifiedAt: z.string().optional()
 });
 
 export const GearItemSchema = z.object({

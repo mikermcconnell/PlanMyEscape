@@ -1,7 +1,9 @@
 import { Trip } from '../types';
 import { StorageAdapter, HybridStorageAdapter } from './storageAdapter';
 import { toast } from 'react-toastify';
-import { supabase } from '../supabaseClient';
+import logger from '../utils/logger';
+import { db, auth } from '../firebaseConfig';
+import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 
 export interface TripPerformanceStats {
   id: string;
@@ -17,33 +19,13 @@ export interface TripPerformanceStats {
 }
 
 export class TripService {
-  constructor(private adapter: StorageAdapter) {}
+  constructor(private adapter: StorageAdapter) { }
 
   async saveTrip(trip: Trip): Promise<Trip> {
     try {
-      console.log('🔍 [TripService.saveTrip] Input:', {
-        id: trip.id,
-        tripName: trip.tripName,
-        startDate: trip.startDate,
-        endDate: trip.endDate,
-        startDateType: typeof trip.startDate,
-        endDateType: typeof trip.endDate
-      });
-      
-      const result = await this.adapter.saveTrip(trip);
-      
-      console.log('🔍 [TripService.saveTrip] Result:', {
-        id: result.id,
-        tripName: result.tripName,
-        startDate: result.startDate,
-        endDate: result.endDate,
-        startDateType: typeof result.startDate,
-        endDateType: typeof result.endDate
-      });
-      
-      return result;
+      return await this.adapter.saveTrip(trip);
     } catch (error) {
-      console.error('🔴 [TripService.saveTrip] Error:', error);
+      logger.error('[TripService.saveTrip] Failed to save trip', error);
       toast.error('Unable to save trip');
       throw new Error('Unable to save trip');
     }
@@ -51,25 +33,9 @@ export class TripService {
 
   async getTrips(): Promise<Trip[]> {
     try {
-      console.log('🔍 [TripService.getTrips] Starting...');
-      
-      const trips = await this.adapter.getTrips();
-      
-      console.log('🔍 [TripService.getTrips] Result:', {
-        tripCount: trips.length,
-        trips: trips.map(t => ({
-          id: t.id,
-          tripName: t.tripName,
-          startDate: t.startDate,
-          endDate: t.endDate,
-          startDateType: typeof t.startDate,
-          endDateType: typeof t.endDate
-        }))
-      });
-      
-      return trips;
+      return await this.adapter.getTrips();
     } catch (error) {
-      console.error('🔴 [TripService.getTrips] Error:', error);
+      logger.error('[TripService.getTrips] Failed to load trips', error);
       toast.error('Unable to load trips');
       throw new Error('Unable to load trips');
     }
@@ -79,9 +45,8 @@ export class TripService {
     try {
       await this.adapter.deleteTrip(tripId);
     } catch (error) {
-      console.error('Failed to delete trip:', error);
-      
-      // Provide more specific error messages
+      logger.error('[TripService.deleteTrip] Failed to delete trip', error);
+
       if (error instanceof Error) {
         if (error.message.includes('Not signed in')) {
           toast.error('Please sign in to delete trips');
@@ -95,36 +60,60 @@ export class TripService {
       } else {
         toast.error('Unable to delete trip');
       }
-      
-      throw error; // Re-throw the original error for further handling
+
+      throw error;
     }
   }
 
   async getTripPerformanceStats(): Promise<TripPerformanceStats[]> {
+    const user = auth.currentUser;
+    if (!user) return [];
+
     try {
-      console.log('🔍 [TripService.getTripPerformanceStats] Starting...');
-      
-      // Call the security definer function that handles user isolation
-      const { data, error } = await supabase.rpc('get_user_trip_performance_stats');
-      
-      if (error) {
-        console.error('🔴 [TripService.getTripPerformanceStats] Supabase error:', error);
-        throw new Error(`Failed to fetch performance stats: ${error.message}`);
+      // Since we don't have a stored procedure, we'll fetch trips and count items.
+      // This is expensive if there are many trips, but for a single user it should be fine.
+      // Alternatively, we could maintain counters on the trip document.
+      // For now, let's just return basic stats or empty to unblock.
+
+      const trips = await this.getTrips();
+      const stats: TripPerformanceStats[] = [];
+
+      for (const trip of trips) {
+        // Parallelize these counts
+        const [packingCount, mealsCount, shoppingCount, todoCount] = await Promise.all([
+          getCountFromServer(query(collection(db, 'packing_items'), where('trip_id', '==', trip.id), where('user_id', '==', user.uid))),
+          getCountFromServer(query(collection(db, 'meals'), where('trip_id', '==', trip.id), where('user_id', '==', user.uid))),
+          getCountFromServer(query(collection(db, 'shopping_items'), where('trip_id', '==', trip.id), where('user_id', '==', user.uid))),
+          getCountFromServer(query(collection(db, 'todo_items'), where('trip_id', '==', trip.id), where('user_id', '==', user.uid)))
+        ]);
+
+        const totalItems = packingCount.data().count + mealsCount.data().count + shoppingCount.data().count + todoCount.data().count;
+        let complexity: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
+        if (totalItems > 50) complexity = 'MEDIUM';
+        if (totalItems > 150) complexity = 'HIGH';
+
+        stats.push({
+          id: trip.id,
+          trip_name: trip.tripName,
+          user_id: user.uid,
+          packing_items_count: packingCount.data().count,
+          meals_count: mealsCount.data().count,
+          shopping_items_count: shoppingCount.data().count,
+          todo_items_count: todoCount.data().count,
+          complexity_level: complexity,
+          created_at: new Date().toISOString(), // We don't have this easily available without fetching more
+          updated_at: new Date().toISOString()
+        });
       }
-      
-      console.log('🔍 [TripService.getTripPerformanceStats] Result:', {
-        statsCount: data?.length || 0,
-        stats: data?.slice(0, 3) // Log first 3 for debugging
-      });
-      
-      return data || [];
+
+      return stats;
+
     } catch (error) {
-      console.error('🔴 [TripService.getTripPerformanceStats] Error:', error);
-      toast.error('Unable to load trip performance stats');
-      throw new Error('Unable to load trip performance stats');
+      logger.error('[TripService.getTripPerformanceStats] Failed to load stats', error);
+      // Don't throw, just return empty to avoid breaking UI
+      return [];
     }
   }
 }
 
-// Default singleton instance using Hybrid
-export const tripService = new TripService(new HybridStorageAdapter()); 
+export const tripService = new TripService(new HybridStorageAdapter());

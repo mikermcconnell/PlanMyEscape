@@ -1,4 +1,4 @@
-export const TRIP_TYPES = ['car camping', 'canoe camping', 'hike camping', 'cottage'] as const;
+export const TRIP_TYPES = ['car camping', 'canoe camping', 'hike camping', 'cottage', 'day hike'] as const;
 export type TripTypeOption = typeof TRIP_TYPES[number];
 export type TripType = TripTypeOption;
 
@@ -27,7 +27,7 @@ export interface Trip {
 
 export interface Activity {
   id: string;
-  name: string;  
+  name: string;
   type: 'outdoor' | 'indoor' | 'water' | 'entertainment';
   equipment?: string[];
   notes?: string;
@@ -47,6 +47,7 @@ export interface PackingItem {
   id: string;
   name: string;
   category: string;
+  subcategory?: string;
   quantity: number;
   weight?: number;
   isOwned: boolean;
@@ -60,6 +61,7 @@ export interface PackingItem {
   lastModifiedBy?: string; // ID of user who last modified this item
   lastModifiedAt?: string; // Timestamp of last modification
   notes?: string; // User notes for this item
+  sourceActivityIds?: string[]; // Activity IDs that generated this item
 }
 
 export interface ShoppingItem {
@@ -161,6 +163,14 @@ export interface TodoItem {
   displayOrder: number;
 }
 
+export interface Note {
+  id: string;
+  title: string;
+  content?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 // Template interfaces for saving trip data as reusable templates
 export interface PackingTemplate {
   id: string;
@@ -183,3 +193,11 @@ export interface MealTemplate {
 
 // Explicit export to ensure type is available
 export type { MealTemplate as MealTemplateType };
+
+export interface PackingSuggestion {
+  name: string;
+  category: string;
+  subcategory?: string;
+  required: boolean;
+  quantity?: number;
+}

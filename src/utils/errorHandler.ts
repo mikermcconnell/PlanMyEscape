@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient';
+import { logSecurityEvent as logEvent } from './securityLogger';
 
 export interface SecurityEvent {
   event_type: 'auth_failure' | 'data_access_violation' | 'rate_limit_exceeded' | 'input_validation_error' | 'suspicious_activity';
@@ -44,25 +44,23 @@ class ErrorHandler {
   private isDevelopment = process.env.NODE_ENV === 'development';
 
   /**
-   * Log security events to Supabase
+   * Log security events to Firestore via securityLogger
    */
   async logSecurityEvent(event: SecurityEvent): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('security_logs')
-        .insert({
-          event_type: event.event_type,
-          user_id: event.user_id,
-          ip_address: event.ip_address || 'client-side',
-          user_agent: event.user_agent || navigator.userAgent,
-          details: event.details,
+      // Adapt the event to match securityLogger's expected format if needed
+      // Currently they seem compatible enough, but let's be explicit
+      await logEvent({
+        type: event.event_type,
+        userId: event.user_id || 'unknown',
+        userAgent: event.user_agent || navigator.userAgent,
+        details: {
+          ...event.details,
           severity: event.severity,
-          timestamp: new Date().toISOString()
-        });
+          ip_address: event.ip_address
+        }
+      });
 
-      if (error && this.isDevelopment) {
-        console.error('Failed to log security event:', error);
-      }
     } catch (err) {
       // Fail silently in production to avoid exposing system internals
       if (this.isDevelopment) {
@@ -104,7 +102,7 @@ class ErrorHandler {
    */
   validateEmail(email: string): boolean {
     if (!email || typeof email !== 'string') return false;
-    
+
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
     return emailRegex.test(email) && email.length <= 254 && email.length >= 5;
   }
@@ -118,10 +116,10 @@ class ErrorHandler {
       const now = Date.now();
       const stored = localStorage.getItem(key);
       const attempts = stored ? JSON.parse(stored) : [];
-      
+
       // Remove old attempts outside the window
       const validAttempts = attempts.filter((timestamp: number) => now - timestamp < windowMs);
-      
+
       if (validAttempts.length >= maxAttempts) {
         this.logSecurityEvent({
           event_type: 'rate_limit_exceeded',
@@ -185,7 +183,7 @@ const errorHandlerInstance = new ErrorHandler();
  */
 export const handleError = async (error: unknown, context?: string): Promise<{ message: string; code: number }> => {
   const isDevelopment = process.env.NODE_ENV === 'development';
-  
+
   // Log detailed error in development
   if (isDevelopment) {
     console.error('Application error:', error, 'Context:', context);
@@ -227,4 +225,4 @@ export const sanitizeInput = (input: string, maxLength?: number) => errorHandler
 export const validateEmail = (email: string) => errorHandlerInstance.validateEmail(email);
 export const checkRateLimit = (action: string, maxAttempts?: number, windowMs?: number) => errorHandlerInstance.checkRateLimit(action, maxAttempts, windowMs);
 export const detectSuspiciousActivity = (input: string, context: string) => errorHandlerInstance.detectSuspiciousActivity(input, context);
-export const logSecurityEvent = (event: SecurityEvent) => errorHandlerInstance.logSecurityEvent(event); 
+export const logSecurityEvent = (event: SecurityEvent) => errorHandlerInstance.logSecurityEvent(event);

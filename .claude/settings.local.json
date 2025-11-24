@@ -155,7 +155,11 @@
       "Read(//c/Users/Mike McConnell/.happy/logs/**)",
       "WebSearch",
       "WebFetch(domain:happy.engineering)",
-      "Bash(checkpoint.bat create \"Before implementing critical fixes from comprehensive code review - removing debug code, adding tests, and security improvements\")"
+      "Bash(checkpoint.bat create \"Before implementing critical fixes from comprehensive code review - removing debug code, adding tests, and security improvements\")",
+      "Bash(git rm:*)",
+      "mcp__playwright__browser_tabs",
+      "mcp__playwright__browser_navigate_back",
+      "TodoWrite(*/**)"
     ],
     "deny": []
   }

@@ -1,163 +1,88 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { X } from 'lucide-react';
-import { Group } from '../../types';
-import { PackingListService } from '../../services/packingListService';
 
 interface AddItemModalProps {
   isOpen: boolean;
-  category: string;
-  groups: Group[];
-  isCoordinated: boolean;
   onClose: () => void;
-  onAdd: (name: string, category: string, quantity: number, assignedGroupId?: string, isPersonal?: boolean) => void;
+  category: string;
+  name: string;
+  quantity: number;
+  onNameChange: (value: string) => void;
+  onQuantityChange: (value: number) => void;
+  onAdd: () => void;
 }
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({
   isOpen,
-  category,
-  groups,
-  isCoordinated,
   onClose,
+  category,
+  name,
+  quantity,
+  onNameChange,
+  onQuantityChange,
   onAdd
 }) => {
-  const [name, setName] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [assignedGroupId, setAssignedGroupId] = useState<string>('');
-  const [isPersonal, setIsPersonal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setName('');
-      setQuantity(1);
-      setAssignedGroupId('');
-      setIsPersonal(false);
-      setError(null);
-    }
-  }, [isOpen]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const validation = PackingListService.validateItemName(name);
-    if (!validation.isValid) {
-      setError(validation.error || 'Invalid item name');
-      return;
-    }
-
-    onAdd(
-      name,
-      category,
-      quantity,
-      assignedGroupId || undefined,
-      isPersonal
-    );
-    onClose();
-  };
-
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
             Add Item to {category}
-          </h2>
+          </h3>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           >
-            <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Item Name *
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="Enter item name"
-                autoFocus
-                required
-              />
-              {error && (
-                <p className="mt-1 text-sm text-red-600">{error}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Quantity
-              </label>
-              <input
-                type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                min="1"
-                required
-              />
-            </div>
-
-            {isCoordinated && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Assign to Group
-                  </label>
-                  <select
-                    value={assignedGroupId}
-                    onChange={(e) => setAssignedGroupId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="">Shared Item</option>
-                    {groups.map(group => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="isPersonal"
-                    checked={isPersonal}
-                    onChange={(e) => setIsPersonal(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="isPersonal" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                    Personal item (not shared)
-                  </label>
-                </div>
-              </>
-            )}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Item Name
+            </label>
+            <input
+              type="text"
+              placeholder="Item name"
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
+              autoFocus
+            />
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Quantity
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={quantity}
+              onChange={(e) => onQuantityChange(parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md dark:bg-gray-700"
+            />
+          </div>
+
+          <div className="flex space-x-2 pt-4">
             <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              onClick={onAdd}
+              disabled={!name.trim()}
+              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               Add Item
             </button>
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            >
+              Cancel
+            </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

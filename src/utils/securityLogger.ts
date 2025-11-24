@@ -1,30 +1,19 @@
-import { supabase } from '../supabaseClient';
+import { db } from '../firebaseConfig';
+import { collection, addDoc, query, where, getDocs, writeBatch, Timestamp } from 'firebase/firestore';
 
-export type SecurityEventType = 'login' | 'failed_login' | 'data_access' | 'data_export' | 'password_reset' | 'password_reset_initiated' | 'password_updated';
+export type SecurityEventType = 'login' | 'login_google' | 'signup' | 'failed_login' | 'data_access' | 'data_export' | 'password_reset' | 'password_reset_initiated' | 'password_updated' | 'suspicious_activity' | 'rate_limit_exceeded' | 'auth_failure' | 'data_access_violation' | 'input_validation_error';
 
 interface SecurityEvent {
   type: SecurityEventType;
   userId?: string;
   ip?: string;
   userAgent?: string;
-  details?: unknown;
+  details?: Record<string, unknown>;
 }
 
-// Privacy-compliant logging - anonymize sensitive data
-interface PrivacyCompliantEvent {
-  type: SecurityEventType;
-  userIdHash?: string; // Hash instead of actual user ID
-  ipHash?: string;     // Hash instead of actual IP
-  timestamp: string;
-  eventId: string;     // Unique identifier for this event
-}
-
-/**
- * Hash sensitive data for privacy compliance
- */
 const hashData = async (data: string): Promise<string> => {
   if (!data) return '';
-  
+
   try {
     const encoder = new TextEncoder();
     const dataBuffer = encoder.encode(data);
@@ -32,75 +21,72 @@ const hashData = async (data: string): Promise<string> => {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
   } catch {
-    // Fallback to simple hash for older browsers
     let hash = 0;
     for (let i = 0; i < data.length; i++) {
       const char = data.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
+      hash |= 0;
     }
     return Math.abs(hash).toString(16).substring(0, 16);
   }
 };
 
-/**
- * logSecurityEvent – write a privacy-compliant security event to the `security_logs` table.
- * Implements ephemeral data collection by hashing sensitive information.
- * Data is processed in memory and only anonymized data is persisted.
- */
+const redactIp = (ip?: string): string | null => {
+  if (!ip) return null;
+  if (ip.includes(':')) {
+    const parts = ip.split(':');
+    return `${parts.slice(0, -1).join(':')}:0000`;
+  }
+  const segments = ip.split('.');
+  if (segments.length === 4) {
+    return `${segments[0]}.${segments[1]}.xxx.xxx`;
+  }
+  return null;
+};
+
 export const logSecurityEvent = async (event: SecurityEvent): Promise<void> => {
   try {
-    // Process data ephemerally - hash sensitive info in memory before storage
-    const privacyCompliantEvent: PrivacyCompliantEvent = {
-      type: event.type,
-      userIdHash: event.userId ? await hashData(event.userId) : undefined,
-      ipHash: event.ip ? await hashData(event.ip) : undefined,
-      timestamp: new Date().toISOString(),
-      eventId: crypto.randomUUID()
-    };
-    
-    // Only store anonymized event data
-    await supabase.from('security_logs').insert({
-      event_type: privacyCompliantEvent.type,
-      user_id_hash: privacyCompliantEvent.userIdHash,
-      ip_hash: privacyCompliantEvent.ipHash,
-      timestamp: privacyCompliantEvent.timestamp,
-      event_id: privacyCompliantEvent.eventId,
-      details: event.details ? JSON.stringify(event.details) : null
+    const redactedIp = redactIp(event.ip);
+    const hashedUserId = event.userId ? await hashData(event.userId) : undefined;
+    const hashedIp = event.ip ? await hashData(event.ip) : undefined;
+
+    await addDoc(collection(db, 'security_logs'), {
+      event_type: event.type,
+      user_id: event.userId ?? null,
+      ip_address: redactedIp,
+      user_agent: event.userAgent || navigator.userAgent,
+      details: JSON.parse(JSON.stringify({
+        ...event.details,
+        hashed_user_id: hashedUserId,
+        hashed_ip: hashedIp
+      })),
+      timestamp: Timestamp.now()
     });
-    
-    // Clear sensitive data from memory immediately
-    Object.keys(event).forEach(key => {
-      if (key === 'userId' || key === 'ip' || key === 'userAgent') {
-        delete (event as any)[key];
-      }
-    });
-    
   } catch (error) {
-    // Log minimal error info without exposing sensitive data
-    console.error('Security event logging failed');
+    console.error('Security event logging failed', error);
   }
 };
 
-/**
- * Clean up old security logs to comply with data retention policies
- */
 export const cleanupOldSecurityLogs = async (retentionDays: number = 90): Promise<void> => {
   try {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-    
-    const { error } = await supabase
-      .from('security_logs')
-      .delete()
-      .lt('timestamp', cutoffDate.toISOString());
-    
-    if (error) {
-      console.error('Failed to cleanup old security logs');
-    } else {
-      console.log(`🧹 [SecurityLogger] Cleaned security logs older than ${retentionDays} days`);
-    }
+    const cutoffTimestamp = Timestamp.fromDate(cutoffDate);
+
+    const q = query(
+      collection(db, 'security_logs'),
+      where('timestamp', '<', cutoffTimestamp)
+    );
+
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
   } catch (error) {
-    console.error('Security log cleanup failed');
+    console.error('Security log cleanup failed', error);
   }
 };

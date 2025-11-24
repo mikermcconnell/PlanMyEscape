@@ -112,6 +112,17 @@
 - [ ] **API Security**: Test all API endpoints
 - [ ] **Client-Side Security**: Test browser-based attacks
 
+### Security QA Action Plan (Google Play Submission)
+1. **Authentication coverage:** Execute manual sign-in flows for Email/Password, Google, and Facebook providers; capture screenshots/logs and update the manual testing checklist accordingly.
+2. **Authorization validation:** Use two test accounts to confirm Row Level Security isolation for trips, packing items, and meals via Supabase SQL console.
+3. **Malicious input sweep:** Run the scripted XSS/SQLi payload tests in staging and record results; attach findings to QA notes.
+4. **Automated scans:** Add `npm run lint`, `npm run type-check`, `npm audit --production`, and Lighthouse security header checks to the release CI run; archive reports.
+5. **Rate limiting verification:** Trigger repeated login attempts to confirm lockout thresholds and log entries in `security_logs`.
+6. **Security header verification:** Use securityheaders.com or OWASP ZAP to export a report confirming CSP, HSTS, and COOP/COEP presence.
+7. **Dependency review:** Capture `npm outdated` snapshot and plan dependency upgrades for any high-severity advisories.
+8. **Incident response drill:** Document the on-call escalation path and test the alert pipeline configured in Supabase (thresholds defined in this file).
+9. **Sign-off:** Require peer review of the filled checklists before marking the open boxes in this document.
+
 ## 📋 Security Monitoring Setup
 
 ### Real-Time Monitoring

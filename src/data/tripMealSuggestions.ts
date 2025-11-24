@@ -100,5 +100,28 @@ export const tripMealSuggestions: MealSuggestions = {
       'Pasta dishes',
       'Stir fry'
     ]
+  },
+  'day hike': {
+    breakfast: [
+      'Energy Bar',
+      'Fruit',
+      'Yogurt',
+      'Smoothie',
+      'Oatmeal'
+    ],
+    lunch: [
+      'Sandwich',
+      'Trail Mix',
+      'Wrap',
+      'Fruit',
+      'Salad'
+    ],
+    dinner: [
+      'Restaurant',
+      'Home Cooked',
+      'Takeout',
+      'Pizza',
+      'Burgers'
+    ]
   }
 }; 
