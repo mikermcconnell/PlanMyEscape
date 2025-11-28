@@ -47,7 +47,15 @@ export default function SignIn() {
             navigate('/dashboard');
         } catch (err: any) {
             console.error(err);
-            setError(err.message.replace('Firebase: ', ''));
+            if (err.code === 'auth/invalid-credential' || err.message.includes('auth/invalid-credential')) {
+                setError('Incorrect email or password. Please try again.');
+            } else if (err.code === 'auth/user-not-found' || err.message.includes('auth/user-not-found')) {
+                setError('No account found with this email. Please sign up.');
+            } else if (err.code === 'auth/wrong-password' || err.message.includes('auth/wrong-password')) {
+                setError('Incorrect password. Please try again.');
+            } else {
+                setError(err.message.replace('Firebase: ', ''));
+            }
         } finally {
             setLoading(false);
         }
@@ -63,7 +71,15 @@ export default function SignIn() {
             navigate('/dashboard');
         } catch (err: any) {
             console.error(err);
-            setError(err.message.replace('Firebase: ', ''));
+            if (err.code === 'auth/invalid-credential' || err.message.includes('auth/invalid-credential')) {
+                setError('Incorrect email or password. Please try again.');
+            } else if (err.code === 'auth/user-not-found' || err.message.includes('auth/user-not-found')) {
+                setError('No account found with this email. Please sign up.');
+            } else if (err.code === 'auth/wrong-password' || err.message.includes('auth/wrong-password')) {
+                setError('Incorrect password. Please try again.');
+            } else {
+                setError(err.message.replace('Firebase: ', ''));
+            }
         } finally {
             setLoading(false);
         }
