@@ -4,7 +4,7 @@ import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCC7Z05xhoWleAQCSUSm0RCMU3bfeeXNgE",
+  apiKey: "AIzaSyBTjQlKKZW0To0wpVe9KsN6YcA-yZexYA8",
   authDomain: "planmyescape-b38b8.firebaseapp.com",
   projectId: "planmyescape-b38b8",
   storageBucket: "planmyescape-b38b8.firebasestorage.app",
