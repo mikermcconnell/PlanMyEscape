@@ -11,6 +11,7 @@ import { collection, doc, getDocs, setDoc, deleteDoc, query, where, getDoc } fro
 export interface StorageAdapter {
   saveTrip(trip: Trip): Promise<Trip>;
   getTrips(): Promise<Trip[]>;
+  getTripById(tripId: string): Promise<Trip | null>;
   deleteTrip(tripId: string): Promise<void>;
 }
 
@@ -171,6 +172,53 @@ export class FirebaseStorageAdapter implements StorageAdapter {
     return trips;
   }
 
+  async getTripById(tripId: string): Promise<Trip | null> {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Not signed in');
+
+    logger.log(`🔍 [FirebaseStorageAdapter.getTripById] Fetching trip: ${tripId}`);
+
+    // Direct document fetch - O(1) instead of loading all trips
+    const tripRef = doc(db, 'trips', tripId);
+    const tripSnap = await getDoc(tripRef);
+
+    if (!tripSnap.exists()) {
+      logger.log(`⚠️ [FirebaseStorageAdapter.getTripById] Trip not found: ${tripId}`);
+      return null;
+    }
+
+    const data = tripSnap.data();
+
+    // Verify ownership
+    if (data.user_id !== user.uid) {
+      logger.log(`⚠️ [FirebaseStorageAdapter.getTripById] Unauthorized access attempt: ${tripId}`);
+      return null;
+    }
+
+    // Fetch groups for this specific trip
+    const groupsQ = query(
+      collection(db, 'groups'),
+      where('trip_id', '==', tripId),
+      where('user_id', '==', user.uid)
+    );
+    const groupsSnap = await getDocs(groupsQ);
+    const groups = groupsSnap.docs.map(d => d.data());
+
+    logger.log(`✅ [FirebaseStorageAdapter.getTripById] Found trip with ${groups.length} groups`);
+
+    // Reconstruct Trip object
+    const trip: Trip = {
+      ...data.data, // Spread the 'data' field
+      id: data.id,
+      tripName: data.trip_name,
+      startDate: data.start_date,
+      endDate: data.end_date,
+      groups: groups.map(coerceToGroup)
+    };
+
+    return trip;
+  }
+
   async deleteTrip(tripId: string): Promise<void> {
     const user = auth.currentUser;
     if (!user) throw new Error('Not signed in');
@@ -223,6 +271,19 @@ export class HybridStorageAdapter implements StorageAdapter {
     return isSignedIn
       ? this.firebaseAdapter.getTrips()
       : this.localAdapter.getTrips();
+  }
+
+  async getTripById(tripId: string): Promise<Trip | null> {
+    const isSignedIn = this.isSignedIn();
+    logger.log('🔍 [HybridStorageAdapter.getTripById] Using storage:', isSignedIn ? 'Firebase' : 'Local');
+
+    if (isSignedIn) {
+      return this.firebaseAdapter.getTripById(tripId);
+    }
+
+    // Local fallback - load all trips and filter (IndexedDB doesn't have single-doc fetch)
+    const trips = await this.localAdapter.getTrips();
+    return trips.find(t => t.id === tripId) || null;
   }
 
   async deleteTrip(tripId: string): Promise<void> {

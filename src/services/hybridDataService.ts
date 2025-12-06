@@ -9,10 +9,11 @@ import {
   getDeletedIngredients as getDeletedIngredientsLocal,
   saveDeletedIngredients as saveDeletedIngredientsLocal,
   getTodoItems as getTodoItemsLocal,
-  saveTodoItems as saveTodoItemsLocal
+  saveTodoItems as saveTodoItemsLocal,
+  getTrips as getTripsLocal
 } from '../utils/storage';
 import { auth } from '../firebaseConfig';
-import { PackingItem, Meal, ShoppingItem, GearItem, TodoItem, PackingTemplate, MealTemplate } from '../types';
+import { Trip, PackingItem, Meal, ShoppingItem, GearItem, TodoItem, PackingTemplate, MealTemplate } from '../types';
 import { Unsubscribe } from 'firebase/firestore';
 import logger from '../utils/logger';
 
@@ -57,7 +58,7 @@ export class HybridDataService {
           const data = JSON.parse(item);
           if (data.timestamp && data.timestamp < cutoffTime) {
             localStorage.removeItem(key);
-            console.log(`🧹 [HybridDataService] Cleaned expired temp data: ${key}`);
+            logger.log(`🧹 [HybridDataService] Cleaned expired temp data: ${key}`);
           }
         }
       } catch {
@@ -78,6 +79,52 @@ export class HybridDataService {
     setInterval(() => {
       this.cleanupTempData();
     }, 15 * 60 * 1000);
+  }
+
+  // === TRIP OPERATIONS ===
+
+  async getTrip(tripId: string): Promise<Trip | null> {
+    logger.log(`🏕️ [HybridDataService] Getting trip ${tripId}`);
+
+    if (await this.isSignedIn()) {
+      try {
+        // Import tripService dynamically to avoid circular dependency
+        const { tripService } = await import('./tripService');
+        const trip = await tripService.getTripById(tripId);
+        logger.log(`✅ [HybridDataService] Loaded trip from Firebase: ${trip?.tripName || 'not found'}`);
+        return trip;
+      } catch (error) {
+        logger.error('❌ [HybridDataService] Failed to get trip from Firebase, falling back to local:', error);
+      }
+    }
+
+    // Fallback to local storage
+    const trips = await getTripsLocal();
+    const trip = trips.find(t => t.id === tripId) || null;
+    logger.log(`📱 [HybridDataService] Loaded trip from local: ${trip?.tripName || 'not found'}`);
+    return trip;
+  }
+
+  async updateTrip(tripId: string, updates: Partial<Trip>): Promise<void> {
+    logger.log(`🔄 [HybridDataService] Updating trip ${tripId}`);
+
+    if (await this.isSignedIn()) {
+      try {
+        const { tripService } = await import('./tripService');
+        const existingTrip = await tripService.getTripById(tripId);
+        if (existingTrip) {
+          const updatedTrip = { ...existingTrip, ...updates };
+          await tripService.saveTrip(updatedTrip);
+          logger.log('✅ [HybridDataService] Trip updated in Firebase');
+        }
+      } catch (error) {
+        logger.error('❌ [HybridDataService] Failed to update trip in Firebase:', error);
+        throw error;
+      }
+    } else {
+      logger.warn('⚠️ [HybridDataService] Cannot update trip: user not signed in');
+      throw new Error('User must be signed in to update trip');
+    }
   }
 
   // === MIGRATION ===
@@ -136,7 +183,7 @@ export class HybridDataService {
   // === PACKING ITEMS ===
 
   async getPackingItems(tripId: string): Promise<PackingItem[]> {
-    console.log(`🎒 [HybridDataService] Getting packing items for trip ${tripId}`);
+    logger.log(`🎒 [HybridDataService] Getting packing items for trip ${tripId}`);
 
     // Clean temp data before processing
     this.cleanupTempData();
@@ -144,30 +191,30 @@ export class HybridDataService {
     if (await this.isSignedIn()) {
       try {
         const items = await firebaseDataService.getPackingItems(tripId);
-        console.log(`📦 [HybridDataService] Loaded ${items.length} packing items from Firebase`);
+        logger.log(`📦 [HybridDataService] Loaded ${items.length} packing items from Firebase`);
         return items;
       } catch (error) {
-        console.error('Failed to get packing items from Firebase, using local fallback');
+        logger.error('Failed to get packing items from Firebase, using local fallback');
         const localItems = await getPackingListLocal(tripId);
         return localItems;
       }
     }
 
     const localItems = await getPackingListLocal(tripId);
-    console.log(`📱 [HybridDataService] Loaded ${localItems.length} items from local storage`);
+    logger.log(`📱 [HybridDataService] Loaded ${localItems.length} items from local storage`);
     return localItems;
   }
 
   subscribeToPackingItems(tripId: string, callback: (items: PackingItem[]) => void): Unsubscribe {
     if (auth.currentUser) {
-      console.log(`🎧 [HybridDataService] Delegating subscription to Firebase for trip ${tripId}`);
+      logger.log(`🎧 [HybridDataService] Delegating subscription to Firebase for trip ${tripId}`);
       return firebaseDataService.subscribeToPackingItems(tripId, async (items) => {
         // Also save to local storage for offline backup
         await savePackingListLocal(tripId, items);
         callback(items);
       });
     } else {
-      console.log('📱 [HybridDataService] User not signed in, loading local items once (no real-time updates)');
+      logger.log('📱 [HybridDataService] User not signed in, loading local items once (no real-time updates)');
       getPackingListLocal(tripId).then(items => callback(items));
       return () => { }; // No-op unsubscribe
     }
@@ -178,18 +225,18 @@ export class HybridDataService {
 
     if (await this.isSignedIn()) {
       try {
-        console.log('📤 [HybridDataService] User signed in, saving to Firebase...');
+        logger.log('📤 [HybridDataService] User signed in, saving to Firebase...');
         await firebaseDataService.savePackingItems(tripId, items);
 
         // Also save locally as backup
         await savePackingListLocal(tripId, items);
-        console.log('✅ [HybridDataService] Packing items saved successfully to Firebase');
+        logger.log('✅ [HybridDataService] Packing items saved successfully to Firebase');
       } catch (error) {
-        console.error('❌ [HybridDataService] Failed to save packing items to Firebase, saving locally:', error);
+        logger.error('❌ [HybridDataService] Failed to save packing items to Firebase, saving locally:', error);
         await savePackingListLocal(tripId, items);
       }
     } else {
-      console.log('📱 [HybridDataService] User not signed in, saving locally only');
+      logger.log('📱 [HybridDataService] User not signed in, saving locally only');
       await savePackingListLocal(tripId, items);
     }
   }
@@ -197,65 +244,65 @@ export class HybridDataService {
   // === MEALS ===
 
   async getMeals(tripId: string): Promise<Meal[]> {
-    console.log(`🍽️ [HybridDataService] Getting meals for trip ${tripId}`);
+    logger.log(`🍽️ [HybridDataService] Getting meals for trip ${tripId}`);
     if (await this.isSignedIn()) {
       try {
-        console.log('📤 [HybridDataService] User signed in, loading from Firebase...');
+        logger.log('📤 [HybridDataService] User signed in, loading from Firebase...');
         const firebaseMeals = await firebaseDataService.getMeals(tripId);
-        console.log(`✅ [HybridDataService] Loaded ${firebaseMeals.length} meals from Firebase`);
+        logger.log(`✅ [HybridDataService] Loaded ${firebaseMeals.length} meals from Firebase`);
         return firebaseMeals;
       } catch (error) {
-        console.error('❌ [HybridDataService] Failed to get meals from Firebase, falling back to local:', error);
+        logger.error('❌ [HybridDataService] Failed to get meals from Firebase, falling back to local:', error);
         const localMeals = await getMealsLocal(tripId);
-        console.log(`📱 [HybridDataService] Loaded ${localMeals.length} meals from local storage as fallback`);
+        logger.log(`📱 [HybridDataService] Loaded ${localMeals.length} meals from local storage as fallback`);
         return localMeals;
       }
     }
-    console.log('📱 [HybridDataService] User not signed in, loading from local storage only');
+    logger.log('📱 [HybridDataService] User not signed in, loading from local storage only');
     const localMeals = await getMealsLocal(tripId);
-    console.log(`📱 [HybridDataService] Loaded ${localMeals.length} meals from local storage`);
+    logger.log(`📱 [HybridDataService] Loaded ${localMeals.length} meals from local storage`);
     return localMeals;
   }
 
   subscribeToMeals(tripId: string, callback: (meals: Meal[]) => void): Unsubscribe {
     if (auth.currentUser) {
-      console.log(`🎧 [HybridDataService] Delegating subscription to Firebase for meals trip ${tripId}`);
+      logger.log(`🎧 [HybridDataService] Delegating subscription to Firebase for meals trip ${tripId}`);
       return firebaseDataService.subscribeToMeals(tripId, async (meals) => {
         await saveMealsLocal(tripId, meals);
         callback(meals);
       });
     } else {
-      console.log('📱 [HybridDataService] User not signed in, loading local meals once');
+      logger.log('📱 [HybridDataService] User not signed in, loading local meals once');
       getMealsLocal(tripId).then(meals => callback(meals));
       return () => { };
     }
   }
 
   async saveMeals(tripId: string, meals: Meal[]): Promise<void> {
-    console.log(`🔍 [HybridDataService] saveMeals called with tripId: ${tripId}, meals.length: ${meals.length}`);
-    console.log(`🍽️ [HybridDataService] Saving ${meals.length} meals for trip ${tripId}`);
+    logger.log(`🔍 [HybridDataService] saveMeals called with tripId: ${tripId}, meals.length: ${meals.length}`);
+    logger.log(`🍽️ [HybridDataService] Saving ${meals.length} meals for trip ${tripId}`);
 
     const isSignedIn = await this.isSignedIn();
-    console.log(`🔐 [HybridDataService] User signed in status: ${isSignedIn}`);
+    logger.log(`🔐 [HybridDataService] User signed in status: ${isSignedIn}`);
 
     if (isSignedIn) {
       try {
-        console.log('📤 [HybridDataService] User signed in, calling firebaseDataService.saveMeals...');
+        logger.log('📤 [HybridDataService] User signed in, calling firebaseDataService.saveMeals...');
         await firebaseDataService.saveMeals(tripId, meals);
-        console.log('✅ [HybridDataService] firebaseDataService.saveMeals completed successfully');
+        logger.log('✅ [HybridDataService] firebaseDataService.saveMeals completed successfully');
 
         // Also save locally as backup
-        console.log('💾 [HybridDataService] Saving locally as backup...');
+        logger.log('💾 [HybridDataService] Saving locally as backup...');
         await saveMealsLocal(tripId, meals);
-        console.log('✅ [HybridDataService] Meals saved successfully to Firebase and local backup');
+        logger.log('✅ [HybridDataService] Meals saved successfully to Firebase and local backup');
       } catch (error) {
-        console.error('❌ [HybridDataService] Failed to save meals to Firebase, saving locally:', error);
+        logger.error('❌ [HybridDataService] Failed to save meals to Firebase, saving locally:', error);
         await saveMealsLocal(tripId, meals);
-        console.warn('⚠️ [HybridDataService] Firebase save failed; meals saved locally only');
+        logger.warn('⚠️ [HybridDataService] Firebase save failed; meals saved locally only');
         return;
       }
     } else {
-      console.log('📱 [HybridDataService] User not signed in, saving locally only');
+      logger.log('📱 [HybridDataService] User not signed in, saving locally only');
       await saveMealsLocal(tripId, meals);
     }
   }
@@ -269,7 +316,7 @@ export class HybridDataService {
         // Ensure shopping list is automatically populated with packing and meal items
         return await this.ensureShoppingListPopulated(tripId, items);
       } catch (error) {
-        console.error('Failed to get shopping items from Firebase, falling back to local:', error);
+        logger.error('Failed to get shopping items from Firebase, falling back to local:', error);
         const localItems = await getShoppingListLocal(tripId);
         return await this.ensureShoppingListPopulated(tripId, localItems);
       }
@@ -280,14 +327,14 @@ export class HybridDataService {
 
   subscribeToShoppingItems(tripId: string, callback: (items: ShoppingItem[]) => void): Unsubscribe {
     if (auth.currentUser) {
-      console.log(`🎧 [HybridDataService] Delegating subscription to Firebase for shopping items trip ${tripId}`);
+      logger.log(`🎧 [HybridDataService] Delegating subscription to Firebase for shopping items trip ${tripId}`);
       return firebaseDataService.subscribeToShoppingItems(tripId, async (items) => {
         const populatedItems = await this.ensureShoppingListPopulated(tripId, items);
         await saveShoppingListLocal(tripId, populatedItems);
         callback(populatedItems);
       });
     } else {
-      console.log('📱 [HybridDataService] User not signed in, loading local shopping items once');
+      logger.log('📱 [HybridDataService] User not signed in, loading local shopping items once');
       getShoppingListLocal(tripId).then(async items => {
         const populated = await this.ensureShoppingListPopulated(tripId, items);
         callback(populated);
@@ -304,7 +351,7 @@ export class HybridDataService {
         // Use provided meals instead of loading from database
         return await this.ensureShoppingListPopulatedWithMeals(tripId, items, currentMeals);
       } catch (error) {
-        console.error('Failed to get shopping items from Firebase, falling back to local:', error);
+        logger.error('Failed to get shopping items from Firebase, falling back to local:', error);
         const localItems = await getShoppingListLocal(tripId);
         return await this.ensureShoppingListPopulatedWithMeals(tripId, localItems, currentMeals);
       }
@@ -424,7 +471,7 @@ export class HybridDataService {
         existing.quantity === item.quantity &&
         existing.assignedGroupId === item.assignedGroupId
       ))) {
-      console.log(`🛒 [HybridDataService] Shopping list changed, saving...`);
+      logger.log(`🛒 [HybridDataService] Shopping list changed, saving...`);
       await this.saveShoppingItems(tripId, allItems);
       return allItems;
     }
@@ -433,19 +480,19 @@ export class HybridDataService {
   }
 
   async saveShoppingItems(tripId: string, items: ShoppingItem[]): Promise<void> {
-    console.log(`🛒 [HybridDataService] Saving ${items.length} shopping items for trip ${tripId}`);
+    logger.log(`🛒 [HybridDataService] Saving ${items.length} shopping items for trip ${tripId}`);
     if (await this.isSignedIn()) {
       try {
-        console.log('📤 [HybridDataService] User signed in, saving to Firebase...');
+        logger.log('📤 [HybridDataService] User signed in, saving to Firebase...');
         await firebaseDataService.saveShoppingItems(tripId, items);
         await saveShoppingListLocal(tripId, items);
-        console.log('✅ [HybridDataService] Shopping items saved successfully to Firebase');
+        logger.log('✅ [HybridDataService] Shopping items saved successfully to Firebase');
       } catch (error) {
-        console.error('❌ [HybridDataService] Failed to save shopping items to Firebase, saving locally:', error);
+        logger.error('❌ [HybridDataService] Failed to save shopping items to Firebase, saving locally:', error);
         await saveShoppingListLocal(tripId, items);
       }
     } else {
-      console.log('📱 [HybridDataService] User not signed in, saving locally only');
+      logger.log('📱 [HybridDataService] User not signed in, saving locally only');
       await saveShoppingListLocal(tripId, items);
     }
   }
@@ -457,7 +504,7 @@ export class HybridDataService {
       try {
         return await firebaseDataService.getGearItems();
       } catch (error) {
-        console.error('Failed to get gear items from Firebase, falling back to local:', error);
+        logger.error('Failed to get gear items from Firebase, falling back to local:', error);
         return [];
       }
     }
@@ -469,11 +516,11 @@ export class HybridDataService {
       try {
         await firebaseDataService.saveGearItems(items);
       } catch (error) {
-        console.error('Failed to save gear items to Firebase:', error);
+        logger.error('Failed to save gear items to Firebase:', error);
         throw error;
       }
     } else {
-      console.warn('Cannot save gear items: user not signed in');
+      logger.warn('Cannot save gear items: user not signed in');
     }
   }
 
@@ -484,7 +531,7 @@ export class HybridDataService {
       try {
         return await firebaseDataService.getDeletedIngredients(tripId);
       } catch (error) {
-        console.error('Failed to get deleted ingredients from Firebase, falling back to local:', error);
+        logger.error('Failed to get deleted ingredients from Firebase, falling back to local:', error);
         return await getDeletedIngredientsLocal(tripId);
       }
     }
@@ -497,7 +544,7 @@ export class HybridDataService {
         await firebaseDataService.saveDeletedIngredients(tripId, ingredientNames);
         await saveDeletedIngredientsLocal(tripId, ingredientNames);
       } catch (error) {
-        console.error('Failed to save deleted ingredients to Firebase, saving locally:', error);
+        logger.error('Failed to save deleted ingredients to Firebase, saving locally:', error);
         await saveDeletedIngredientsLocal(tripId, ingredientNames);
       }
     } else {
@@ -512,7 +559,7 @@ export class HybridDataService {
       try {
         return await firebaseDataService.getTodoItems(tripId);
       } catch (error) {
-        console.error('Failed to get todo items from Firebase, falling back to local:', error);
+        logger.error('Failed to get todo items from Firebase, falling back to local:', error);
         return await getTodoItemsLocal(tripId);
       }
     }
@@ -521,27 +568,27 @@ export class HybridDataService {
 
   subscribeToTodoItems(tripId: string, callback: (items: TodoItem[]) => void): Unsubscribe {
     if (auth.currentUser) {
-      console.log(`🎧 [HybridDataService] Delegating subscription to Firebase for todo items trip ${tripId}`);
+      logger.log(`🎧 [HybridDataService] Delegating subscription to Firebase for todo items trip ${tripId}`);
       return firebaseDataService.subscribeToTodoItems(tripId, async (items) => {
         await saveTodoItemsLocal(tripId, items);
         callback(items);
       });
     } else {
-      console.log('📱 [HybridDataService] User not signed in, loading local todo items once');
+      logger.log('📱 [HybridDataService] User not signed in, loading local todo items once');
       getTodoItemsLocal(tripId).then(items => callback(items));
       return () => { };
     }
   }
 
   async saveTodoItems(tripId: string, items: TodoItem[]): Promise<void> {
-    console.log(`✅ [HybridDataService] Saving ${items.length} todo items for trip ${tripId}`);
+    logger.log(`✅ [HybridDataService] Saving ${items.length} todo items for trip ${tripId}`);
     if (await this.isSignedIn()) {
       try {
-        console.log('📤 [HybridDataService] User signed in, saving to Firebase...');
+        logger.log('📤 [HybridDataService] User signed in, saving to Firebase...');
         await firebaseDataService.saveTodoItems(tripId, items);
         await saveTodoItemsLocal(tripId, items);
       } catch (error) {
-        console.error('Failed to save todo items to Firebase, saving locally:', error);
+        logger.error('Failed to save todo items to Firebase, saving locally:', error);
         await saveTodoItemsLocal(tripId, items);
       }
     } else {
@@ -556,7 +603,7 @@ export class HybridDataService {
       try {
         return await firebaseDataService.getPackingTemplates();
       } catch (error) {
-        console.error('Failed to get packing templates from Firebase:', error);
+        logger.error('Failed to get packing templates from Firebase:', error);
         return [];
       }
     }
@@ -574,7 +621,7 @@ export class HybridDataService {
       try {
         return await firebaseDataService.getMealTemplates();
       } catch (error) {
-        console.error('Failed to get meal templates from Firebase:', error);
+        logger.error('Failed to get meal templates from Firebase:', error);
         return [];
       }
     }

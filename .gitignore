@@ -13,6 +13,7 @@
 .DS_Store
 .env
 .env.local
+.env.development
 .env.development.local
 .env.test.local
 .env.production.local
@@ -37,3 +38,5 @@ supabase/functions/**/.env
 # Firebase
 google-services.json
 android/app/google-services.json
+
+.vercel

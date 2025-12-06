@@ -18,6 +18,39 @@ import logger from '../utils/logger';
 
 export class FirebaseDataService {
 
+    // Firestore batch limit is 500 operations per batch
+    private static readonly BATCH_SIZE = 450; // Use 450 to have some buffer
+
+    /**
+     * Execute batch operations in chunks to handle Firestore's 500 operation limit
+     */
+    private async executeBatchedOperations(
+        deleteRefs: Array<{ ref: any }>,
+        setOperations: Array<{ ref: any; data: any }>
+    ): Promise<void> {
+        const allOperations = [
+            ...deleteRefs.map(op => ({ type: 'delete' as const, ...op })),
+            ...setOperations.map(op => ({ type: 'set' as const, ...op }))
+        ];
+
+        // Process in chunks
+        for (let i = 0; i < allOperations.length; i += FirebaseDataService.BATCH_SIZE) {
+            const chunk = allOperations.slice(i, i + FirebaseDataService.BATCH_SIZE);
+            const batch = writeBatch(db);
+
+            for (const op of chunk) {
+                if (op.type === 'delete') {
+                    batch.delete(op.ref);
+                } else {
+                    batch.set(op.ref, op.data);
+                }
+            }
+
+            await batch.commit();
+            logger.log(`📦 [FirebaseDataService] Committed batch ${Math.floor(i / FirebaseDataService.BATCH_SIZE) + 1}/${Math.ceil(allOperations.length / FirebaseDataService.BATCH_SIZE)}`);
+        }
+    }
+
     // === PACKING ITEMS ===
 
     async getPackingItems(tripId: string): Promise<PackingItem[]> {
@@ -73,14 +106,6 @@ export class FirebaseDataService {
 
         logger.log(`🎒 [FirebaseDataService] Saving ${items.length} packing items for user ${user.uid}, trip ${tripId}`);
 
-        const batch = writeBatch(db);
-
-        // First, get all existing items for this trip to delete them (or we could update them)
-        // For simplicity and matching Supabase logic, we'll delete and recreate or upsert.
-        // However, Firestore batch limit is 500. If we have many items, we need to handle chunks.
-        // A better approach for Firestore might be to read existing, calculate diff, and apply.
-        // But to stick to the "replace" logic:
-
         // 1. Get existing items to delete
         const q = query(
             collection(db, 'packing_items'),
@@ -89,19 +114,21 @@ export class FirebaseDataService {
         );
         const querySnapshot = await getDocs(q);
 
-        // 2. Delete existing items
-        querySnapshot.forEach((doc) => {
-            batch.delete(doc.ref);
+        // 2. Prepare delete operations
+        const deleteRefs: Array<{ ref: any }> = [];
+        querySnapshot.forEach((docSnapshot) => {
+            deleteRefs.push({ ref: docSnapshot.ref });
         });
 
-        // 3. Add new items
-        items.forEach((item) => {
+        // 3. Prepare set operations
+        const setOperations: Array<{ ref: any; data: any }> = items.map((item) => {
             const dbItem = this.mapPackingItemToDB(item, tripId, user.uid);
             const docRef = doc(db, 'packing_items', dbItem.id);
-            batch.set(docRef, dbItem);
+            return { ref: docRef, data: dbItem };
         });
 
-        await batch.commit();
+        // 4. Execute with chunking to handle >500 items
+        await this.executeBatchedOperations(deleteRefs, setOperations);
         logger.log('✅ [FirebaseDataService] Packing items replaced successfully in FIRESTORE');
     }
 
@@ -200,27 +227,29 @@ export class FirebaseDataService {
         const user = auth.currentUser;
         if (!user) throw new Error('Not signed in');
 
-        const batch = writeBatch(db);
+        logger.log(`🍽️ [FirebaseDataService] Saving ${meals.length} meals for trip ${tripId}`);
 
-        // Delete existing
+        // Get existing meals to delete
         const q = query(
             collection(db, 'meals'),
             where('trip_id', '==', tripId),
             where('user_id', '==', user.uid)
         );
         const querySnapshot = await getDocs(q);
-        querySnapshot.forEach((doc) => {
-            batch.delete(doc.ref);
+
+        const deleteRefs: Array<{ ref: any }> = [];
+        querySnapshot.forEach((docSnapshot) => {
+            deleteRefs.push({ ref: docSnapshot.ref });
         });
 
-        // Add new
-        meals.forEach((meal) => {
+        const setOperations: Array<{ ref: any; data: any }> = meals.map((meal) => {
             const dbMeal = this.mapMealToDB(meal, tripId, user.uid);
             const docRef = doc(db, 'meals', dbMeal.id);
-            batch.set(docRef, dbMeal);
+            return { ref: docRef, data: dbMeal };
         });
 
-        await batch.commit();
+        await this.executeBatchedOperations(deleteRefs, setOperations);
+        logger.log('✅ [FirebaseDataService] Meals saved successfully');
     }
 
     private mapMealFromDB(dbMeal: any): Meal {
@@ -310,7 +339,7 @@ export class FirebaseDataService {
         const user = auth.currentUser;
         if (!user) throw new Error('Not signed in');
 
-        const batch = writeBatch(db);
+        logger.log(`🛒 [FirebaseDataService] Saving ${items.length} shopping items for trip ${tripId}`);
 
         const q = query(
             collection(db, 'shopping_items'),
@@ -318,17 +347,20 @@ export class FirebaseDataService {
             where('user_id', '==', user.uid)
         );
         const querySnapshot = await getDocs(q);
-        querySnapshot.forEach((doc) => {
-            batch.delete(doc.ref);
+
+        const deleteRefs: Array<{ ref: any }> = [];
+        querySnapshot.forEach((docSnapshot) => {
+            deleteRefs.push({ ref: docSnapshot.ref });
         });
 
-        items.forEach((item) => {
+        const setOperations: Array<{ ref: any; data: any }> = items.map((item) => {
             const dbItem = this.mapShoppingItemToDB(item, tripId, user.uid);
             const docRef = doc(db, 'shopping_items', dbItem.id);
-            batch.set(docRef, dbItem);
+            return { ref: docRef, data: dbItem };
         });
 
-        await batch.commit();
+        await this.executeBatchedOperations(deleteRefs, setOperations);
+        logger.log('✅ [FirebaseDataService] Shopping items saved successfully');
     }
 
     private mapShoppingItemFromDB(dbItem: any): ShoppingItem {
@@ -459,7 +491,7 @@ export class FirebaseDataService {
         const user = auth.currentUser;
         if (!user) throw new Error('Not signed in');
 
-        const batch = writeBatch(db);
+        logger.log(`🗑️ [FirebaseDataService] Saving ${ingredientNames.length} deleted ingredients for trip ${tripId}`);
 
         const q = query(
             collection(db, 'deleted_ingredients'),
@@ -467,22 +499,27 @@ export class FirebaseDataService {
             where('user_id', '==', user.uid)
         );
         const querySnapshot = await getDocs(q);
-        querySnapshot.forEach((doc) => {
-            batch.delete(doc.ref);
+
+        const deleteRefs: Array<{ ref: any }> = [];
+        querySnapshot.forEach((docSnapshot) => {
+            deleteRefs.push({ ref: docSnapshot.ref });
         });
 
-        ingredientNames.forEach((name) => {
+        const setOperations: Array<{ ref: any; data: any }> = ingredientNames.map((name) => {
             const id = crypto.randomUUID();
             const docRef = doc(db, 'deleted_ingredients', id);
-            batch.set(docRef, {
-                id,
-                trip_id: tripId,
-                user_id: user.uid,
-                ingredient_name: name
-            });
+            return {
+                ref: docRef,
+                data: {
+                    id,
+                    trip_id: tripId,
+                    user_id: user.uid,
+                    ingredient_name: name
+                }
+            };
         });
 
-        await batch.commit();
+        await this.executeBatchedOperations(deleteRefs, setOperations);
     }
 
     // === TODO ITEMS ===
@@ -535,7 +572,7 @@ export class FirebaseDataService {
         const user = auth.currentUser;
         if (!user) throw new Error('Not signed in');
 
-        const batch = writeBatch(db);
+        logger.log(`✅ [FirebaseDataService] Saving ${items.length} todo items for trip ${tripId}`);
 
         const q = query(
             collection(db, 'todo_items'),
@@ -543,17 +580,20 @@ export class FirebaseDataService {
             where('user_id', '==', user.uid)
         );
         const querySnapshot = await getDocs(q);
-        querySnapshot.forEach((doc) => {
-            batch.delete(doc.ref);
+
+        const deleteRefs: Array<{ ref: any }> = [];
+        querySnapshot.forEach((docSnapshot) => {
+            deleteRefs.push({ ref: docSnapshot.ref });
         });
 
-        items.forEach((item) => {
+        const setOperations: Array<{ ref: any; data: any }> = items.map((item) => {
             const dbItem = this.mapTodoItemToDB(item, tripId, user.uid);
             const docRef = doc(db, 'todo_items', dbItem.id);
-            batch.set(docRef, dbItem);
+            return { ref: docRef, data: dbItem };
         });
 
-        await batch.commit();
+        await this.executeBatchedOperations(deleteRefs, setOperations);
+        logger.log('✅ [FirebaseDataService] Todo items saved successfully');
     }
 
     private mapTodoItemFromDB(dbItem: any): TodoItem {

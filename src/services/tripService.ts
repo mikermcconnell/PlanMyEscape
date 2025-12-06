@@ -41,6 +41,16 @@ export class TripService {
     }
   }
 
+  async getTripById(tripId: string): Promise<Trip | null> {
+    try {
+      return await this.adapter.getTripById(tripId);
+    } catch (error) {
+      logger.error('[TripService.getTripById] Failed to load trip', error);
+      // Don't show toast for single trip load - let component handle it
+      return null;
+    }
+  }
+
   async deleteTrip(tripId: string): Promise<void> {
     try {
       await this.adapter.deleteTrip(tripId);

@@ -20,40 +20,26 @@ const TripContainer: React.FC = () => {
       console.log('🔍 [TripContainer] Loading trip:', { tripId });
       setLoading(true);
       try {
-        const trips = await tripService.getTrips();
-        console.log('🔍 [TripContainer] All trips loaded:', {
-          tripCount: trips.length,
-          trips: trips.map(t => ({
-            id: t.id,
-            tripName: t.tripName,
-            startDate: t.startDate,
-            endDate: t.endDate,
-            startDateType: typeof t.startDate,
-            endDateType: typeof t.endDate
-          }))
-        });
+        // Use direct trip lookup instead of loading all trips
+        const currentTrip = await tripService.getTripById(tripId);
 
-        const currentTrip = trips.find((t: Trip) => t.id === tripId);
-        console.log('🔍 [TripContainer] Found trip:', {
-          tripId,
-          found: !!currentTrip,
-          trip: currentTrip ? {
-            id: currentTrip.id,
+        if (currentTrip) {
+          console.log('🔍 [TripContainer] Found trip:', {
+            tripId,
             tripName: currentTrip.tripName,
             startDate: currentTrip.startDate,
-            endDate: currentTrip.endDate,
-            startDateType: typeof currentTrip.startDate,
-            endDateType: typeof currentTrip.endDate,
-            fullTrip: currentTrip
-          } : null
-        });
+            endDate: currentTrip.endDate
+          });
 
-        // Ensure isCoordinated property exists (for older trips)
-        if (currentTrip && currentTrip.isCoordinated === undefined) {
-          currentTrip.isCoordinated = currentTrip.groups && currentTrip.groups.length > 0;
+          // Ensure isCoordinated property exists (for older trips)
+          if (currentTrip.isCoordinated === undefined) {
+            currentTrip.isCoordinated = currentTrip.groups && currentTrip.groups.length > 0;
+          }
+        } else {
+          console.log('🔍 [TripContainer] Trip not found:', { tripId });
         }
 
-        setTrip(currentTrip || null);
+        setTrip(currentTrip);
 
       } catch (error) {
         console.error('🔴 [TripContainer] Failed to load trip:', error);

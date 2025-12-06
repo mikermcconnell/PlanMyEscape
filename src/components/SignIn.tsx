@@ -11,6 +11,9 @@ import {
 import { AuthContext } from '../contexts/AuthContext';
 import { Tent, Mail, Lock, Loader2 } from 'lucide-react';
 import { logSecurityEvent } from '../utils/securityLogger';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { signInWithCredential } from 'firebase/auth';
 
 export default function SignIn() {
     const { user } = useContext(AuthContext);
@@ -65,8 +68,14 @@ export default function SignIn() {
         setLoading(true);
         setError(null);
         try {
-            const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
+            if (Capacitor.isNativePlatform()) {
+                const result = await FirebaseAuthentication.signInWithGoogle();
+                const credential = GoogleAuthProvider.credential(result.credential?.idToken);
+                await signInWithCredential(auth, credential);
+            } else {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            }
             await logSecurityEvent({ type: 'login_google', userId: auth.currentUser?.uid || 'unknown', userAgent: navigator.userAgent });
             navigate('/dashboard');
         } catch (err: any) {

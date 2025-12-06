@@ -2,12 +2,13 @@
 
 ## 🎯 LEVEL 1: IMMEDIATE CONTEXT (What Claude needs first)
 ```
-PROJECT: React/TypeScript camping trip planner with Supabase backend
-DATA SERVICE: Always use hybridDataService.ts - never direct Supabase calls
-DATA PERSISTENCE: ALL new features with user input MUST save to Supabase
+PROJECT: React/TypeScript camping trip planner with Firebase backend
+DATA SERVICE: Always use hybridDataService.ts - never direct Firebase calls
+DATA PERSISTENCE: ALL new features with user input MUST save to Firebase Firestore
 CHECKPOINT: Run `checkpoint.bat create "description"` before major changes
 COMMANDS: npm start | npm test | npm run type-check | npm run lint
 ANDROID BUILDS: ALWAYS increment versionCode in android/app/build.gradle before building AAB
+ENVIRONMENT: Firebase config loaded from process.env (see .env.development)
 ```
 
 ## 🚀 LEVEL 2: HOW DO I...
@@ -157,10 +158,10 @@ WHEN TO SAVE:
 └── Item deletion → immediate=true
 
 WHICH DATA SERVICE:
-├── Authenticated user → hybridDataService (Supabase + local backup)
+├── Authenticated user → hybridDataService (Firebase + local backup)
 ├── Anonymous user → hybridDataService (local only)
-├── NEVER use supabaseDataService directly
-└── NEW FEATURES → MUST save to Supabase via hybridDataService
+├── NEVER use firebaseDataService directly
+└── NEW FEATURES → MUST save to Firebase via hybridDataService
 
 COMPONENT STATE:
 ├── Trip data → useOutletContext from TripContainer
@@ -185,9 +186,9 @@ Build Errors:
 
 Runtime Errors:
 ├── "Cannot read property of undefined" → Add loading states
-├── "Network request failed" → Check Supabase connection
+├── "Network request failed" → Check Firebase connection
 ├── "User is not authenticated" → Check useAuth() hook
-└── "RLS policy violation" → Verify user_id in queries
+└── "Permission denied" → Verify Firestore security rules
 ```
 
 ## 🏥 HEALTH CHECK COMMANDS
@@ -333,15 +334,16 @@ checkpoint.bat restore <name>        # Restore to checkpoint
 ## 🏗️ Project Architecture
 
 ### Project Overview
-PlanMyEscape is a React/TypeScript camping and trip planning web application with Supabase backend. Users can plan trips, manage packing lists, coordinate meals, and collaborate with groups.
+PlanMyEscape is a React/TypeScript camping and trip planning web application with Firebase backend. Users can plan trips, manage packing lists, coordinate meals, and collaborate with groups.
 
 ### Tech Stack
 - **Frontend**: React 18, TypeScript, Tailwind CSS
-- **Backend**: Supabase (PostgreSQL with RLS)
-- **Authentication**: Supabase Auth (Google, Facebook, Email/Password)
+- **Backend**: Firebase (Firestore with Security Rules)
+- **Authentication**: Firebase Auth (Google, Email/Password)
 - **Testing**: Jest, React Testing Library
 - **Deployment**: Vercel-ready
 - **Build Tool**: Create React App
+- **Mobile**: Capacitor for iOS/Android
 
 ### Advanced Commands (Reference)
 ```bash
@@ -349,8 +351,9 @@ PlanMyEscape is a React/TypeScript camping and trip planning web application wit
 npm run build               # Build for production
 npm run test:coverage       # Run tests with coverage
 
-# Database Advanced
-supabase link --project-ref <ref>  # Link to project
+# Mobile
+npm run mobile:build        # Build and sync Capacitor
+npm run android:studio      # Open Android Studio
 ```
 
 ### Project Structure
@@ -358,14 +361,10 @@ supabase link --project-ref <ref>  # Link to project
 src/
 ├── components/             # Reusable UI components
 │   ├── layout/            # Layout components
-│   ├── ActivitiesPlanner.tsx
+│   ├── packing/           # Packing list components
 │   ├── CostSplitter.tsx   # Cost splitting and expense management
-│   ├── DataExport.tsx
 │   ├── ErrorBoundary.tsx
-│   ├── ExpenseSummary.tsx # Expense reporting and settlements
-│   ├── ProtectedRoute.tsx
-│   ├── ShoppingList.tsx   # Shopping list modal component
-│   ├── SupaSignIn.tsx
+│   ├── SignIn.tsx         # Firebase Auth component
 │   ├── TripContainer.tsx
 │   └── TripNavigation.tsx
 ├── pages/                 # Page components
@@ -373,64 +372,57 @@ src/
 │   ├── TripSetup.tsx
 │   ├── PackingList.tsx
 │   ├── MealPlanner.tsx
-│   ├── ShoppingListPage.tsx  # Main shopping list page
+│   ├── ShoppingListPage.tsx
 │   ├── TripOverview.tsx
-│   ├── TripSchedule.tsx
-│   ├── Notes.tsx
-│   └── Privacy/Terms pages
+│   └── Notes.tsx
 ├── utils/                 # Utility functions
-│   ├── supabaseClient.ts  # Supabase client config
-│   ├── supabaseTrips.ts   # Trip operations
-│   ├── storage.ts         # Local storage utils
-│   ├── authGuard.ts       # Authentication utilities
-│   ├── validation.ts      # Input validation
+│   ├── storage.ts         # Local storage (IndexedDB)
+│   ├── authGuard.ts       # Session management
+│   ├── validation.ts      # Input validation (DOMPurify)
+│   ├── enhancedValidation.ts # Zod schemas
 │   └── securityLogger.ts  # Security event logging
-├── types/                 # TypeScript definitions
-├── data/                  # Static data/templates
-├── hooks/                 # Custom React hooks
-├── contexts/              # React contexts
 ├── services/              # Business logic services
-│   ├── hybridDataService.ts    # Primary data service (local + Supabase)
-│   └── supabaseDataService.ts  # Direct Supabase operations
-├── schemas/               # Validation schemas
-└── middleware/            # Express middleware
+│   ├── hybridDataService.ts    # Primary data service (local + Firebase)
+│   └── firebaseDataService.ts  # Direct Firestore operations
+├── firebaseConfig.ts      # Firebase initialization
+└── types/                 # TypeScript definitions
 ```
 
-### Database Schema (Supabase)
-```sql
--- Core tables with RLS enabled
-trips (id, user_id, trip_name, trip_type, start_date, end_date, ...)
-groups (id, trip_id, name, size, contact_name, contact_email, color)
-packing_items (id, trip_id, name, category, quantity, is_checked, needs_to_buy, is_owned, is_packed, assigned_group_id, ...)
-meals (id, trip_id, name, day, type, ingredients, assigned_group_id, is_custom)
-shopping_items (id, trip_id, name, quantity, category, is_checked, cost, paid_by_group_id, splits, assigned_group_id, ...)
-gear_items (id, user_id, name, category, weight, notes)
-todo_items (id, trip_id, name, is_completed, assigned_group_id)
-security_logs (id, user_id, event_type, timestamp, details)
-
--- Template tables (added 2025-08-26)
-packing_templates (id, user_id, name, trip_type, items, created_at)
-meal_templates (id, user_id, name, trip_type, trip_duration, meals, created_at)
+### Database Schema (Firestore)
 ```
+// Firestore Collections (with Security Rules enforcing RLS)
+trips/{tripId}           - id, user_id, trip_name, trip_type, start_date, end_date
+groups/{tripId}/groups   - id, name, size, contact_name, color
+packing_items/{docId}    - id, trip_id, user_id, name, category, quantity, is_owned, is_packed
+meals/{docId}            - id, trip_id, user_id, name, day, type, ingredients, assigned_group_id
+shopping_items/{docId}   - id, trip_id, user_id, name, quantity, category, is_checked
+gear_items/{docId}       - id, user_id, name, category, weight, notes
+todo_items/{docId}       - id, trip_id, user_id, name, is_completed
+security_logs/{docId}    - id, user_id, event_type, timestamp, details
+packing_templates/{docId} - id, user_id, name, trip_type, items
+meal_templates/{docId}   - id, user_id, name, trip_type, meals
+```
+
+See `firestore.rules` for security configuration.
 
 ---
 
 ## 🔐 Security & Authentication
 
 ### Authentication Flow
-1. **SupaSignIn** component handles login/signup
+1. **SignIn** component handles Firebase login/signup
 2. **AuthContext** provides auth state throughout app with automatic data migration
 3. **ProtectedRoute** wraps authenticated pages
-4. **useRequireAuth** hook for auth requirements
-5. RLS policies ensure data isolation per user
-6. **Data Migration**: Upon sign-in, local data is automatically migrated to Supabase with retry logic
+4. **authGuard** manages sessions with timeout handling
+5. Firestore Security Rules ensure data isolation per user
+6. **Data Migration**: Upon sign-in, local data is automatically migrated to Firebase
 
 ### Security Features
-- **Row Level Security (RLS)**: Each user can only access their own data
-- **Security Logging**: Login attempts, data access logged to security_logs table
-- **Rate Limiting**: Express middleware for login attempts (5 per 15 min)
-- **Input Validation**: Zod schemas for data validation
-- **Security Headers**: CSP, X-Frame-Options, etc. in public/_headers
+- **Firestore Security Rules**: Each user can only access their own data (see `firestore.rules`)
+- **Security Logging**: Login attempts, data access logged to security_logs collection
+- **Session Management**: 8-hour session timeout, 30-min inactivity timeout (authGuard.ts)
+- **Input Validation**: DOMPurify for XSS prevention, Zod schemas for data validation
+- **Attack Detection**: XSS, SQL injection, path traversal detection (errorHandler.ts)
 
 ---
 

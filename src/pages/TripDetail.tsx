@@ -15,17 +15,25 @@ const TripDetail = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setLoading(true);
-    tripService.getTrips()
-      .then(trips => {
-        const currentTrip = trips.find((t: Trip) => t.id === tripId);
+    const loadTrip = async () => {
+      setLoading(true);
+      try {
+        // Use direct trip lookup instead of loading all trips
+        const currentTrip = await tripService.getTripById(tripId!);
         if (currentTrip) {
           setTrip(currentTrip);
           setLocationInput(currentTrip.location || '');
         }
-      })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load trip');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (tripId) {
+      loadTrip();
+    }
   }, [tripId]);
 
   const updateTripLocation = async () => {

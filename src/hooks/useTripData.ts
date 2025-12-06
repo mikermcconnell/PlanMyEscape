@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Trip, PackingItem, Meal, ShoppingItem, TodoItem } from '../types';
 import { hybridDataService } from '../services/hybridDataService';
 import { usePerformanceMonitor } from '../utils/performanceMonitor';
@@ -66,6 +66,12 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
 
   const { measure } = usePerformanceMonitor('TripData');
   const { isOffline } = useOfflineDetection();
+
+  // Use ref to always have access to current state in async callbacks (fixes stale closure)
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Load all trip data (manual fetch for refresh/recovery)
   const loadTripData = useCallback(async () => {
@@ -186,18 +192,23 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
     return () => window.removeEventListener('syncRequired', handleSync);
   }, [isOffline, loadTripData]);
 
-  // Optimistic update helper
+  // Optimistic update helper - uses stateRef to get fresh state values
   const optimisticUpdate = async <T,>(
     updateState: (prev: TripDataState) => TripDataState,
-    saveOperation: () => Promise<T>,
+    saveOperation: (currentState: TripDataState) => Promise<T>,
     revertState?: (prev: TripDataState) => TripDataState
   ): Promise<T> => {
-    // Optimistic update
-    setState(updateState);
+    // Apply optimistic update
+    let updatedState: TripDataState;
+    setState(prev => {
+      updatedState = updateState(prev);
+      return updatedState;
+    });
 
     try {
-      // Persist to storage
-      const result = await saveOperation();
+      // Persist to storage using the updated state (not stale closure)
+      // @ts-ignore - updatedState is assigned synchronously in setState
+      const result = await saveOperation(updatedState!);
       setState(prev => ({ ...prev, lastSyncTime: new Date() }));
       return result;
     } catch (error) {
@@ -239,8 +250,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
         ...prev,
         packingItems: [...prev.packingItems, newItem]
       }),
-      async () => {
-        await hybridDataService.savePackingItems(tripId, [...state.packingItems, newItem]);
+      async (currentState) => {
+        await hybridDataService.savePackingItems(tripId, currentState.packingItems);
       }
     );
   };
@@ -253,11 +264,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
           item.id === id ? { ...item, ...updates } : item
         )
       }),
-      async () => {
-        const updatedItems = state.packingItems.map(item =>
-          item.id === id ? { ...item, ...updates } : item
-        );
-        await hybridDataService.savePackingItems(tripId, updatedItems);
+      async (currentState) => {
+        await hybridDataService.savePackingItems(tripId, currentState.packingItems);
       }
     );
   };
@@ -270,9 +278,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
         ...prev,
         packingItems: prev.packingItems.filter(item => item.id !== id)
       }),
-      async () => {
-        const updatedItems = state.packingItems.filter(item => item.id !== id);
-        await hybridDataService.savePackingItems(tripId, updatedItems);
+      async (currentState) => {
+        await hybridDataService.savePackingItems(tripId, currentState.packingItems);
       },
       // Revert function
       prev => ({
@@ -296,8 +303,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
         ...prev,
         meals: [...prev.meals, newMeal]
       }),
-      async () => {
-        await hybridDataService.saveMeals(tripId, [...state.meals, newMeal]);
+      async (currentState) => {
+        await hybridDataService.saveMeals(tripId, currentState.meals);
       }
     );
   };
@@ -310,11 +317,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
           meal.id === id ? { ...meal, ...updates } : meal
         )
       }),
-      async () => {
-        const updatedMeals = state.meals.map(meal =>
-          meal.id === id ? { ...meal, ...updates } : meal
-        );
-        await hybridDataService.saveMeals(tripId, updatedMeals);
+      async (currentState) => {
+        await hybridDataService.saveMeals(tripId, currentState.meals);
       }
     );
   };
@@ -327,9 +331,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
         ...prev,
         meals: prev.meals.filter(meal => meal.id !== id)
       }),
-      async () => {
-        const updatedMeals = state.meals.filter(meal => meal.id !== id);
-        await hybridDataService.saveMeals(tripId, updatedMeals);
+      async (currentState) => {
+        await hybridDataService.saveMeals(tripId, currentState.meals);
       },
       // Revert function
       prev => ({
@@ -350,11 +353,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
           item.id === id ? { ...item, ...updates } : item
         )
       }),
-      async () => {
-        const updatedItems = state.shoppingItems.map(item =>
-          item.id === id ? { ...item, ...updates } : item
-        );
-        await hybridDataService.saveShoppingItems(tripId, updatedItems);
+      async (currentState) => {
+        await hybridDataService.saveShoppingItems(tripId, currentState.shoppingItems);
       }
     );
   };
@@ -378,8 +378,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
         ...prev,
         todoItems: [...prev.todoItems, newItem]
       }),
-      async () => {
-        await hybridDataService.saveTodoItems(tripId, [...state.todoItems, newItem]);
+      async (currentState) => {
+        await hybridDataService.saveTodoItems(tripId, currentState.todoItems);
       }
     );
   };
@@ -392,11 +392,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
           item.id === id ? { ...item, ...updates } : item
         )
       }),
-      async () => {
-        const updatedItems = state.todoItems.map(item =>
-          item.id === id ? { ...item, ...updates } : item
-        );
-        await hybridDataService.saveTodoItems(tripId, updatedItems);
+      async (currentState) => {
+        await hybridDataService.saveTodoItems(tripId, currentState.todoItems);
       }
     );
   };
@@ -407,9 +404,8 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
         ...prev,
         todoItems: prev.todoItems.filter(item => item.id !== id)
       }),
-      async () => {
-        const updatedItems = state.todoItems.filter(item => item.id !== id);
-        await hybridDataService.saveTodoItems(tripId, updatedItems);
+      async (currentState) => {
+        await hybridDataService.saveTodoItems(tripId, currentState.todoItems);
       }
     );
   };
@@ -453,11 +449,3 @@ export const useTripData = (tripId: string): TripDataState & TripDataActions => 
     refresh: loadTripData
   };
 };
-
-// Placeholder for missing getTrip method
-declare module '../services/hybridDataService' {
-  interface HybridDataService {
-    getTrip(tripId: string): Promise<Trip>;
-    updateTrip(tripId: string, updates: Partial<Trip>): Promise<void>;
-  }
-}

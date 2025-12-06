@@ -1,74 +1,122 @@
 # Security Documentation
 
-## Recent Security Fixes
+## Security Architecture Overview
 
-### SECURITY DEFINER View Issue (Fixed: 2025-08-26)
+PlanMyEscape uses **Firebase** for authentication and **Firestore** for data storage, with comprehensive client-side security measures.
 
-**Issue**: The `trip_performance_stats` view was flagged for using SECURITY DEFINER property, which could potentially bypass Row Level Security (RLS) policies.
+## Authentication
 
-**Resolution**: 
-- Migration `20250826000001_force_remove_security_definer.sql` created to fix the issue
-- View recreated without SECURITY DEFINER property
-- Function `get_user_trip_performance_stats()` recreated to use SECURITY INVOKER (default)
-- Access properly restricted with RLS enforcement
+### Firebase Authentication
+- Handled by Firebase Auth SDK
+- Supports multiple providers: Email/Password, Google
+- Session tokens are securely managed by Firebase client SDK
+- Session management with 8-hour timeout and 30-minute inactivity timeout (see `authGuard.ts`)
 
-**Implementation Details**:
-1. **View** (`trip_performance_stats`): 
-   - Now restricted to postgres role only (admin use)
-   - Does not use SECURITY DEFINER
-   - Should not be directly accessed by application
+### Session Security
+- Activity tracking across user interactions
+- Automatic session health checks every 5 minutes
+- CSRF protection with cryptographic tokens (see `csrfProtection.ts`)
 
-2. **Function** (`get_user_trip_performance_stats()`):
-   - Uses SECURITY INVOKER (default) - runs with calling user's permissions
-   - Properly filters data using `auth.uid()`
-   - RLS policies on underlying tables are enforced
-   - This is what the application uses (via `tripService.getTripPerformanceStats()`)
+## Data Protection
 
-## Security Architecture
+### Firestore Security Rules
+All Firestore collections have security rules that ensure users can only access their own data. Rules are defined in `firestore.rules`:
 
-### Row Level Security (RLS)
-All database tables have RLS enabled with policies that ensure users can only access their own data:
-- Each table has a `user_id` column that references the authenticated user
-- Policies use `auth.uid()` to filter data to the current user
-- No user can see or modify another user's data
+```javascript
+match /packing_items/{itemId} {
+  allow create: if request.auth != null && request.resource.data.user_id == request.auth.uid;
+  allow read, update, delete: if request.auth != null && resource.data.user_id == request.auth.uid;
+}
+```
 
-### Authentication
-- Handled by Supabase Auth
-- Supports multiple providers: Email/Password, Google, Facebook
-- Session tokens are securely managed by Supabase client
+**Key principles:**
+1. All operations require authentication (`request.auth != null`)
+2. Write operations validate `user_id` matches authenticated user
+3. Read/update/delete operations verify document ownership
+4. No user can see or modify another user's data
 
-### Data Access Patterns
-1. **Direct Table Access**: Protected by RLS policies
-2. **Views**: Admin-only, restricted to postgres role
-3. **Functions**: Use SECURITY INVOKER to respect RLS policies
-4. **Application Layer**: Uses hybrid data service that respects auth state
+### Protected Collections
+- `trips` - User trip metadata
+- `packing_items` - Packing list items
+- `meals` - Meal planning data
+- `shopping_items` - Shopping list items
+- `gear_items` - Gear inventory
+- `todo_items` - To-do lists
+- `packing_templates` - User templates
+- `meal_templates` - Meal templates
+- `notes` - User notes
+- `security_logs` - Security event logs
 
-### Security Best Practices
-1. Never use SECURITY DEFINER unless absolutely necessary
-2. Always filter data by `auth.uid()` in queries
-3. Use RLS policies as the primary security mechanism
-4. Functions should use SECURITY INVOKER (default) to respect RLS
-5. Views intended for users should be wrapped in secure functions
-6. Admin views should be restricted to postgres role
+## Input Validation & Sanitization
+
+### XSS Protection
+- All user input is sanitized using **DOMPurify** (see `validation.ts`)
+- No HTML tags or attributes are allowed in user content
+- Suspicious activity patterns are detected and logged
+
+### Schema Validation
+- **Zod** schemas validate all data structures (see `enhancedValidation.ts`)
+- Type-safe validation for trips, packing items, meals, expenses
+- Business rule validation (e.g., packed items must be owned)
+
+### Attack Detection
+The system detects and logs suspicious patterns including:
+- XSS attempts (`<script>`, `javascript:`, `data:`)
+- SQL injection patterns
+- Path traversal attempts
+- Code injection attempts
+- URL-encoded attacks
 
 ## Security Logging
-All security-relevant events are logged to the `security_logs` table:
+
+Security events are logged to Firestore `security_logs` collection:
 - Login attempts (successful and failed)
-- Data access patterns
-- System maintenance events
-- Security configuration changes
+- Rate limit exceeded events
+- Suspicious activity detection
+- Authentication state changes
+
+## Environment Configuration
+
+### API Keys
+Firebase configuration is loaded from environment variables:
+- Development: `.env.development` (gitignored)
+- Production: Set via deployment platform (Vercel, etc.)
+
+**Required variables:**
+- `REACT_APP_FIREBASE_API_KEY`
+- `REACT_APP_FIREBASE_AUTH_DOMAIN`
+- `REACT_APP_FIREBASE_PROJECT_ID`
+- `REACT_APP_FIREBASE_STORAGE_BUCKET`
+- `REACT_APP_FIREBASE_MESSAGING_SENDER_ID`
+- `REACT_APP_FIREBASE_APP_ID`
+- `REACT_APP_FIREBASE_MEASUREMENT_ID`
+
+## Security Best Practices
+
+1. **Environment Variables**: Never hardcode API keys in source code
+2. **User Isolation**: Always filter data by authenticated user ID
+3. **Input Validation**: Validate and sanitize all user input
+4. **Security Logging**: Log security-relevant events for audit
+5. **Rate Limiting**: Client-side rate limiting for sensitive operations
+6. **Session Management**: Automatic timeout for inactive sessions
 
 ## Regular Security Tasks
+
 1. Review security logs monthly
-2. Check for any SECURITY DEFINER views/functions quarterly
-3. Audit RLS policies when schema changes
-4. Monitor for unusual access patterns
-5. Keep Supabase and dependencies updated
+2. Audit Firestore rules when schema changes
+3. Monitor for unusual access patterns
+4. Keep Firebase SDK and dependencies updated
+5. Review and rotate API keys periodically
 
 ## Emergency Procedures
+
 If a security issue is discovered:
-1. Immediately restrict access if necessary
-2. Create a migration to fix the issue
-3. Document the issue and resolution in this file
-4. Apply the fix to production ASAP
-5. Review logs for any exploitation attempts
+1. Immediately restrict access if necessary (disable Firebase rules)
+2. Document the issue and resolution
+3. Apply fixes to production ASAP
+4. Review logs for any exploitation attempts
+5. Notify affected users if data was compromised
+
+## Reporting Security Issues
+
+Please report security vulnerabilities responsibly by contacting the development team directly. Do not open public issues for security vulnerabilities.
