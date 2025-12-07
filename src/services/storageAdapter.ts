@@ -134,27 +134,32 @@ export class FirebaseStorageAdapter implements StorageAdapter {
     // Or fetch all groups for the user? Groups are linked to trips, not directly users in the schema above.
     // But we can query groups where trip_id IN [tripIds] (limit 10) or just fetch all groups for trips we found.
 
-    // Let's fetch all groups for the trips we found.
+    // Optimized: Fetch all groups for the user in a single query
+    // This avoids N+1 queries where we would otherwise fetch groups for each trip individually.
     const tripIds = querySnapshot.docs.map(d => d.id);
     let groupsByTripId: Record<string, any[]> = {};
 
     if (tripIds.length > 0) {
-      // Firestore 'in' query is limited to 10. If we have more, we need to batch or fetch differently.
-      // For now, let's assume < 10 trips or just fetch groups one by one if needed.
-      // Actually, let's just fetch groups for each trip in parallel.
+      logger.log(`🔍 [FirebaseStorageAdapter.getTrips] Fetching all groups for user...`);
+      const groupsQuery = query(
+        collection(db, 'groups'),
+        where('user_id', '==', user.uid)
+      );
 
-      await Promise.all(tripIds.map(async (tripId) => {
-        // Query by trip_id AND user_id to satisfy security rules
-        const gq = query(
-          collection(db, 'groups'),
-          where('trip_id', '==', tripId),
-          where('user_id', '==', user.uid)
-        );
-        logger.log(`🔍 [FirebaseStorageAdapter.getTrips] Fetching groups for trip ${tripId}...`);
-        const gSnap = await getDocs(gq);
-        logger.log(`✅ [FirebaseStorageAdapter.getTrips] Found ${gSnap.size} groups for trip ${tripId}`);
-        groupsByTripId[tripId] = gSnap.docs.map(d => d.data());
-      }));
+      const groupsSnapshot = await getDocs(groupsQuery);
+      logger.log(`✅ [FirebaseStorageAdapter.getTrips] Found ${groupsSnapshot.size} total groups`);
+
+      groupsSnapshot.forEach(doc => {
+        const groupData = doc.data();
+        const tripId = groupData.trip_id;
+
+        if (tripId) {
+          if (!groupsByTripId[tripId]) {
+            groupsByTripId[tripId] = [];
+          }
+          groupsByTripId[tripId].push(groupData);
+        }
+      });
     }
 
     querySnapshot.forEach((doc) => {

@@ -30,7 +30,7 @@ export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   }),
-  experimentalAutoDetectLongPolling: true
+  experimentalForceLongPolling: true
 });
 
 // Analytics may not be supported in all environments (e.g., SSR, some browsers)
