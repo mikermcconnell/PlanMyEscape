@@ -79,33 +79,37 @@ export class FirebaseStorageAdapter implements StorageAdapter {
     // Let's use top-level `groups` collection to match the previous relational model closer
     // and allow for easier querying if needed.
 
+    // Save groups using upsert pattern - only delete removed groups
     if (safeTrip.groups && safeTrip.groups.length > 0) {
-      // Delete existing groups for this trip?
-      // Firestore doesn't support "delete where" easily without reading first.
-      const groupsQ = query(
-        collection(db, 'groups'),
-        where('trip_id', '==', trip.id),
-        where('user_id', '==', user.uid)
-      );
-      const groupsSnapshot = await getDocs(groupsQ);
-      const deletePromises = groupsSnapshot.docs.map(doc => deleteDoc(doc.ref));
-      await Promise.all(deletePromises);
+      const currentGroupIds = new Set(safeTrip.groups.map(g => g.id));
 
-      // Add new groups
+      // Upsert all current groups
       const groupPromises = safeTrip.groups.map(group => {
         const groupRef = doc(db, 'groups', group.id);
         return setDoc(groupRef, {
           id: group.id,
           trip_id: trip.id,
-          user_id: user.uid, // Add user_id for security rules
+          user_id: user.uid,
           name: group.name,
           size: group.size || 1,
           contact_name: group.contactName || null,
           contact_email: group.contactEmail || null,
           color: group.color || null
-        });
+        }, { merge: true });
       });
       await Promise.all(groupPromises);
+
+      // Delete only groups that no longer exist
+      const groupsQ = query(
+        collection(db, 'groups'),
+        where('trip_id', '==', trip.id),
+        where('user_id', '==', user.uid)
+      );
+      const existingGroups = await getDocs(groupsQ);
+      const deletePromises = existingGroups.docs
+        .filter(doc => !currentGroupIds.has(doc.id))
+        .map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
     }
 
     return safeTrip;
