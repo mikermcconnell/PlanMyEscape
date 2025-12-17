@@ -96,3 +96,23 @@ When contributing, maintain the vibe:
 - **Think mobile** - If it doesn't work on phone, it doesn't work
 - **Be helpful** - Error messages should guide, not scold
 - **Stay camping-focused** - Every feature should make trips better
+## 🚨 Incident Log: Firestore Connection Blocking (Dec 2025)
+
+### Issue
+Authentication and data loading failed in production with `net::ERR_BLOCKED_BY_CLIENT` errors on Firestore network requests. The app would hang indefinitely on the loading screen.
+
+### Root Cause
+Vercel environment variables (`REACT_APP_FIREBASE_PROJECT_ID`, etc.) contained invisible trailing newline characters (`\n`). This likely happened during copy-paste into the Vercel dashboard. These newlines were injected into the Firestore connection URLs (e.g., `.../databases/(default)%0A`), causing the browser or firewall to block the malformed requests.
+
+### Fix
+1.  **Code Hardening:** Updated `firebaseConfig.ts` to explicitly `.trim()` all environment variables before using them in the Firebase configuration.
+    `	ypescript
+    const firebaseConfig = {
+      apiKey: process.env.REACT_APP_FIREBASE_API_KEY?.trim(),
+      // ...
+    };
+    `
+2.  **Infrastructure Cleanup:** Removed and re-added clean environment variables in Vercel using the CLI (avoiding PowerShell `echo` which adds CRLF).
+
+### Lesson Learned
+Always sanitize environment inputs in the code layer. Do not trust that the hosting platform or deployment pipeline will strip whitespace.

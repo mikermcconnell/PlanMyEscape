@@ -15,14 +15,6 @@ const firebaseConfig = {
   measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID?.trim()
 };
 
-// Debug config issues in production without exposing secrets
-console.log('[FirebaseConfig] Loaded config lengths:', {
-  apiKeyLen: firebaseConfig.apiKey?.length,
-  projectId: firebaseConfig.projectId, // Safe to log public project ID
-  projectIdLen: firebaseConfig.projectId?.length,
-  appIdLen: firebaseConfig.appId?.length,
-  bucketLen: firebaseConfig.storageBucket?.length
-});
 
 // Validate required configuration in development
 if (process.env.NODE_ENV === 'development') {
