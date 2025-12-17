@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
 // Firebase configuration from environment variables
@@ -26,10 +26,12 @@ if (process.env.NODE_ENV === 'development') {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+// Use memory cache to avoid Firebase Installations dependency issues
+// The persistentLocalCache with persistentMultipleTabManager requires Firebase Installations
+// which can fail with 400 INVALID_ARGUMENT if project setup has issues
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  }),
+  localCache: memoryLocalCache(),
   experimentalForceLongPolling: true
 });
 

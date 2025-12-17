@@ -157,7 +157,7 @@ export class FirebaseStorageAdapter implements StorageAdapter {
           if (!groupsByTripId[tripId]) {
             groupsByTripId[tripId] = [];
           }
-          groupsByTripId[tripId].push(groupData);
+          groupsByTripId[tripId]!.push(groupData);
         }
       });
     }
